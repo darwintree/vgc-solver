@@ -5,6 +5,7 @@
   "description": "Exact small-state 1v1 Pokemon endgame solver backed by @pkmn/sim",
   "type": "commonjs",
   "scripts": {
+    "benchmark": "node src/benchmark.js",
     "demo": "node src/demo.js",
     "test": "node --test"
   },

@@ -1,22 +1,76 @@
 'use strict';
 
-const {Battle, toID} = require('@pkmn/sim');
-const {BranchingPRNG, NeedRandom, FIXED_SEED} = require('./branching-prng');
+const {Battle, State, toID} = require('@pkmn/sim');
+const {BranchingPRNG, FIXED_SEED} = require('./branching-prng');
+const {installSimulatorOptimizations} = require('./simulator-optimizations');
+const {auditPPBattle, createPPTransitionCache, installTracker, intersectPPIntervals, isPPAuditToken, makeCacheKey, nativeMethodsAreUsable, ppValuesWithinIntervals, readOutputPP, setOutputPP, setOutputPPFromDelta, slotShape} = require('./pp-transition-cache');
+
+const nativeBattleToJSON = Battle.prototype.toJSON;
+const SERIALIZER_METHODS = Object.freeze([
+  'serializeBattle', 'serializeField', 'serializeSide', 'serializePokemon',
+  'serializeChoice', 'serializeActiveMove', 'serializeWithRefs',
+  'isActiveMove', 'isReferable', 'toRef', 'serialize',
+]);
+const nativeSerializerMethods = Object.freeze(Object.fromEntries(
+  SERIALIZER_METHODS.map(name => [name, State[name]])
+));
+
+function hasNativeSerializerMethods() {
+  return SERIALIZER_METHODS.every(name => State[name] === nativeSerializerMethods[name]);
+}
 
 function cloneJSON(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+// Match JSON.stringify's value normalization without serializing the complete
+// state. State.serializeWithRefs has already rejected unsupported object types.
+function normalizeJSON(value) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? (Object.is(value, -0) ? 0 : value) : null;
+  }
+  if (Array.isArray(value)) {
+    const result = [];
+    result.length = value.length;
+    for (let i = 0; i < value.length; i++) {
+      const normalized = Object.prototype.hasOwnProperty.call(value, i)
+        ? normalizeJSON(value[i]) : undefined;
+      result[i] = normalized === undefined ? null : normalized;
+    }
+    return result;
+  }
+  if (typeof value === 'object') {
+    // Build a detached plain graph. Defining __proto__ as an own data key
+    // preserves JSON.stringify semantics without mutating simulator objects.
+    const result = {};
+    for (const key of Object.keys(value)) {
+      const item = value[key];
+      if (item === undefined || typeof item === 'function') continue;
+      const normalized = normalizeJSON(item);
+      if (key === '__proto__') {
+        Object.defineProperty(result, key, {
+          value: normalized, enumerable: true, configurable: true, writable: true,
+        });
+      } else {
+        result[key] = normalized;
+      }
+    }
+    return result;
+  }
+  return undefined;
+}
+
 function stableStringify(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  const keys = Object.keys(value).sort();
+  if (Array.isArray(value)) return `[${value.map(item => stableStringify(item) ?? 'null').join(',')}]`;
+  const keys = Object.keys(value).filter(key => value[key] !== undefined).sort();
   return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
 }
 
 /** Remove history/PRNG data which must not distinguish otherwise equal states. */
 function canonicalizeSnapshot(raw) {
-  const state = cloneJSON(raw);
+  const state = {...raw};
   state.log = [];
   state.inputLog = [];
   state.messageLog = [];
@@ -31,11 +85,38 @@ function canonicalizeSnapshot(raw) {
 }
 
 function snapshotBattle(battle) {
-  return canonicalizeSnapshot(battle.toJSON());
+  // A custom serializer may retain arbitrary aliases or rely on different
+  // omission rules. Keep the established JSON fallback unless both native
+  // entry points are still the audited implementations.
+  const state = canonicalizeSnapshot(battle.toJSON());
+  if (battle.toJSON !== nativeBattleToJSON || !hasNativeSerializerMethods()) {
+    return cloneJSON(state);
+  }
+
+  // The native serializer creates a fresh graph except for Pokemon.set. Copy
+  // every set independently to preserve the old JSON roundtrip semantics,
+  // including splitting accidental aliases between Pokemon objects.
+  for (const side of state.sides || []) {
+    for (const pokemon of side.pokemon || []) {
+      const set = pokemon.set;
+      if (!set || typeof set !== 'object') continue;
+      pokemon.set = cloneJSON(set);
+    }
+  }
+  return normalizeJSON(state);
 }
 
 function restoreBattle(snapshot) {
-  return Battle.fromJSON(cloneJSON(snapshot));
+  // @pkmn/sim 0.10.11 reconstructs all mutable state except log and Pokemon.set.
+  // Detach those retained references; copying the entire snapshot duplicates its work.
+  return Battle.fromJSON({
+    ...snapshot,
+    log: snapshot.log.slice(),
+    sides: snapshot.sides.map(side => ({
+      ...side,
+      pokemon: side.pokemon.map(pokemon => ({...pokemon, set: cloneJSON(pokemon.set)})),
+    })),
+  });
 }
 
 function stateKey(snapshot) {
@@ -136,12 +217,57 @@ function terminalUtility(battle) {
 /**
  * Enumerate exactly the finite random calls made while resolving one turn.
  * Each replay starts from the same serialized Showdown state.
+ * Outcomes carry either a continuing snapshot or a terminal utility, plus probability.
  */
 function enumerateTurn(snapshot, p1Action, p2Action, options = {}) {
   const maxRuns = options.maxSimulatorRunsPerTransition ?? 100000;
+  const outcomeKey = options.outcomeKey ?? stateKey;
+  const ppCache = options.ppCache;
+  let ppEligible = false;
+  if (ppCache) {
+    // Cache lookup is after the audit. Without the solve-scoped token, audit
+    // this transition before consulting any existing template.
+    ppEligible = isPPAuditToken(options.ppAudit);
+    if (!ppEligible) {
+      const auditBattle = restoreBattle(snapshot);
+      ppEligible = nativeMethodsAreUsable(auditBattle);
+    }
+  }
+  const cacheKey = ppEligible ? makeCacheKey(snapshot, p1Action, p2Action, stateKey, ppCache) : null;
+  const inputShape = ppEligible ? slotShape(snapshot) : null;
+
+  if (ppEligible && cacheKey) {
+    const template = ppCache.templates.get(cacheKey);
+    if (template && template.inputShape === inputShape) {
+      const inputPP = readOutputPP(snapshot);
+      if (ppValuesWithinIntervals(inputPP, template.intervals)) {
+        const replayed = [];
+        let replayable = true;
+        for (const outcomeTemplate of template.outcomes) {
+          const outcome = outcomeTemplate.snapshot
+            ? {snapshot: cloneJSON(outcomeTemplate.snapshot)}
+            : {utility: outcomeTemplate.utility};
+          if (outcome.snapshot && !setOutputPPFromDelta(outcome.snapshot, inputPP, outcomeTemplate.deltas)) {
+            replayable = false;
+            break;
+          }
+          replayed.push({...outcome, probability: outcomeTemplate.probability});
+        }
+        if (replayable) {
+          ppCache.cacheHits++;
+          return {outcomes: replayed, simulatorRuns: 0, cacheHits: 1};
+        }
+      }
+      ppCache.rejected++;
+    }
+    ppCache.cacheMisses++;
+  }
+
   const pending = [{decisions: [], probability: 1}];
   const outcomes = new Map();
+  const templateBranches = [];
   let runs = 0;
+  let cacheSafe = ppEligible;
 
   while (pending.length) {
     if (++runs > maxRuns) {
@@ -150,33 +276,63 @@ function enumerateTurn(snapshot, p1Action, p2Action, options = {}) {
 
     const branch = pending.pop();
     const battle = restoreBattle(snapshot);
-    const prng = new BranchingPRNG(branch.decisions);
-    battle.prng = prng;
-
-    try {
-      battle.makeChoices(p1Action.command, p2Action.command);
-      if (prng.cursor !== branch.decisions.length) {
-        throw new Error('Random replay completed without consuming its full prefix');
-      }
-
-      const next = snapshotBattle(battle);
-      const key = stateKey(next);
-      const existing = outcomes.get(key);
-      if (existing) {
-        existing.probability += branch.probability;
-      } else {
-        outcomes.set(key, {snapshot: next, probability: branch.probability});
-      }
-    } catch (error) {
-      if (!(error instanceof NeedRandom)) throw error;
-      for (const alternative of error.alternatives) {
+    // Audit and install the PP accessors before simulator optimizations add
+    // their private wrappers; event identity remains untouched during replay.
+    const tracker = ppEligible ? installTracker(battle, true) : null;
+    if (ppCache && !tracker) cacheSafe = false;
+    installSimulatorOptimizations(battle, {eventPlan: options.eventPlan || null});
+    const prng = new BranchingPRNG(branch.decisions, 0, (alternatives, source) => {
+      for (let index = 1; index < alternatives.length; index++) {
+        const alternative = alternatives[index];
         const probability = branch.probability * alternative.probability;
         if (probability === 0) continue;
         pending.push({
-          decisions: [...branch.decisions, alternative.decision],
+          decisions: [...source.decisions, alternative.decision],
           probability,
         });
       }
+      branch.probability *= alternatives[0].probability;
+      return alternatives[0];
+    });
+    battle.prng = prng;
+
+    let utility;
+    let next;
+    let captured;
+    try {
+      battle.makeChoices(p1Action.command, p2Action.command);
+      if (prng.cursor !== prng.decisions.length) {
+        throw new Error('Random replay completed without consuming its full prefix');
+      }
+      utility = terminalUtility(battle);
+      if (tracker) tracker.enterSnapshot();
+      next = utility === null ? snapshotBattle(battle) : null;
+      if (tracker) {
+        captured = tracker.capture();
+        if (next && (slotShape(next) !== inputShape || !tracker.identityIntact())) tracker.markUnsafe();
+      }
+    } finally {
+      if (tracker && !tracker.finish()) cacheSafe = false;
+    }
+
+    if (ppCache && tracker && !tracker.safe) cacheSafe = false;
+    if (ppCache && tracker && captured) {
+      templateBranches.push({
+        snapshot: next,
+        utility,
+        probability: branch.probability,
+        intervals: captured.intervals,
+        deltas: captured.deltas,
+      });
+    }
+
+    const key = next ? outcomeKey(next) : `terminal:${utility}`;
+    const existing = outcomes.get(key);
+    if (existing) {
+      existing.probability += branch.probability;
+    } else {
+      const outcome = next ? {snapshot: next} : {utility};
+      outcomes.set(key, {...outcome, probability: branch.probability});
     }
   }
 
@@ -187,7 +343,54 @@ function enumerateTurn(snapshot, p1Action, p2Action, options = {}) {
   }
   for (const outcome of result) outcome.probability /= total;
 
-  return {outcomes: result, simulatorRuns: runs};
+  if (ppCache && cacheSafe && templateBranches.length === runs) {
+    const inputPP = readOutputPP(snapshot);
+    const slotCount = inputPP.length;
+    const intervals = Array.from({length: slotCount}, () => ({min: 0, max: Infinity}));
+    const grouped = new Map();
+    let templateValid = true;
+    for (const branch of templateBranches) {
+      if (!branch.intervals || branch.intervals.length !== slotCount ||
+          !branch.deltas || branch.deltas.length !== slotCount ||
+          !intersectPPIntervals(intervals, branch.intervals)) {
+        templateValid = false;
+        break;
+      }
+      const values = inputPP.map((value, index) => value - branch.deltas[index]);
+      if (values.some((value, index) => !Number.isSafeInteger(value) || value < 0 ||
+          !Number.isSafeInteger(branch.deltas[index]) || branch.deltas[index] < 0) ||
+          (branch.snapshot && readOutputPP(branch.snapshot).some((value, index) => value !== values[index]))) {
+        templateValid = false;
+        break;
+      }
+      const key = branch.snapshot ? outcomeKey(branch.snapshot) : `terminal:${branch.utility}`;
+      let outcome = grouped.get(key);
+      if (!outcome) {
+        outcome = branch.snapshot
+          ? {snapshot: branch.snapshot, guards: [], probability: 0}
+          : {utility: branch.utility, guards: [], probability: 0};
+        grouped.set(key, outcome);
+      }
+      outcome.probability += branch.probability;
+      outcome.guards.push(branch.deltas);
+    }
+    if (templateValid) {
+      const total = [...grouped.values()].reduce((sum, outcome) => sum + outcome.probability, 0);
+      for (const outcome of grouped.values()) {
+        outcome.probability /= total;
+        const deltas = outcome.guards[0] || Array(slotCount).fill(0);
+        if (outcome.guards.some(candidate => candidate.length !== deltas.length ||
+            candidate.some((value, index) => value !== deltas[index]))) {
+          templateValid = false;
+          break;
+        }
+        outcome.deltas = deltas;
+        delete outcome.guards;
+      }
+      if (templateValid) ppCache.templates.set(cacheKey, {inputShape, intervals, outcomes: [...grouped.values()]});
+    }
+  }
+  return {outcomes: result, simulatorRuns: runs, cacheHits: 0};
 }
 
 module.exports = {
@@ -200,5 +403,9 @@ module.exports = {
   setMovePP,
   snapshotBattle,
   stateKey,
+  canonicalizeSnapshot,
+  stableStringify,
   terminalUtility,
+  createPPTransitionCache,
+  auditPPBattle,
 };

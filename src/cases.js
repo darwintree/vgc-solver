@@ -93,12 +93,10 @@ function suckerPunchGame() {
 
   setHP(battle, 'p1', 1);
   setHP(battle, 'p2', 1);
-  for (const move of ['Sucker Punch', 'Knock Off']) setMovePP(battle, 'p1', move, 1);
-  for (const move of ['Protect', 'Tackle']) setMovePP(battle, 'p2', move, 1);
   refreshMoveRequest(battle);
   return {
     name: 'Sucker Punch / Knock Off vs Protect / attack',
-    expected: 'matching-pennies value = 0; both mix 50/50',
+    expected: 'maximum PP; value ≈ 0.6011',
     battle,
   };
 }
