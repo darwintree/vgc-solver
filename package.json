@@ -1,0 +1,17 @@
+{
+  "name": "pokemon-1v1-endgame-solver-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Exact small-state 1v1 Pokemon endgame solver backed by @pkmn/sim",
+  "type": "commonjs",
+  "scripts": {
+    "demo": "node src/demo.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@pkmn/sim": "0.10.11"
+  }
+}
