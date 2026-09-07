@@ -1,8 +1,8 @@
-import type {Battle, PRNG, PokemonSet} from '@pkmn/sim';
+import type {PRNG, PokemonSet} from '@pkmn/sim';
 import type {Mutable} from './helpers/types';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {Dex} from '@pkmn/sim';
+import {Battle, Dex, toID} from '@pkmn/sim';
 import {BranchingPRNG, NeedRandom} from '../src/branching-prng';
 import {assertSameDistribution, enumerateNative} from './helpers/distribution';
 import {installSimulatorOptimizations} from '../src/simulator-optimizations';
@@ -236,4 +236,77 @@ test('post-tail saturation preserves resisted and threshold-crossing damage', ()
   const crossing = compareDamage('Tackle', {species: 'Rhyhorn', ability: 'Rock Head'}, 20);
   assert.ok(crossing.optimized.simulatorRuns < crossing.native.simulatorRuns);
   assert.ok(crossing.optimized.outcomes.length > 1);
+});
+
+function contactBattleWithReserve(defense: Partial<PokemonSet> = {}) {
+  const battle = new Battle({
+    formatid: toID('gen9customgame'), seed: '1,2,3,4',
+    p1: {name: 'P1', team: [{species: 'Mew', moves: ['Tackle']}] as PokemonSet[]},
+    p2: {name: 'P2', team: [
+      {species: 'Garchomp', ...defense, moves: ['Splash']},
+      {species: 'Snorlax', moves: ['Splash']},
+    ] as PokemonSet[]},
+  });
+  battle.makeChoices('team 1', 'team 12');
+  setHP(battle, 'p2', 1);
+  refreshMoveRequest(battle);
+  return battle;
+}
+
+test('saturated contact damage preserves retaliation and complete surviving team state', () => {
+  for (const defense of [
+    {ability: 'Rough Skin'},
+    {item: 'Rocky Helmet'},
+    {ability: 'Rough Skin', item: 'Rocky Helmet'},
+  ]) {
+    const battle = contactBattleWithReserve(defense);
+    const snapshot = snapshotBattle(battle);
+    const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    assertSameDistribution(native, optimized);
+    assert.ok(optimized.outcomes.every(outcome => outcome.snapshot));
+    assert.ok(optimized.outcomes.every(outcome =>
+      outcome.snapshot.sides[0].pokemon[0].hp < snapshot.sides[0].pokemon[0].hp));
+    assert.ok(optimized.simulatorRuns < native.simulatorRuns);
+  }
+});
+
+test('custom raw damage observers retain their complete native distribution', () => {
+  const move = Dex.moves.get('tackle') as Mutable<ReturnType<typeof Dex.moves.get>>;
+  const original = move.onDamage;
+  move.onDamage = function(damage, target, source) {
+    source.hp = damage + 100;
+  };
+  try {
+    const snapshot = snapshotBattle(contactBattleWithReserve({ability: 'Rough Skin'}));
+    const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    assertSameDistribution(native, optimized);
+    assert.ok(optimized.outcomes.length > 1);
+  } finally {
+    if (original === undefined) delete move.onDamage;
+    else move.onDamage = original;
+  }
+});
+
+test('custom spread-hit wrappers retain native damage randomization', () => {
+  const battle = contactBattleWithReserve({ability: 'Rough Skin'});
+  const native = battle.actions.spreadMoveHit;
+  const randomizer = battle.randomizer;
+  battle.actions.spreadMoveHit = function(...args) {
+    return native.apply(this, args);
+  };
+  installSimulatorOptimizations(battle);
+  assert.equal(battle.randomizer, randomizer);
+});
+
+test('weather damage adjustment preserves the complete nonterminal roll distribution', () => {
+  const battle = attackBattle('Water Gun');
+  battle.field.setWeather('sunnyday', battle.p1.active[0]);
+  const snapshot = snapshotBattle(battle);
+  const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+  const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+  assertSameDistribution(native, optimized);
+  assert.ok(optimized.outcomes.every(outcome => outcome.snapshot));
+  assert.ok(optimized.simulatorRuns < native.simulatorRuns);
 });

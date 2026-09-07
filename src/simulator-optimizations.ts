@@ -136,6 +136,7 @@ function installDamageOptimization(battle, eventPlan = null) {
   const actionPrototype = NativeBattleActions.prototype;
   if (!actions || actions.constructor.prototype !== actionPrototype ||
       actions.getSpreadDamage !== actionPrototype.getSpreadDamage ||
+      actions.spreadMoveHit !== actionPrototype.spreadMoveHit ||
       actions.getDamage !== actionPrototype.getDamage ||
       actions.modifyDamage !== actionPrototype.modifyDamage) return false;
 
@@ -181,6 +182,7 @@ function installDamageOptimization(battle, eventPlan = null) {
         battle.clampIntRange !== nativeBattle.clampIntRange ||
         battle.singleEvent !== nativeBattle.singleEvent ||
         battle.modify !== nativeBattle.modify ||
+        actions.spreadMoveHit !== actionPrototype.spreadMoveHit ||
         battle.suppressingAbility !== nativeBattle.suppressingAbility ||
         battle.dex.getEffectiveness !== Dex.ModdedDex.prototype.getEffectiveness ||
         target.damage !== nativeBattle.pokemonDamage ||
@@ -201,14 +203,16 @@ function installDamageOptimization(battle, eventPlan = null) {
     // These are all post-randomizer observations or transformations. A
     // nonempty list means a callback may inspect a different raw value or
     // mutate state during one of the probes, so the native path is required.
+    // WeatherModifyDamage has already run before randomizer. DamagingHit
+    // only receives the actual HP loss returned by spreadDamage, after the
+    // saturation represented by our key; its callbacks cannot see the raw
+    // roll. Both events still execute natively, including contact retaliation.
     return noHandlers('ModifySTAB', source, target) &&
       noHandlers('Type', source, null) &&
       noHandlers('Type', target, null) &&
       noHandlers('Effectiveness', target, null) &&
-      noHandlers('WeatherModifyDamage', source, target) &&
       noHandlers('ModifyDamage', source, target) &&
-      noHandlers('Damage', target, source) &&
-      noHandlers('DamagingHit', target, source);
+      noHandlers('Damage', target, source);
   };
 
   const optimizedRandomizer = function(baseDamage) {
