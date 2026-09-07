@@ -99,6 +99,46 @@ test('eager expansion stops on a pure security certificate and preserves unknown
   assert.equal(result.approximate, true, 'unexpanded cells prevent an exact certificate');
 });
 
+test('deep eager nodes stop at the scheduler-width threshold', () => {
+  let transitions = 0;
+  const adapter = toyAdapter({
+    actions: {
+      root: ['enter'],
+      middle: ['enter'],
+      leaf: ['winning-row', 'unknown-row'],
+    },
+    opponentActions: {
+      root: ['wait'],
+      middle: ['wait'],
+      leaf: ['c0', 'c1'],
+    },
+    transitions: {
+      'root:enter:wait': snapshot('middle'),
+      'middle:enter:wait': snapshot('leaf'),
+      'leaf:winning-row:c0': utility(1),
+      'leaf:winning-row:c1': utility(1),
+    },
+  });
+  const originalEnumerate = adapter.enumerateTurn;
+  adapter.enumerateTurn = (...args) => {
+    transitions++;
+    return originalEnumerate(...args);
+  };
+
+  const result = new BoundedSolver({
+    adapter,
+    lazyCells: false,
+    tolerance: 0.02,
+    warmStartRoot: false,
+  }).solve('root');
+
+  assert.equal(result.converged, true);
+  assert.ok(result.lowerBound >= 1 - 1e-9);
+  assert.ok(result.upperBound <= 1 + 1e-9);
+  assert.equal(transitions, 4, 'two path transitions plus the two leaf cells');
+  assert.equal(result.approximate, true, 'the leaf retains two unknown cells');
+});
+
 test('returns honest bounds when the node limit blocks an unresolved child', () => {
   const adapter = toyAdapter({
     actions: {root: ['wait']},

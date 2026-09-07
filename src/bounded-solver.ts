@@ -83,6 +83,7 @@ export interface SearchNode {
 const DEFAULT_LOWER = -1;
 const DEFAULT_UPPER = 1;
 const EPSILON = 1e-12;
+const EAGER_CERTIFICATE_WIDTH = 1e-9;
 
 const nativeAdapter = Object.freeze({
   enumerateTurn,
@@ -422,7 +423,6 @@ class BoundedSearch {
     }
     this._initializeNode(node);
     if (!this.options.lazyCells) {
-      const canStopEarly = node === this.rootNode;
       for (let i = 0; i < node.actions1.length; i++) {
         for (let j = 0; j < node.actions2.length; j++) {
           this._expandCell(node, i, j);
@@ -430,10 +430,8 @@ class BoundedSearch {
           // generated matrix entries certify its value. Unknown cells retain
           // [-1, 1] and remain available to the normal frontier selector if a
           // parent later needs a tighter child interval.
-          if (canStopEarly) {
-            this._refresh(node);
-            if (this._hasSufficientCertificate(node)) return;
-          }
+          this._backupFrom([node]);
+          if (this._hasSufficientCertificate(node)) return;
           if (this._timedOut()) return;
         }
       }
@@ -441,23 +439,20 @@ class BoundedSearch {
   }
 
   /**
-   * Return whether the current node bounds are sufficient to stop an eager
-   * cell pass. These are all safe certificates: the matrix interval already
-   * encloses the true value, pure policies provide additional valid bounds,
-   * and +/-1 are the global utility extrema.
+   * Return whether the current node's refreshed interval is narrow enough to
+   * stop an eager cell pass. The interval itself remains the only certificate
+   * used here; convergence is still decided separately at the root.
    */
   _hasSufficientCertificate(node: SearchNode) {
     if (node.terminal !== null) return true;
-    if (node !== this.rootNode) return false;
     if (!node.initialized || !node.lowerSolution || !node.upperSolution) return false;
-    if (node.upper - node.lower <= this.options.tolerance + EPSILON) return true;
-    if (node.lower >= DEFAULT_UPPER - EPSILON || node.upper <= DEFAULT_LOWER + EPSILON) return true;
-
-    const pureLower = Math.max(...node.cells.map(row =>
-      Math.min(...row.map(cell => cell.lower))));
-    const pureUpper = Math.min(...node.cells[0].map((_, j) =>
-      Math.max(...node.cells.map(row => row[j].upper))));
-    return pureLower >= pureUpper - EPSILON;
+    // The root may use the requested bounded tolerance. A child uses the
+    // tighter scheduler threshold so its remaining uncertainty falls below
+    // the frontier selector's existing 1e-9 gap cutoff.
+    const threshold = node === this.rootNode
+      ? this.options.tolerance + EPSILON
+      : EAGER_CERTIFICATE_WIDTH;
+    return node.upper - node.lower <= threshold;
   }
 
   _expandCell(node: SearchNode, i, j) {

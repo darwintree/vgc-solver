@@ -68,3 +68,18 @@ Reason:
 这些条件分别是由矩阵单调性、纯策略安全证书和效用范围直接推出的充分条件；停止只减少尚无助于根证书的转移生成，不改变已生成格或未知格的界。保留根的完整矩阵 shape，未生成格仍可由后续 frontier 补生成。代价是根节点每个 eager cell 都可能增加一次矩阵 backup，需用 expandedCells、matrixSolves 和基准 search 时间验证是否值得。
 
 Follow-up: 需要在混合策略、未知格、循环、节点限额和终局 toy adapter 上验证区间包含 exact，并在 Champions 基准窗口中比较转移数量与搜索耗时。
+
+### 6. 非根节点的 eager 停止阈值
+
+Type: unresolved-implementation-decision
+
+Context:
+第一版只允许根节点按 bounded tolerance 提前结束；尝试将同一 `.02` 局部证书用于所有节点时，随机 DAG 出现实际停滞：根仍有较宽区间，但 selector 沿一个已经局部收窄、内部仍保留较宽未知格的 child 路径结束。用户要求继续研究通用节点剪枝，但不改变 convergence 合同。
+
+Decision:
+第二候选保留根节点使用用户 tolerance 的提前结束；非根节点只有在实际上下界宽度不超过 `1e-9` 时结束 eager cell pass。删除 pure row/column 与全局 `+1/-1` 的额外提前门槛，也不使用用户的 `.02` tolerance 作为局部 child 停止阈值。`converged` 仍只由根的原 tolerance 判断。
+
+Reason:
+根保留 `.02` 可继续减少 Champions 根层工作；非根 `1e-9` 与现有 frontier selector 的 child-gap cutoff 对齐，该节点对父节点的未证实收益质量至多约 `1e-9`，远低于 bounded tolerance。每个 cell 后必须通过 `_backupFrom` 传播，而不是只刷新当前节点；否则后续外层 backup 看不到端点已在展开期间变化，深层祖先会保留 stale 区间。适用性仍需用深层混合策略、共享后继、循环和节点限额 toy 图验证。
+
+Follow-up: 暂不在主代理的性能测量窗口运行测试；测量后比较根-only 版本与此版本的 expandedCells、search 时间和全套正确性。
