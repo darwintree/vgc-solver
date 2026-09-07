@@ -35,11 +35,27 @@ function effectOrderContext(state) {
 }
 
 function jsonStringifyMemo(state, context) {
-  return JSON.stringify(state, function replacer(key, value) {
-    if (key !== 'effectOrder' || typeof value !== 'number') return value;
-    if (this === state) return context.next;
-    return value === 0 ? 0 : context.rank.get(value);
-  });
+  // Copy only paths containing live order counters, then let native JSON
+  // serialize the graph without calling a JS replacer for every property.
+  function normalize(value) {
+    if (!value || typeof value !== 'object') return value;
+    let result = value;
+    for (const key of Object.keys(value)) {
+      const child = value[key];
+      let next = child;
+      if (key === 'effectOrder' && typeof child === 'number') {
+        if (value === state) next = context.next;
+        else next = child === 0 ? 0 : context.rank.get(child);
+      } else {
+        next = normalize(child);
+      }
+      if (next === child) continue;
+      if (result === value) result = Array.isArray(value) ? value.slice() : {...value};
+      Object.defineProperty(result, key, {value: next, enumerable: true, configurable: true, writable: true});
+    }
+    return result;
+  }
+  return JSON.stringify(normalize(state));
 }
 
 function privateSnapshotKey(snapshot) {

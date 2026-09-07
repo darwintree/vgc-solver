@@ -235,7 +235,7 @@ test('private memo key normalizes only relative live effect order', {concurrency
   }
 });
 
-test('JSON replacer preserves strings, escaped keys, arrays, and undefined slots', {concurrency: false}, () => {
+test('private key preserves strings, escaped keys, arrays, and undefined slots', {concurrency: false}, () => {
   const first = {
     effectOrder: 20,
     live: {effectOrder: 3},
@@ -260,6 +260,24 @@ test('JSON replacer preserves strings, escaped keys, arrays, and undefined slots
   assert.match(encoded, /"array":\[null/);
   assert.match(encoded, /effectOrder: 999/);
   assert.match(encoded, /"foo\\"effectOrder":123/);
+});
+
+test('relative-order serialization preserves frozen graphs and own __proto__ paths', () => {
+  const snapshot = JSON.parse('{"effectOrder":20,"__proto__":{"effectOrder":7},"array":[{"effectOrder":2}],"zero":{"effectOrder":0}}');
+  const before = JSON.stringify(snapshot);
+  function freeze(value) {
+    if (!value || typeof value !== 'object') return;
+    Object.values(value).forEach(freeze);
+    Object.freeze(value);
+  }
+  freeze(snapshot);
+  const encoded = privateSnapshotKey(snapshot);
+  const result = JSON.parse(encoded.slice('memo:relative-effect-order:'.length));
+  assert.equal(result.effectOrder, 3);
+  assert.equal(result.__proto__.effectOrder, 2);
+  assert.equal(result.array[0].effectOrder, 1);
+  assert.equal(result.zero.effectOrder, 0);
+  assert.equal(JSON.stringify(snapshot), before);
 });
 
 test('one solver re-audits a reused instance and separates exact keys', {concurrency: false}, () => {

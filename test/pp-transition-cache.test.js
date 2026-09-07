@@ -9,7 +9,64 @@ const {
   snapshotBattle,
   stateKey,
 } = require('../src/showdown-adapter');
-const {assertSameDistribution} = require('./helpers/distribution');
+const {assertSameDistribution, enumerateNative} = require('./helpers/distribution');
+const {suckerPunchOHKOTwoHKOGame} = require('../src/cases');
+const {ppBaseKey} = require('../src/pp-transition-cache');
+
+test('full-PP Tackle/Tackle root preserves every native successor and probability', () => {
+  const snapshot = snapshotBattle(suckerPunchOHKOTwoHKOGame().battle);
+  const action = {command: 'move 2'};
+  const native = enumerateNative(snapshot, action, action);
+  const cache = createPPTransitionCache();
+  const options = {ppCache: cache};
+  const computed = enumerateTurn(snapshot, action, action, options);
+  const replayed = enumerateTurn(snapshot, action, action, options);
+  assert.ok(computed.outcomes.filter(outcome => outcome.snapshot).length > 1);
+  assert.equal(replayed.cacheHits, 1);
+  assertSameDistribution(native, computed);
+  assertSameDistribution(native, replayed);
+});
+
+test('PP key buckets only move-slot PP without changing the snapshot', () => {
+  const snapshot = snapshotBattle(createBattle(
+    {species: 'Mew', moves: ['splash', 'protect']},
+    {species: 'Snorlax', moves: ['splash', 'protect']},
+  ));
+  snapshot.sides[0].pokemon[0].baseMoveSlots = [{id: 'splash', pp: 0}];
+  snapshot.sides[0].pokemon[0].volatiles.probe = {pp: 23};
+  const before = JSON.stringify(snapshot);
+  const expected = JSON.parse(before);
+  for (const side of expected.sides) {
+    for (const pokemon of side.pokemon) {
+      for (const name of ['moveSlots', 'baseMoveSlots']) {
+        if (!Array.isArray(pokemon[name])) continue;
+        for (const slot of pokemon[name]) slot.pp = slot.pp > 0 ? 1 : 0;
+      }
+    }
+  }
+  assert.equal(ppBaseKey(snapshot), JSON.stringify(expected));
+  assert.equal(JSON.stringify(snapshot), before);
+});
+
+test('PP template construction keys each continuing branch once and preserves the distribution', () => {
+  const snapshot = snapshotBattle(createBattle(
+    {species: 'Snorlax', moves: ['tackle']},
+    {species: 'Mew', moves: ['splash']},
+  ));
+  const action = {command: 'move 1'};
+  const cache = createPPTransitionCache();
+  let keyCalls = 0;
+  const result = enumerateTurn(snapshot, action, action, {
+    ppCache: cache,
+    outcomeKey(next) { keyCalls++; return stateKey(next); },
+  });
+  assert.equal(cache.templates.size, 1);
+  assert.equal(keyCalls, result.simulatorRuns);
+  const candidate = withPP(snapshot, 0, 0, 0, 3);
+  const cached = enumerateTurn(candidate, action, action, {ppCache: cache});
+  assert.equal(cached.cacheHits, 1);
+  assertSameDistribution(enumerateTurn(candidate, action, action), cached);
+});
 
 function withPP(snapshot, sideIndex, pokemonIndex, slotIndex, pp) {
   const copy = JSON.parse(JSON.stringify(snapshot));

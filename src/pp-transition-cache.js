@@ -3,8 +3,6 @@
 const {Pokemon, Side} = require('@pkmn/sim');
 const {auditNativeRules} = require('./native-rules');
 
-function cloneJSON(value) { return JSON.parse(JSON.stringify(value)); }
-
 const NATIVE_DEDUCT_PP = Pokemon.prototype.deductPP;
 const NATIVE_GET_MOVES = Pokemon.prototype.getMoves;
 const NATIVE_GET_MOVE_DATA = Pokemon.prototype.getMoveData;
@@ -55,17 +53,25 @@ function slotShape(snapshot) {
 }
 
 function ppBaseKey(snapshot, stateKey) {
-  const copy = cloneJSON(snapshot);
-  walkPokemon(copy, pokemon => {
-    for (const slots of [pokemon.moveSlots, pokemon.baseMoveSlots]) {
-      if (!Array.isArray(slots)) continue;
-      for (const slot of slots) slot.pp = ppBucket(slot.pp);
-    }
-  });
+  // Only PP slots change. Snapshot graphs are already JSON-normalized, so
+  // unrelated subtrees can be read directly by the serializer.
+  const copy = canonicalizePPKey(snapshot);
+  if (snapshot.sides) copy.sides = snapshot.sides.map(side => ({
+    ...side,
+    pokemon: side.pokemon?.map(pokemon => {
+      const result = {...pokemon};
+      for (const name of ['moveSlots', 'baseMoveSlots']) {
+        if (Array.isArray(pokemon[name])) {
+          result[name] = pokemon[name].map(slot => ({...slot, pp: ppBucket(slot.pp)}));
+        }
+      }
+      return result;
+    }),
+  }));
   // PP keys are private and may conservatively miss when property insertion
   // order differs. Native JSON avoids the sorted-replacer callback cost; the
   // public state key remains unchanged and continues to sort properties.
-  return JSON.stringify(canonicalizePPKey(copy));
+  return JSON.stringify(copy);
 }
 
 function actionCommand(action) {

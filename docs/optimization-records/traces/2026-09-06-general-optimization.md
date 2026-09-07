@@ -148,4 +148,4 @@ Reason:
 不为未证明的整体收益增加序列化契约假设。当前主要成本仍是模拟器事件处理和对象恢复；进一步改变这些行为需要新的语义证据。
 
 Follow-up:
-最终基准、回归证据及更大对局边界见 docs/general-performance.md。
+最终基准、回归证据及更大对局边界见 docs/optimization-records/general-performance.md。

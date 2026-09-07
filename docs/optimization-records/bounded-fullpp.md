@@ -1,4 +1,6 @@
-# 有界搜索说明与满 PP 验收
+# 有界搜索：case 3–5 满 PP 验收记录
+
+本文保留 2026-09-06 当轮算法说明、配置与验收数据，不作为当前实现的唯一说明。当前方法论与具体推演见[有界搜索技术](../optimization-techniques/bounded-search.md)，运行口径见 [benchmark 指南](../benchmarking.md)。
 
 有界求解器返回的是期望效用的安全区间 `[lowerBound, upperBound]`，而不是把未搜索部分当成某个猜测值。终局效用固定在 `[-1, 1]`；尚未展开的后继先使用 `[-1, 1]`，已知的随机后继按原生概率加权。每个行动矩阵分别求下界矩阵和上界矩阵，再用零和矩阵值更新状态区间。因此返回的 `value` 是区间中点，`valueErrorBound` 是区间宽度的一半。
 
@@ -22,7 +24,7 @@ node src/benchmark.js --solver bounded --case sucker-punch-5 --workers 9 --warmu
 
 ## 满 PP 结果
 
-数据保存在 [bounded-fullpp.json](benchmarks/bounded-fullpp.json)。所有 15 次正式 run 都通过 `worker` backend 并收敛，输入 PP 为：case 3/4 的 P1 `[8, 32, 16]`、P2 `[16, 56, 8]`；case 5 的 P1 `[8, 32, 16, 16]`、P2 `[16, 56, 8]`。时间单位为毫秒；`total` 包含 prepare，`search` 是区间搜索本身。
+数据保存在 [bounded-fullpp.json](data/bounded-fullpp.json)。所有 15 次正式 run 都通过 `worker` backend 并收敛，输入 PP 为：case 3/4 的 P1 `[8, 32, 16]`、P2 `[16, 56, 8]`；case 5 的 P1 `[8, 32, 16, 16]`、P2 `[16, 56, 8]`。时间单位为毫秒；`total` 包含 prepare，`search` 是区间搜索本身。
 
 | 局面 | 根区间 `[lower, upper]` | 中点 `value` | total min / median / max | search min / median / max | prepare min / median / max |
 | --- | --- | --- | --- | --- | --- |

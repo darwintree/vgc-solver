@@ -316,8 +316,10 @@ function enumerateTurn(snapshot, p1Action, p2Action, options = {}) {
     }
 
     if (ppCache && tracker && !tracker.safe) cacheSafe = false;
+    const key = next ? outcomeKey(next) : `terminal:${utility}`;
     if (ppCache && tracker && captured) {
       templateBranches.push({
+        key,
         snapshot: next,
         utility,
         probability: branch.probability,
@@ -326,7 +328,6 @@ function enumerateTurn(snapshot, p1Action, p2Action, options = {}) {
       });
     }
 
-    const key = next ? outcomeKey(next) : `terminal:${utility}`;
     const existing = outcomes.get(key);
     if (existing) {
       existing.probability += branch.probability;
@@ -363,7 +364,7 @@ function enumerateTurn(snapshot, p1Action, p2Action, options = {}) {
         templateValid = false;
         break;
       }
-      const key = branch.snapshot ? outcomeKey(branch.snapshot) : `terminal:${branch.utility}`;
+      const key = branch.key;
       let outcome = grouped.get(key);
       if (!outcome) {
         outcome = branch.snapshot

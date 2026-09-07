@@ -1,0 +1,386 @@
+{
+  "date": "2026-09-07",
+  "environment": {
+    "node": "v25.8.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Pro",
+    "logicalCPUs": 10,
+    "memoryGiB": 16,
+    "note": "Other applications were active; baseline and optimized benchmarks ran sequentially, not on an otherwise idle system."
+  },
+  "baseCommit": "8c36db9",
+  "optimizedChange": "branch outcome key reuse, copy-on-write PP and relative-effect-order keys",
+  "configuration": {
+    "solver": "bounded",
+    "fixture": "sucker-punch-6",
+    "pp": [
+      [
+        8,
+        56,
+        16
+      ],
+      [
+        16,
+        56,
+        8
+      ]
+    ],
+    "tolerance": 0.02,
+    "workers": 9,
+    "batchSize": 8,
+    "lazyCells": false,
+    "selectionPolicy": "auto",
+    "warmup": 3,
+    "runs": 5,
+    "measurementSearchBudgetMs": 60000,
+    "targetSearchMs": 3000
+  },
+  "identicalNonTimingResults": true,
+  "sharedSearchCounts": {
+    "expandedStates": 1123,
+    "solvedStates": 13768,
+    "discoveredStates": 13768,
+    "transitionCalls": 9834,
+    "simulatorRuns": 35578,
+    "memoHits": 39045,
+    "ppCacheHits": 5372,
+    "backupUpdates": 15139,
+    "expandedCells": 9834,
+    "matrixSolves": 14107,
+    "nodes": 13768
+  },
+  "sharedResult": {
+    "value": 0.6371770140759139,
+    "lowerBound": 0.6273551937263693,
+    "upperBound": 0.6469988344254585,
+    "valueErrorBound": 0.009821820349544597,
+    "converged": true,
+    "approximate": true,
+    "isApproximate": true,
+    "exact": false,
+    "stopReason": null,
+    "p1Strategy": [
+      {
+        "action": "Sucker Punch",
+        "probability": 0.7929751077134508
+      },
+      {
+        "action": "Tackle",
+        "probability": 0
+      },
+      {
+        "action": "Earthquake",
+        "probability": 0.20702489228654922
+      }
+    ],
+    "p2Strategy": [
+      {
+        "action": "Protect",
+        "probability": 0.9753870852715335
+      },
+      {
+        "action": "Tackle",
+        "probability": 0
+      },
+      {
+        "action": "Hyper Beam",
+        "probability": 0.024612914728466474
+      }
+    ],
+    "payoffMatrix": [
+      [
+        0.6320613644989711,
+        1,
+        1
+      ],
+      [
+        0.6576938673438031,
+        -0.02083333337213844,
+        -0.8694148938159287
+      ],
+      [
+        0.657856564973357,
+        0.9583333332557231,
+        -0.8000000002793968
+      ]
+    ],
+    "payoffMatrixLower": [
+      [
+        0.6260315250081654,
+        1,
+        1
+      ],
+      [
+        0.631875336192488,
+        -1,
+        -0.9388297873524613
+      ],
+      [
+        0.632425291494816,
+        0.9583333332557231,
+        -0.8000000002793968
+      ]
+    ],
+    "payoffMatrixUpper": [
+      [
+        0.6380912039897768,
+        1,
+        1
+      ],
+      [
+        0.6835123984951181,
+        0.9583333332557231,
+        -0.8000000002793963
+      ],
+      [
+        0.6832878384518979,
+        0.9583333332557231,
+        -0.8000000002793968
+      ]
+    ],
+    "payoffMatrixIntervals": [
+      [
+        {
+          "lowerBound": 0.6260315250081654,
+          "upperBound": 0.6380912039897768
+        },
+        {
+          "lowerBound": 1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": 1,
+          "upperBound": 1
+        }
+      ],
+      [
+        {
+          "lowerBound": 0.631875336192488,
+          "upperBound": 0.6835123984951181
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 0.9583333332557231
+        },
+        {
+          "lowerBound": -0.9388297873524613,
+          "upperBound": -0.8000000002793963
+        }
+      ],
+      [
+        {
+          "lowerBound": 0.632425291494816,
+          "upperBound": 0.6832878384518979
+        },
+        {
+          "lowerBound": 0.9583333332557231,
+          "upperBound": 0.9583333332557231
+        },
+        {
+          "lowerBound": -0.8000000002793968,
+          "upperBound": -0.8000000002793968
+        }
+      ]
+    ],
+    "backend": "worker"
+  },
+  "baseline": {
+    "poolReadyMs": 2085.501208,
+    "timing": {
+      "elapsed": {
+        "minMs": 28237.499624999997,
+        "medianMs": 35853.41741600001,
+        "maxMs": 37151.89308300003
+      },
+      "elapsedSearch": {
+        "minMs": 22538.323124999995,
+        "medianMs": 30892.18279099997,
+        "maxMs": 33624.80541699997
+      },
+      "prepare": {
+        "minMs": 3486.2240839999868,
+        "medianMs": 4909.867333000002,
+        "maxMs": 7412.220499999996
+      },
+      "convergedElapsed": {
+        "minMs": 28237.499624999997,
+        "medianMs": 35853.41741600001,
+        "maxMs": 37151.89308300003
+      },
+      "convergedSearch": {
+        "minMs": 22538.323124999995,
+        "medianMs": 30892.18279099997,
+        "maxMs": 33624.80541699997
+      }
+    },
+    "completedRuns": 5,
+    "withinTargetRuns": 0,
+    "samples": [
+      {
+        "totalMs": 36407.732709,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 5083.353249999986,
+        "searchMs": 31309.212624999986
+      },
+      {
+        "totalMs": 35853.41741600001,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 4909.867333000002,
+        "searchMs": 30892.18279099997
+      },
+      {
+        "totalMs": 29956.38191699999,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 7412.220499999996,
+        "searchMs": 22538.323124999995
+      },
+      {
+        "totalMs": 37151.89308300003,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 3524.622457999969,
+        "searchMs": 33624.80541699997
+      },
+      {
+        "totalMs": 28237.499624999997,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 3486.2240839999868,
+        "searchMs": 24750.721625000006
+      }
+    ],
+    "poolMetrics": {
+      "dispatched": 63561,
+      "completed": 63561,
+      "peakBusy": 9,
+      "busyMs": 871204.3000600064,
+      "peakQueue": 1,
+      "routedDispatches": 63561,
+      "batches": 0,
+      "batchedJobs": 0
+    }
+  },
+  "optimized": {
+    "poolReadyMs": 1271.777917,
+    "timing": {
+      "elapsed": {
+        "minMs": 27664.511708000005,
+        "medianMs": 27930.878916999995,
+        "maxMs": 33594.59916699999
+      },
+      "elapsedSearch": {
+        "minMs": 19858.10029099998,
+        "medianMs": 23656.155874999997,
+        "maxMs": 27025.092042000004
+      },
+      "prepare": {
+        "minMs": 4273.439290999988,
+        "medianMs": 5761.174625,
+        "maxMs": 8358.486250000002
+      },
+      "convergedElapsed": {
+        "minMs": 27664.511708000005,
+        "medianMs": 27930.878916999995,
+        "maxMs": 33594.59916699999
+      },
+      "convergedSearch": {
+        "minMs": 19858.10029099998,
+        "medianMs": 23656.155874999997,
+        "maxMs": 27025.092042000004
+      }
+    },
+    "completedRuns": 5,
+    "withinTargetRuns": 0,
+    "samples": [
+      {
+        "totalMs": 32788.588625000004,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 5761.174625,
+        "searchMs": 27025.092042000004
+      },
+      {
+        "totalMs": 33594.59916699999,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 8358.486250000002,
+        "searchMs": 25230.561874999985
+      },
+      {
+        "totalMs": 27930.878916999995,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 4273.439290999988,
+        "searchMs": 23656.155874999997
+      },
+      {
+        "totalMs": 27715.098790999997,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 5695.369792000012,
+        "searchMs": 22017.702375000023
+      },
+      {
+        "totalMs": 27664.511708000005,
+        "backend": "worker",
+        "value": 0.6371770140759139,
+        "lowerBound": 0.6273551937263693,
+        "upperBound": 0.6469988344254585,
+        "valueErrorBound": 0.009821820349544597,
+        "converged": true,
+        "prepareMs": 7799.8943750000035,
+        "searchMs": 19858.10029099998
+      }
+    ],
+    "poolMetrics": {
+      "dispatched": 78672,
+      "completed": 78672,
+      "peakBusy": 9,
+      "busyMs": 495010.2830839958,
+      "peakQueue": 1,
+      "routedDispatches": 78672,
+      "batches": 0,
+      "batchedJobs": 0
+    }
+  }
+}
