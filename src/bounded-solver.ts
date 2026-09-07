@@ -13,6 +13,7 @@ import {createPPTransitionCache, auditPPBattle} from './pp-transition-cache';
 import {createTurnCursor, type TransitionCursor} from './progressive-transition';
 import {createEventPlan} from './event-plan';
 import {auditNativeRules} from './native-rules';
+import {createTerminalEnvelope} from './terminal-envelope';
 
 export interface BoundedAdapter {
   // Custom adapters may use primitive state IDs and action IDs.
@@ -126,6 +127,7 @@ function createStats() {
     matrixSolves: 0,
     searchMs: 0,
     prepareMs: 0,
+    terminalEnvelopes: 0,
   };
 }
 
@@ -155,6 +157,7 @@ class BoundedSearch {
   declare proofTurn: number;
   declare autoJoint: boolean;
   declare rootNode: SearchNode | null;
+  declare terminalEnvelope: ReturnType<typeof createTerminalEnvelope>;
 
   constructor(options: BoundedOptions = {}) {
     this.options = {
@@ -197,6 +200,7 @@ class BoundedSearch {
     this.proofTurn = 0;
     this.autoJoint = false;
     this.rootNode = null;
+    this.terminalEnvelope = null;
   }
 
   /** Solve a battle, returning a certified interval around the value. */
@@ -210,6 +214,7 @@ class BoundedSearch {
     let nativeAudit;
     if (isNative) {
       nativeAudit = auditNativeRules(battle);
+      this.terminalEnvelope = createTerminalEnvelope(battle, nativeAudit);
       this.memoStateKey = createMemoStateKey(battle, stateKey, nativeAudit);
       this.ppCache = createPPTransitionCache({admitOnSecondUse: true});
       this.ppAudit = auditPPBattle(battle, nativeAudit);
@@ -369,12 +374,17 @@ class BoundedSearch {
     if (!node.actions1.length || !node.actions2.length) {
       throw new Error('BoundedSolver requires at least one legal action per player');
     }
-    node.cells = Array.from({length: node.actions1.length}, () =>
-      Array.from({length: node.actions2.length}, () => ({
-        outcomes: null,
-        lower: DEFAULT_LOWER,
-        upper: DEFAULT_UPPER,
-      })));
+    node.cells = Array.from({length: node.actions1.length}, (_, i) =>
+      Array.from({length: node.actions2.length}, (_, j) => {
+        const envelope = this.terminalEnvelope?.(node.snapshot,
+          node.actions1[i] as Action, node.actions2[j] as Action, this.deadline);
+        if (envelope) this.stats.terminalEnvelopes++;
+        return {
+          outcomes: null,
+          lower: envelope?.lower ?? DEFAULT_LOWER,
+          upper: envelope?.upper ?? DEFAULT_UPPER,
+        };
+      }));
     node.initialized = true;
     this.stats.expandedStates++;
   }
