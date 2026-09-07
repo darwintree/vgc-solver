@@ -602,6 +602,33 @@ class BoundedSearch {
         }
         return selected;
       };
+      const canExpandCell = cell => {
+        if (cell.upper - cell.lower <= 1e-9) return false;
+        if (!cell.outcomes) return true;
+        return cell.outcomes.some(outcome => outcome.utility === null && outcome.child &&
+          outcome.child.upper - outcome.child.lower > 1e-9);
+      };
+      const chooseSecurityCell = (cells, lowerProof) => {
+        let selected = null;
+        for (let j = 0; j < cells.length; j++) {
+          const cell = cells[j];
+          if (!canExpandCell(cell)) continue;
+          const gap = cell.upper - cell.lower;
+          const bound = lowerProof ? cell.lower : cell.upper;
+          if (!selected) {
+            selected = {j, cell, gap, bound, score: gap};
+            continue;
+          }
+          const improvesBound = lowerProof
+            ? bound < selected.bound - EPSILON
+            : bound > selected.bound + EPSILON;
+          const tiesBound = Math.abs(bound - selected.bound) <= EPSILON;
+          if (improvesBound || (tiesBound && gap > selected.gap + EPSILON)) {
+            selected = {j, cell, gap, bound, score: gap};
+          }
+        }
+        return selected;
+      };
       let chosen = null;
       if (selectionPolicy === 'security') {
         const lowerProof = (this.proofTurn & 1) === 1;
@@ -627,11 +654,8 @@ class BoundedSearch {
                 (Math.abs(rowStats[i].floor - rowStats[row].floor) <= EPSILON &&
                  rowStats[i].mean > rowStats[row].mean + EPSILON)) row = i;
           }
-          for (let j = 0; j < node.cells[row].length; j++) {
-            const cell = node.cells[row][j];
-            const gap = cell.upper - cell.lower;
-            if (!chosen || gap > chosen.gap + EPSILON) chosen = {i: row, j, cell, gap, score: gap};
-          }
+          const selected = chooseSecurityCell(node.cells[row], true);
+          if (selected) chosen = {...selected, i: row};
         } else {
           const columnStats = node.cells[0].map((_, j) => {
             const values = node.cells.map(row => row[j].upper);
@@ -646,11 +670,8 @@ class BoundedSearch {
                 (Math.abs(columnStats[j].ceiling - columnStats[column].ceiling) <= EPSILON &&
                  columnStats[j].mean < columnStats[column].mean - EPSILON)) column = j;
           }
-          for (let i = 0; i < node.cells.length; i++) {
-            const cell = node.cells[i][column];
-            const gap = cell.upper - cell.lower;
-            if (!chosen || gap > chosen.gap + EPSILON) chosen = {i, j: column, cell, gap, score: gap};
-          }
+          const selected = chooseSecurityCell(node.cells.map(row => row[column]), false);
+          if (selected) chosen = {...selected, i: selected.j, j: column};
         }
         // If the selected security row/column is already resolved, retain
         // the joint optimistic/pessimistic frontier as a progress fallback.

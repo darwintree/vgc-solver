@@ -288,6 +288,91 @@ test('security ordering returns to mixed support after a pure proof path', () =>
   assert.equal(result.stopReason, null);
 });
 
+function securityFrontierNode(lower, upper, lowerValue, upperValue) {
+  return {
+    terminal: null,
+    initialized: true,
+    cells: lower.map((row, i) => row.map((value, j) => ({
+      lower: value,
+      upper: upper[i][j],
+      outcomes: null,
+    }))),
+    lowerSolution: {value: lowerValue, p1: [1, 0], p2: [1, 0]},
+    upperSolution: {value: upperValue, p1: [1, 0], p2: [1, 0]},
+  } as any;
+}
+
+test('security lower proof chooses the selected row floor constraint', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 1;
+  const root = securityFrontierNode(
+    [[0.5, 0.9], [0.4, 0.4]],
+    [[0.51, 1], [0.5, 0.9]],
+    0.5, 0.51
+  );
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.deepEqual({i: frontier.i, j: frontier.j}, {i: 0, j: 0});
+});
+
+test('security upper proof chooses the selected column ceiling constraint', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 0;
+  const root = securityFrontierNode(
+    [[0.2, 0.2], [0.69, 0.69]],
+    [[0.8, 0.6], [1, 0.7]],
+    0.69, 0.7
+  );
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.deepEqual({i: frontier.i, j: frontier.j}, {i: 1, j: 1});
+});
+
+test('security proof falls back when its selected row has no expandable cell', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 1;
+  const root = securityFrontierNode(
+    [[0.5, 0.5], [0, 0]],
+    [[0.5, 0.5], [0.5, 0.5]],
+    0.5, 0.5
+  );
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.deepEqual({i: frontier.i, j: frontier.j}, {i: 1, j: 0});
+});
+
+test('security scheduling preserves bounds on a small interval DAG', () => {
+  const values = [
+    [0.2, -0.6],
+    [0.8, 0.1],
+  ];
+  const transitions = {};
+  const actions = {root: ['r0', 'r1']};
+  const opponentActions = {root: ['c0', 'c1']};
+  for (let i = 0; i < values.length; i++) {
+    for (let j = 0; j < values[i].length; j++) {
+      const state = `future-${i}-${j}`;
+      actions[state] = ['finish'];
+      opponentActions[state] = ['finish'];
+      transitions[`root:r${i}:c${j}`] = snapshot(state);
+      transitions[`${state}:finish:finish`] = utility(values[i][j]);
+    }
+  }
+  const adapter = toyAdapter({actions, opponentActions, transitions});
+  const expected = solveZeroSumMatrix(values).value;
+  const result = new BoundedSolver({
+    adapter,
+    selectionPolicy: 'security',
+    tolerance: 0.02,
+    warmStartRoot: false,
+  }).solve('root');
+
+  assert.equal(result.converged, true);
+  assert.ok(result.lowerBound <= expected + 1e-8);
+  assert.ok(result.upperBound >= expected - 1e-8);
+  assert.ok(result.upperBound - result.lowerBound <= 0.02 + 1e-8);
+});
+
 test('auto selection switches on a mixed root and resets per solve', () => {
   const adapter = toyAdapter({
     actions: {mixed: ['r0', 'r1'], pure: ['r']},
