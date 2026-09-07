@@ -6,6 +6,8 @@ import {auditNativeRules} from './native-rules';
 const EVENT_PREFIXES = Object.freeze([
   'on', 'onAny', 'onAlly', 'onFoe', 'onSource', 'onSide', 'onField',
 ]);
+const eventPlanWrappers = new WeakMap();
+const pendingEventChecks = new WeakMap();
 function addCondition(battle, effects, id) {
   if (!id) return;
   effects.push(battle.dex.conditions.getByID(id));
@@ -223,12 +225,30 @@ function hasPossibleEvent(plan, battle, eventName) {
 }
 
 function hasNoEventHandlers(battle, plan, eventName, target, source) {
-  if (hasPossibleEvent(plan, battle, eventName) === false) return true;
+  const possible = hasPossibleEvent(plan, battle, eventName);
+  if (possible === false) return true;
+  if (possible === true && eventPlanWrappers.get(battle) === battle.findEventHandlers) {
+    pendingEventChecks.set(battle, {plan, eventName});
+  }
   return battle.findEventHandlers(target, eventName, source).length === 0;
+}
+
+function registerEventPlanWrapper(battle, wrapper) {
+  eventPlanWrappers.set(battle, wrapper);
+  pendingEventChecks.delete(battle);
+}
+
+function consumeEventPlanCheck(battle, plan, eventName) {
+  const pending = pendingEventChecks.get(battle);
+  if (!pending || pending.plan !== plan || pending.eventName !== eventName) return null;
+  pendingEventChecks.delete(battle);
+  return true;
 }
 
 export {
   createEventPlan,
   hasPossibleEvent,
   hasNoEventHandlers,
+  registerEventPlanWrapper,
+  consumeEventPlanCheck,
 };
