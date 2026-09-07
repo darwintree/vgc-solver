@@ -59,3 +59,21 @@ Follow-up:
 Source-only until the root agent's next validation window. Full native distribution tests cover both intact and busted forms, a copied ability, low and surviving HP, and a custom effectiveness observer.
 
 Validation update: Node.js v24.20.0; typecheck, build, simulator-optimizations and native-distribution tests pass. Full regression and performance remain coordinated by the root agent.
+
+### 4. Group rolls absorbed by the active native Disguise Damage callback
+
+Type: unresolved-implementation-decision
+
+Context:
+The root agent requested an intact-Disguise candidate after the inert-callback change. Identical final HP alone is insufficient: earlier callbacks can observe raw damage, and Mold Breaker or transformed-ability suppression can prevent absorption.
+
+Decision:
+Admit an absorbing class only for intact active, untransformed Disguise, a Move parent, no ability-ignoring active move, the native cantsuppress flag, and exactly the target's native Disguise Damage/Effectiveness handlers. Keep the existing no-Type/ModifySTAB/raw-observer guards and only the audited final modifier. Require native immunity/item queries and no NegateImmunity handlers so Effectiveness cannot change the absorbing predicate. Return one raw representative roll for the class, never synthetic zero damage.
+
+Reason:
+Under these state and method conditions, runEvent invokes the sole Damage handler, which returns zero and sets the same busted flag for every roll. The native path still produces the actual type and critical records, ability state, forme change, self-damage, and later move. Intact Effectiveness callbacks may call native immunity checks, but those are pure under the additional guards. Unsupported suppression or extra raw observers use normal raw-roll grouping.
+
+Follow-up:
+Source-only during root benchmarking. Tests cover complete surviving states with a later Shadow Claw, item recoil, reserves, Mold Breaker, Ability Shield, transformed suppression, and a higher-priority raw observer.
+
+Validation update: Node.js v24.20.0; typecheck, build, simulator-optimizations and native-distribution tests pass, including native full-state distribution comparisons for later moves and multi-hit Disguise breakage. The first test run exposed a fixture assertion error: a critical later Shadow Claw can KO Mew. Adding a reserve on each side preserves full observable state for those outcomes. Full regression and performance remain coordinated by the root agent.

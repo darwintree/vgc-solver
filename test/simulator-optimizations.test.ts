@@ -241,13 +241,16 @@ test('post-tail saturation preserves resisted and threshold-crossing damage', ()
 function contactBattleWithReserve(defense: Partial<PokemonSet> = {}, attacker: Partial<PokemonSet> = {}) {
   const battle = new Battle({
     formatid: toID('gen9customgame'), seed: '1,2,3,4',
-    p1: {name: 'P1', team: [{species: 'Mew', moves: ['Tackle'], ...attacker}] as PokemonSet[]},
+    p1: {name: 'P1', team: [
+      {species: 'Mew', moves: ['Tackle'], ...attacker},
+      {species: 'Snorlax', moves: ['Splash']},
+    ] as PokemonSet[]},
     p2: {name: 'P2', team: [
-      {species: 'Garchomp', ...defense, moves: ['Splash']},
+      {species: 'Garchomp', moves: ['Splash'], ...defense},
       {species: 'Snorlax', moves: ['Splash']},
     ] as PokemonSet[]},
   });
-  battle.makeChoices('team 1', 'team 12');
+  battle.makeChoices('team 12', 'team 12');
   setHP(battle, 'p2', 1);
   refreshMoveRequest(battle);
   return battle;
@@ -390,5 +393,83 @@ test('custom Disguise effectiveness observers execute only through the native pa
     assertSameDistribution(native, optimized);
   } finally {
     ability.onEffectiveness = original;
+  }
+});
+
+test('intact Disguise absorbs rolls while preserving later actions and reserve state', () => {
+  for (const moves of [['Splash'], ['Shadow Claw']]) {
+    const battle = contactBattleWithReserve(
+      {species: 'Mimikyu', ability: 'Disguise', item: 'Life Orb', moves},
+      {moves: ['Smart Strike'], item: 'Life Orb'}
+    );
+    setHP(battle, 'p2', 100);
+    refreshMoveRequest(battle);
+    const snapshot = snapshotBattle(battle);
+    const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    assertSameDistribution(native, optimized);
+    assert.ok(optimized.outcomes.every(outcome => outcome.snapshot));
+    assert.ok(optimized.outcomes.every(outcome =>
+      outcome.snapshot.sides[1].pokemon[0].species === '[Species:mimikyubusted]'));
+    if (moves[0] === 'Splash') assert.ok(optimized.simulatorRuns <= 4);
+  }
+});
+
+test('Disguise absorption respects Mold Breaker and transformed-ability suppression', () => {
+  for (const suppression of ['moldbreaker', 'transformed', 'abilityshield']) {
+    const battle = contactBattleWithReserve(
+      {species: 'Mimikyu', ability: 'Disguise', item: suppression === 'abilityshield' ? 'Ability Shield' : ''},
+      {moves: ['Smart Strike'], ability: suppression === 'transformed' ? 'Synchronize' : 'Mold Breaker'}
+    );
+    const target = battle.p2.active[0];
+    if (suppression === 'transformed') target.transformed = true;
+    setHP(battle, 'p2', target.maxhp);
+    refreshMoveRequest(battle);
+    const snapshot = snapshotBattle(battle);
+    const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    assertSameDistribution(native, optimized);
+    assert.ok(optimized.outcomes.every(outcome => outcome.snapshot));
+  }
+});
+
+test('multi-hit damage resumes native roll classes after breaking Disguise', () => {
+  const battle = contactBattleWithReserve(
+    {species: 'Mimikyu', ability: 'Disguise'}, {moves: ['Dual Wingbeat']}
+  );
+  setHP(battle, 'p2', 100);
+  refreshMoveRequest(battle);
+  const snapshot = snapshotBattle(battle);
+  const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+  const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+  assertSameDistribution(native, optimized);
+  assert.ok(optimized.outcomes.every(outcome => outcome.snapshot));
+  assert.ok(optimized.outcomes.length > 2);
+});
+
+test('a raw observer preceding Disguise retains its native damage distribution', () => {
+  const move = Dex.moves.get('smartstrike') as Mutable<ReturnType<typeof Dex.moves.get>>;
+  const originalDamage = move.onDamage;
+  const originalPriority = move.onDamagePriority;
+  move.onDamagePriority = 2;
+  move.onDamage = function(damage, target, source) {
+    source.hp = damage + 100;
+  };
+  try {
+    const battle = contactBattleWithReserve(
+      {species: 'Mimikyu', ability: 'Disguise'}, {moves: ['Smart Strike']}
+    );
+    setHP(battle, 'p2', 100);
+    refreshMoveRequest(battle);
+    const snapshot = snapshotBattle(battle);
+    const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    assertSameDistribution(native, optimized);
+    assert.ok(optimized.outcomes.length > 1);
+  } finally {
+    if (originalDamage === undefined) delete move.onDamage;
+    else move.onDamage = originalDamage;
+    if (originalPriority === undefined) delete move.onDamagePriority;
+    else move.onDamagePriority = originalPriority;
   }
 });
