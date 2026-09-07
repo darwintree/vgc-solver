@@ -1,5 +1,5 @@
 import {Battle} from '@pkmn/sim';
-import {consumeEventPlanCheck, hasPossibleEvent, registerEventPlanWrapper} from './event-plan';
+import {hasPossibleEvent} from './event-plan';
 
 // This optimization is deliberately tied to the exact event-dispatch methods
 // shipped by the pinned simulator. A format or mod can replace any of these
@@ -83,13 +83,11 @@ function installEmptyEventOptimization(battle, eventPlan = null) {
           !hasNativeEventMethods(this, false)) {
         return originalFindEventHandlers.call(this, target, eventName, source);
       }
-      const consumed = consumeEventPlanCheck(this, eventPlan, eventName);
-      if (consumed === null && hasPossibleEvent(eventPlan, this, eventName) === false) return [];
+      if (hasPossibleEvent(eventPlan, this, eventName) === false) return [];
       return originalFindEventHandlers.call(this, target, eventName, source);
     };
     battle.findEventHandlers = optimizedFindEventHandlers;
     wrappedFindEventHandlers.set(battle, optimizedFindEventHandlers);
-    registerEventPlanWrapper(battle, optimizedFindEventHandlers);
   }
   return true;
 }

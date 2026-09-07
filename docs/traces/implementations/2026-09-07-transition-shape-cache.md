@@ -50,3 +50,18 @@ Reason:
 该 token 只跨越同一同步调用边界，不把判定缓存到后续状态，也不放宽 native 方法守卫；方法被替换时注册检查会清理 pending token，wrapper 不匹配时回退原路径。事件计划测试断言正向查询只计一次，同时完整原生分布和事件测试保持通过。
 
 Follow-up: None
+
+### 4. 撤销紧邻事件判定复用
+
+Type: tradeoff
+
+Context:
+相邻事件判定复用已在独立 guard 消融中测量三次：固定 guard 为 `4354/4296/4303ms`，加 PP shape 为 `4250/4239/4233ms`，再加 adjacent token 为 `4334/4356/4301ms`。新增 WeakMap/token 复杂度没有显示稳定收益。
+
+Decision:
+移除 pending event check 与 wrapper registration 接口、相关测试和 wrapper 消费逻辑，恢复事件计划的原有同步查询路径；保留固定 native method guard 与 PP shape cache。
+
+Reason:
+该候选没有达到稳定收益证据门槛，删除其接口和测试可让代码保持与实测收益一致。事件计划仍保留原有 fingerprint、unknown fallback 和 native handler wrapper 守卫。
+
+Follow-up: None

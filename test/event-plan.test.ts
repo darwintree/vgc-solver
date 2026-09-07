@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createBattle, snapshotBattle, enumerateTurn} from '../src/showdown-adapter';
 import {createEventPlan, hasPossibleEvent, hasNoEventHandlers} from '../src/event-plan';
-import {installEmptyEventOptimization} from '../src/empty-events';
 
 test('event plan proves empty native events and preserves callback-bearing events', {concurrency: false}, () => {
   const battle = createBattle(
@@ -21,21 +20,6 @@ test('event plan proves empty native events and preserves callback-bearing event
   assert.equal(hasNoEventHandlers(
     battle, plan, 'TryHit', battle.p1.active[0], battle.p2.active[0]
   ), false);
-});
-
-test('event plan result is consumed by the wrapped handler lookup', {concurrency: false}, () => {
-  const battle = createBattle(
-    {species: 'Mew', ability: 'Water Absorb', moves: ['Splash']},
-    {species: 'Mew', ability: 'Synchronize', moves: ['Splash']}
-  );
-  const plan = createEventPlan(battle);
-  assert.ok(plan);
-  assert.equal(installEmptyEventOptimization(battle, plan), true);
-  const before = plan.stats.queries;
-  assert.equal(hasNoEventHandlers(
-    battle, plan, 'TryHit', battle.p1.active[0], battle.p2.active[0]
-  ), false);
-  assert.equal(plan.stats.queries - before, 1);
 });
 
 test('unknown dynamic effect and custom event use native fallback', {concurrency: false}, () => {
