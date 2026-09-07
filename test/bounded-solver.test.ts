@@ -65,6 +65,40 @@ test('expands one ply at a time and certifies an exact DAG', () => {
   assert.deepEqual(result.payoffMatrixIntervals[1][0], {lowerBound: -1, upperBound: 1});
 });
 
+test('eager expansion stops on a pure security certificate and preserves unknown cells', () => {
+  let transitions = 0;
+  const adapter = toyAdapter({
+    actions: {root: ['winning-row', 'losing-row']},
+    opponentActions: {root: ['c0', 'c1']},
+    transitions: {
+      'root:winning-row:c0': utility(1),
+      'root:winning-row:c1': utility(1),
+      // The losing row is deliberately absent: a pure row certificate should
+      // make it unnecessary to ask the adapter for either transition.
+    },
+  });
+  const originalEnumerate = adapter.enumerateTurn;
+  adapter.enumerateTurn = (...args) => {
+    transitions++;
+    return originalEnumerate(...args);
+  };
+
+  const result = new BoundedSolver({
+    adapter,
+    lazyCells: false,
+    tolerance: 0.02,
+    warmStartRoot: false,
+  }).solve('root');
+
+  assert.equal(result.converged, true);
+  assert.ok(result.lowerBound >= 1 - 1e-9);
+  assert.ok(result.upperBound <= 1 + 1e-9);
+  assert.equal(transitions, 2, 'the losing row is not needed for the pure certificate');
+  assert.deepEqual(result.payoffMatrixIntervals[1][0], {lowerBound: -1, upperBound: 1});
+  assert.deepEqual(result.payoffMatrixIntervals[1][1], {lowerBound: -1, upperBound: 1});
+  assert.equal(result.approximate, true, 'unexpanded cells prevent an exact certificate');
+});
+
 test('returns honest bounds when the node limit blocks an unresolved child', () => {
   const adapter = toyAdapter({
     actions: {root: ['wait']},

@@ -148,6 +148,7 @@ class BoundedSearch {
   declare eventPlan: ReturnType<typeof createEventPlan>;
   declare proofTurn: number;
   declare autoJoint: boolean;
+  declare rootNode: SearchNode | null;
 
   constructor(options: BoundedOptions = {}) {
     this.options = {
@@ -189,6 +190,7 @@ class BoundedSearch {
     this.eventPlan = null;
     this.proofTurn = 0;
     this.autoJoint = false;
+    this.rootNode = null;
   }
 
   /** Solve a battle, returning a certified interval around the value. */
@@ -211,6 +213,7 @@ class BoundedSearch {
     }
     const rootSnapshot = this._snapshot(battle);
     const root = this._intern(rootSnapshot);
+    this.rootNode = root;
     const searchStart = performance.now();
     this.stats.prepareMs = searchStart - (this._prepareStart || searchStart);
     this.deadline = Number.isFinite(this.options.maxSearchMs)
@@ -419,10 +422,42 @@ class BoundedSearch {
     }
     this._initializeNode(node);
     if (!this.options.lazyCells) {
+      const canStopEarly = node === this.rootNode;
       for (let i = 0; i < node.actions1.length; i++) {
-        for (let j = 0; j < node.actions2.length; j++) this._expandCell(node, i, j);
+        for (let j = 0; j < node.actions2.length; j++) {
+          this._expandCell(node, i, j);
+          // A bounded node does not need every action pair when the already
+          // generated matrix entries certify its value. Unknown cells retain
+          // [-1, 1] and remain available to the normal frontier selector if a
+          // parent later needs a tighter child interval.
+          if (canStopEarly) {
+            this._refresh(node);
+            if (this._hasSufficientCertificate(node)) return;
+          }
+          if (this._timedOut()) return;
+        }
       }
     }
+  }
+
+  /**
+   * Return whether the current node bounds are sufficient to stop an eager
+   * cell pass. These are all safe certificates: the matrix interval already
+   * encloses the true value, pure policies provide additional valid bounds,
+   * and +/-1 are the global utility extrema.
+   */
+  _hasSufficientCertificate(node: SearchNode) {
+    if (node.terminal !== null) return true;
+    if (node !== this.rootNode) return false;
+    if (!node.initialized || !node.lowerSolution || !node.upperSolution) return false;
+    if (node.upper - node.lower <= this.options.tolerance + EPSILON) return true;
+    if (node.lower >= DEFAULT_UPPER - EPSILON || node.upper <= DEFAULT_LOWER + EPSILON) return true;
+
+    const pureLower = Math.max(...node.cells.map(row =>
+      Math.min(...row.map(cell => cell.lower))));
+    const pureUpper = Math.min(...node.cells[0].map((_, j) =>
+      Math.max(...node.cells.map(row => row[j].upper))));
+    return pureLower >= pureUpper - EPSILON;
   }
 
   _expandCell(node: SearchNode, i, j) {

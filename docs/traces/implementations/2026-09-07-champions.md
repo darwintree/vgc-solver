@@ -53,3 +53,18 @@ Decision: 新增独立选例文档，建议四个目标（窄区间、较多展�
 Reason: 用较小集合覆盖不同观测行为，并保留全量 54 项作为阶段回归，避免仅按最慢项或同一配对选样。统计只能支撑选例，不能代替根因诊断；原始宽度 0.020000000054120726 的样本应单独处理。
 
 Follow-up: 建议集合待后续优化任务采用；正式比较前重复复现。
+
+### 5. eager 节点的证书提前终止
+
+Type: unresolved-implementation-decision
+
+Context:
+用户要求保持 benchmark 的 `lazyCells:false` 配置与区间合同，同时允许基于已经产生的安全上下界省略无助于证明的行动格。现有实现对每个新节点 eager 展开整张矩阵，只有整层完成后才刷新节点界；规范没有指定节点何时可以安全停止剩余格的生成，也没有要求 bounded 节点的所有格最终都 exact。
+
+Decision:
+bounded 根节点每生成一个 cell 后刷新上下界。若根上下界宽度已达到 tolerance、纯行安全下界与纯列安全上界已相交，或根已达到 `+1/-1` 的全局效用极值证书，则停止根节点本次 eager 展开；未生成 cell 继续保留 `[-1,1]`。非根节点保留原整层 eager 行为，以避免局部 tolerance 证书改变现有 frontier 路径合同。
+
+Reason:
+这些条件分别是由矩阵单调性、纯策略安全证书和效用范围直接推出的充分条件；停止只减少尚无助于根证书的转移生成，不改变已生成格或未知格的界。保留根的完整矩阵 shape，未生成格仍可由后续 frontier 补生成。代价是根节点每个 eager cell 都可能增加一次矩阵 backup，需用 expandedCells、matrixSolves 和基准 search 时间验证是否值得。
+
+Follow-up: 需要在混合策略、未知格、循环、节点限额和终局 toy adapter 上验证区间包含 exact，并在 Champions 基准窗口中比较转移数量与搜索耗时。
