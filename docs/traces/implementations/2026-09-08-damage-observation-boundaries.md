@@ -77,3 +77,21 @@ Follow-up:
 Source-only during root benchmarking. Tests cover complete surviving states with a later Shadow Claw, item recoil, reserves, Mold Breaker, Ability Shield, transformed suppression, and a higher-priority raw observer.
 
 Validation update: Node.js v24.20.0; typecheck, build, simulator-optimizations and native-distribution tests pass, including native full-state distribution comparisons for later moves and multi-hit Disguise breakage. The first test run exposed a fixture assertion error: a critical later Shadow Claw can KO Mew. Adding a reserve on each side preserves full observable state for those outcomes. Full regression and performance remain coordinated by the root agent.
+
+### 5. Capture both Dex query identities used by damage prediction
+
+Type: unresolved-implementation-decision
+
+Context:
+Independent review found that the new immunity guard compared against a mutable prototype property. The same comparison guarded getEffectiveness, now called directly by the prediction path. The requested immunity fix left whether to include that adjacent query to implementation judgment.
+
+Decision:
+Capture getImmunity and getEffectiveness at module initialization and compare resolved methods against those saved identities. Verify fallback using ordinary simulator state changes, without reading private PRNG decisions.
+
+Reason:
+Both new differentials fail against e504633: an immunity override removes Disguise during Effectiveness after the random roll, yielding 12 native HP outcomes versus one optimized outcome; an effectiveness override increments the active move's basePower, revealing two extra speculative queries in the optimized snapshot. Captured identities disable the corresponding damage-tail proof while retaining the native custom behavior. This confirms custom-prototype fallback failures, not a stock Champions error.
+
+Follow-up:
+Run typecheck, build, and focused native-distribution tests; full regression remains coordinated by the root agent.
+
+Validation update: Node.js v24.20.0; typecheck, build, simulator-optimizations and native-distribution tests pass. Both new native full-state differentials passed after failing on the uncorrected guards.

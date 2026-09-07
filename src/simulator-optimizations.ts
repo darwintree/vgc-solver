@@ -53,6 +53,8 @@ const nativeBattle = Object.freeze({
   isGrounded: Pokemon.prototype.isGrounded,
   typesGet: Dex.types.get,
   typesIsName: Dex.types.isName,
+  getImmunity: Dex.ModdedDex.prototype.getImmunity,
+  getEffectiveness: Dex.ModdedDex.prototype.getEffectiveness,
 });
 // This audited callback only chains the constant Gen 9 final-damage modifier.
 // Recognize the callback by identity, not an item name in the current battle.
@@ -230,7 +232,7 @@ function installDamageOptimization(battle, eventPlan = null) {
         battle.getAllActive !== nativeBattle.getAllActive ||
         battle.dex.types.get !== nativeBattle.typesGet ||
         battle.dex.types.isName !== nativeBattle.typesIsName ||
-        battle.dex.getImmunity !== Dex.ModdedDex.prototype.getImmunity) return false;
+        battle.dex.getImmunity !== nativeBattle.getImmunity) return false;
     const ability = target.getAbility();
     if (!ability.flags.cantsuppress ||
         !noHandlers('NegateImmunity', target, null)) return false;
@@ -272,7 +274,7 @@ function installDamageOptimization(battle, eventPlan = null) {
         battle.modify !== nativeBattle.modify ||
         actions.spreadMoveHit !== actionPrototype.spreadMoveHit ||
         battle.suppressingAbility !== nativeBattle.suppressingAbility ||
-        battle.dex.getEffectiveness !== Dex.ModdedDex.prototype.getEffectiveness ||
+        battle.dex.getEffectiveness !== nativeBattle.getEffectiveness ||
         target.damage !== nativeBattle.pokemonDamage ||
         target.runEffectiveness !== Pokemon.prototype.runEffectiveness ||
         target.getMoveHitData !== Pokemon.prototype.getMoveHitData ||

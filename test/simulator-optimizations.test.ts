@@ -473,3 +473,45 @@ test('a raw observer preceding Disguise retains its native damage distribution',
     else move.onDamagePriority = originalPriority;
   }
 });
+
+test('custom immunity prototypes retain damage after a mid-hit ability change', () => {
+  const prototype = Dex.ModdedDex.prototype;
+  const original = prototype.getImmunity;
+  prototype.getImmunity = function(source, target) {
+    const pokemon = target as {battle?: Battle; ability?: string};
+    if (pokemon?.battle?.event?.id === 'Effectiveness') pokemon.ability = '';
+    return original.call(this, source, target);
+  };
+  try {
+    const battle = contactBattleWithReserve(
+      {species: 'Mimikyu', ability: 'Disguise'}, {moves: ['Smart Strike']}
+    );
+    setHP(battle, 'p2', battle.p2.active[0].maxhp);
+    refreshMoveRequest(battle);
+    const snapshot = snapshotBattle(battle);
+    const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    assert.ok(native.outcomes.length > 1);
+    assertSameDistribution(native, optimized);
+  } finally {
+    prototype.getImmunity = original;
+  }
+});
+
+test('custom effectiveness prototypes retain native active-move mutations', () => {
+  const prototype = Dex.ModdedDex.prototype;
+  const original = prototype.getEffectiveness;
+  prototype.getEffectiveness = function(source, target) {
+    const move = source as {effectType?: string; basePower?: number};
+    if (move?.effectType === 'Move') move.basePower++;
+    return original.call(this, source, target);
+  };
+  try {
+    const snapshot = snapshotBattle(contactBattleWithReserve());
+    const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    assertSameDistribution(native, optimized);
+  } finally {
+    prototype.getEffectiveness = original;
+  }
+});
