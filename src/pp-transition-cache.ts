@@ -398,6 +398,7 @@ function makeCacheKey(snapshot, action1, action2, stateKey, cache) {
 class PPTransitionCache {
   declare templates: Map<string, PPTemplate>;
   declare baseKeys: WeakMap<object, string>;
+  declare shapes: WeakMap<object, string>;
   declare cacheHits: number;
   declare cacheMisses: number;
   declare rejected: number;
@@ -405,11 +406,16 @@ class PPTransitionCache {
   constructor() {
     this.templates = new Map();
     this.baseKeys = new WeakMap();
+    this.shapes = new WeakMap();
     this.cacheHits = 0;
     this.cacheMisses = 0;
     this.rejected = 0;
   }
-  clear() { this.templates.clear(); this.baseKeys = new WeakMap(); }
+  clear() {
+    this.templates.clear();
+    this.baseKeys = new WeakMap();
+    this.shapes = new WeakMap();
+  }
   baseKey(snapshot: Snapshot, stateKey: StateKey): string {
     let key = this.baseKeys.get(snapshot);
     if (key === undefined) {
@@ -417,6 +423,14 @@ class PPTransitionCache {
       this.baseKeys.set(snapshot, key);
     }
     return key;
+  }
+  shape(snapshot: Snapshot): string {
+    let shape = this.shapes.get(snapshot);
+    if (shape === undefined) {
+      shape = slotShape(snapshot);
+      this.shapes.set(snapshot, shape);
+    }
+    return shape;
   }
 }
 

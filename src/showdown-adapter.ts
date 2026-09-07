@@ -247,7 +247,7 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
     }
   }
   const cacheKey = ppEligible ? makeCacheKey(snapshot, p1Action, p2Action, stateKey, ppCache) : null;
-  const inputShape = ppEligible ? slotShape(snapshot) : null;
+  const inputShape = ppEligible ? ppCache.shape(snapshot) : null;
 
   if (ppEligible && cacheKey) {
     const template = ppCache.templates.get(cacheKey);
