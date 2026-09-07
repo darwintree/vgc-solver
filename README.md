@@ -8,13 +8,16 @@
 
 ## 快速开始
 
-需要 Node.js 20 或更高版本。在仓库根目录运行：
+需要 Node.js 24 或更高版本（`.nvmrc` 选择 24）。在仓库根目录运行：
 
 ```bash
-npm install
+npm ci
+npm run typecheck
 npm test
 npm run demo
 ```
+
+`npm test`、`npm run demo` 和 `npm run benchmark` 会先编译 TypeScript。开发和单文件测试见[开发指南](docs/development.md)。
 
 复杂局面可用有界搜索查看预算内的收敛情况：
 

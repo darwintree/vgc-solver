@@ -38,7 +38,7 @@ worker 加载的是自己的模拟器规则。如果主线程修改了某物种�
 
 ## 实现与证据索引
 
-- [transition-pool.js](../../src/transition-pool.js)：生命周期、批处理与路由；[transition-worker.js](../../src/transition-worker.js)：每次求解初始化及转移执行。
-- [async-solver.js](../../src/async-solver.js)、[async-bounded-solver.js](../../src/async-bounded-solver.js)：集中求解与并行转移的边界；[stock-rule-profile.js](../../src/stock-rule-profile.js)：跨线程规则一致性。
-- 验证：[async-solver.test.js](../../test/async-solver.test.js)、[async-bounded-routing.test.js](../../test/async-bounded-routing.test.js)、[async-fallback.test.js](../../test/async-fallback.test.js)、[async-lifecycle.test.js](../../test/async-lifecycle.test.js)。
+- [transition-pool.ts](../../src/transition-pool.ts)：生命周期、批处理与路由；[transition-worker.ts](../../src/transition-worker.ts)：每次求解初始化及转移执行。
+- [async-solver.ts](../../src/async-solver.ts)、[async-bounded-solver.ts](../../src/async-bounded-solver.ts)：集中求解与并行转移的边界；[stock-rule-profile.ts](../../src/stock-rule-profile.ts)：跨线程规则一致性。
+- 验证：[async-solver.test.ts](../../test/async-solver.test.ts)、[async-bounded-routing.test.ts](../../test/async-bounded-routing.test.ts)、[async-fallback.test.ts](../../test/async-fallback.test.ts)、[async-lifecycle.test.ts](../../test/async-lifecycle.test.ts)。
 - 历史：[满 PP 正式测量](../optimization-records/full-pp-optimization.md)、[case 6 未采纳候选](../optimization-records/case6-performance.md)。

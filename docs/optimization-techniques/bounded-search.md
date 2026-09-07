@@ -43,4 +43,4 @@ API 默认 `lazyCells: true`，允许逐格生成转移；benchmark 使用 `lazy
 
 运行参数和计时见 [benchmark 指南](../benchmarking.md)。历史验收移至 [case 3–5 记录](../optimization-records/bounded-fullpp.md)；[case 6](../optimization-records/case6-performance.md) 的 3 秒目标仍未达成，不把前者成绩外推给后者。
 
-实现索引：[bounded-solver.js](../../src/bounded-solver.js) 的 `_cellBounds`、`_refresh`、`_backupFrom`、`_selectFrontier`；[async-bounded-solver.js](../../src/async-bounded-solver.js) 的一层展开。验证：[bounded-solver.test.js](../../test/bounded-solver.test.js)、[bounded-stochastic.test.js](../../test/bounded-stochastic.test.js)、[bounded-native-certificate.test.js](../../test/bounded-native-certificate.test.js)。
+实现索引：[bounded-solver.ts](../../src/bounded-solver.ts) 的 `_cellBounds`、`_refresh`、`_backupFrom`、`_selectFrontier`；[async-bounded-solver.ts](../../src/async-bounded-solver.ts) 的一层展开。验证：[bounded-solver.test.ts](../../test/bounded-solver.test.ts)、[bounded-stochastic.test.ts](../../test/bounded-stochastic.test.ts)、[bounded-native-certificate.test.ts](../../test/bounded-native-certificate.test.ts)。

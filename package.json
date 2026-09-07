@@ -5,14 +5,23 @@
   "description": "Exact small-state 1v1 Pokemon endgame solver backed by @pkmn/sim",
   "type": "commonjs",
   "scripts": {
-    "benchmark": "node src/benchmark.js",
-    "demo": "node src/demo.js",
-    "test": "node --test"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prebenchmark": "npm run build",
+    "benchmark": "node dist/src/benchmark.js",
+    "predemo": "npm run build",
+    "demo": "node dist/src/demo.js",
+    "pretest": "npm run build",
+    "test": "node --test --test-concurrency=4 dist/test/*.test.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "dependencies": {
     "@pkmn/sim": "0.10.11"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "^5.9.3"
   }
 }

@@ -35,22 +35,22 @@ Q_s(a,b)=\sum_{s'}P(s'\mid s,a,b)V(s'),\qquad V(s)=\operatorname{val}(Q_s).
 ## 文件结构
 
 ```text
-src/showdown-adapter.js  Showdown 状态复制、合法行动、随机分支枚举
-src/branching-prng.js    可回放且可分叉的 PRNG facade
-src/empty-events.js      空事件消除与原生方法检查
-src/simulator-optimizations.js  副作用与伤害随机结果的等价合并
-src/matrix-game.js       零和矩阵 simplex、数值证书与小矩阵回退
-src/solver.js            同步状态递归、缓存与价值证书剪枝
-src/async-solver.js      异步转移调度与状态依赖管理
-src/bounded-solver.js    有界区间搜索与证明前沿选择
-src/async-bounded-solver.js  worker 支持的一层区间展开
-src/transition-pool.js   常驻工作线程池与批量派发
-src/pp-transition-cache.js  受审计的 PP 转移模板复用
-src/event-plan.js        事件处理函数索引
-src/stock-rule-profile.js  跨线程规则一致性检查
-src/cases.js             基础局面与六个突袭扩展局面
-src/demo.js              命令行输出
-src/benchmark.js         局面及 PP 可选的性能基准
+src/showdown-adapter.ts  Showdown 状态复制、合法行动、随机分支枚举
+src/branching-prng.ts    可回放且可分叉的 PRNG facade
+src/empty-events.ts      空事件消除与原生方法检查
+src/simulator-optimizations.ts  副作用与伤害随机结果的等价合并
+src/matrix-game.ts       零和矩阵 simplex、数值证书与小矩阵回退
+src/solver.ts            同步状态递归、缓存与价值证书剪枝
+src/async-solver.ts      异步转移调度与状态依赖管理
+src/bounded-solver.ts    有界区间搜索与证明前沿选择
+src/async-bounded-solver.ts  worker 支持的一层区间展开
+src/transition-pool.ts   常驻工作线程池与批量派发
+src/pp-transition-cache.ts  受审计的 PP 转移模板复用
+src/event-plan.ts        事件处理函数索引
+src/stock-rule-profile.ts  跨线程规则一致性检查
+src/cases.ts             基础局面与六个突袭扩展局面
+src/demo.ts              命令行输出
+src/benchmark.ts         局面及 PP 可选的性能基准
 ```
 
 ## 当前边界

@@ -56,7 +56,7 @@ memo、PP 模板和键的对象缓存按次 solve 重建，不跨规则变更借
 
 ## 实现与证据索引
 
-- [native-memo-key.js](../../src/native-memo-key.js)：`effectOrderContext`、`privateSnapshotKey`、按改动路径归一化。
-- [pp-transition-cache.js](../../src/pp-transition-cache.js)：`installTracker`、区间与消耗、`ppBaseKey`；[showdown-adapter.js](../../src/showdown-adapter.js)：模板查找／建立、快照隔离与 outcome key 复用。
-- 验证：[native-memo-key.test.js](../../test/native-memo-key.test.js)、[pp-transition-cache.test.js](../../test/pp-transition-cache.test.js)、[pp-cache-semantic.test.js](../../test/pp-cache-semantic.test.js)、[snapshot-serialization.test.js](../../test/snapshot-serialization.test.js)。
+- [native-memo-key.ts](../../src/native-memo-key.ts)：`effectOrderContext`、`privateSnapshotKey`、按改动路径归一化。
+- [pp-transition-cache.ts](../../src/pp-transition-cache.ts)：`installTracker`、区间与消耗、`ppBaseKey`；[showdown-adapter.ts](../../src/showdown-adapter.ts)：模板查找／建立、快照隔离与 outcome key 复用。
+- 验证：[native-memo-key.test.ts](../../test/native-memo-key.test.ts)、[pp-transition-cache.test.ts](../../test/pp-transition-cache.test.ts)、[pp-cache-semantic.test.ts](../../test/pp-cache-semantic.test.ts)、[snapshot-serialization.test.ts](../../test/snapshot-serialization.test.ts)。
 - 历史：[满 PP 优化](../optimization-records/full-pp-optimization.md)、[case 6 键优化](../optimization-records/case6-performance.md)。case 6 的 23.4% 为三项键优化的组合观测，不能分摊为单项收益。

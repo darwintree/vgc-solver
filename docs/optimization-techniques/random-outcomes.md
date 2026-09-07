@@ -42,7 +42,7 @@
 
 ## 实现与证据索引
 
-- [branching-prng.js](../../src/branching-prng.js)：`_take`、`randomMapped`、`randomGrouped`、32 位桶概率；[showdown-adapter.js](../../src/showdown-adapter.js)：`enumerateTurn` 的就地分叉与后继聚合。
-- [simulator-optimizations.js](../../src/simulator-optimizations.js)：`nativeChance`、`installDamageOptimization` 的分组与回退。
-- 验证：[branching-prng.test.js](../../test/branching-prng.test.js)、[simulator-optimizations.test.js](../../test/simulator-optimizations.test.js)、[native-distribution.test.js](../../test/native-distribution.test.js)。
+- [branching-prng.ts](../../src/branching-prng.ts)：`_take`、`randomMapped`、`randomGrouped`、32 位桶概率；[showdown-adapter.ts](../../src/showdown-adapter.ts)：`enumerateTurn` 的就地分叉与后继聚合。
+- [simulator-optimizations.ts](../../src/simulator-optimizations.ts)：`nativeChance`、`installDamageOptimization` 的分组与回退。
+- 验证：[branching-prng.test.ts](../../test/branching-prng.test.ts)、[simulator-optimizations.test.ts](../../test/simulator-optimizations.test.ts)、[native-distribution.test.ts](../../test/native-distribution.test.ts)。
 - 历史：[通用优化](../optimization-records/general-performance.md)、[伤害饱和取舍](../traces/implementations/2026-09-06-damage-saturation.md)。较早通用优化记录仅描述当时的原始伤害合并，后续才加入受守卫的饱和合并。

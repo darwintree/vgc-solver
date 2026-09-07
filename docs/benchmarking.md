@@ -1,6 +1,6 @@
 # Benchmark 指南
 
-所有命令在仓库根目录运行。完整参数以 `node src/benchmark.js --help` 为准，fixture 定义见[测试局面](cases.md)。
+所有命令在仓库根目录运行。完整参数以 `npm run benchmark -- --help` 为准，`npm run benchmark` 先编译到 `dist/`，编译耗时不计入程序输出的 prepare/search/total；fixture 定义见[测试局面](cases.md)。
 
 ## 精确求解
 

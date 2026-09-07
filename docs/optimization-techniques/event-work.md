@@ -36,7 +36,7 @@
 
 ## 实现与证据索引
 
-- [event-plan.js](../../src/event-plan.js)：`createEventPlan`、`hasPossibleEvent`；[empty-events.js](../../src/empty-events.js)：整批空分发及可信 wrapper 身份。
-- [residual-optimization.js](../../src/residual-optimization.js)：`isIndependentDurationHandler`、`installResidualOptimization`。
-- 验证：[event-plan.test.js](../../test/event-plan.test.js)、[empty-events.test.js](../../test/empty-events.test.js)、[residual-optimization.test.js](../../test/residual-optimization.test.js)。
+- [event-plan.ts](../../src/event-plan.ts)：`createEventPlan`、`hasPossibleEvent`；[empty-events.ts](../../src/empty-events.ts)：整批空分发及可信 wrapper 身份。
+- [residual-optimization.ts](../../src/residual-optimization.ts)：`isIndependentDurationHandler`、`installResidualOptimization`。
+- 验证：[event-plan.test.ts](../../test/event-plan.test.ts)、[empty-events.test.ts](../../test/empty-events.test.ts)、[residual-optimization.test.ts](../../test/residual-optimization.test.ts)。
 - 历史：[满 PP 优化](../optimization-records/full-pp-optimization.md)、[满 PP 决策](../traces/implementations/2026-09-06-sucker-punch-full-pp.md)。

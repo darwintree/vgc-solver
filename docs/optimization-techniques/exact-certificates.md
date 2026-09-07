@@ -41,6 +41,6 @@ P1 固定选 A 就能保证 +1，而任何策略不可能超过 +1，所以这�
 
 上述方法只依赖零和收益矩阵、有限随机后继和效用界，可用于矩形行动空间；不要求 1v1 或某种 PP 数量。完整队伍会增加行动数与状态数，证书是否经常出现仍需测量。当前 exact 有限递归无法求解真正可再生循环，需要另行建立随机博弈不动点求解。
 
-实现索引：[solver.js](../../src/solver.js) 的 `ensureCell`／`resolveCell`、极值与鞍点检查；[async-solver.js](../../src/async-solver.js) 的异步价值求解；[matrix-game.js](../../src/matrix-game.js) 的 `solveZeroSumMatrix` 和 `validateEquilibrium`。
+实现索引：[solver.ts](../../src/solver.ts) 的 `ensureCell`／`resolveCell`、极值与鞍点检查；[async-solver.ts](../../src/async-solver.ts) 的异步价值求解；[matrix-game.ts](../../src/matrix-game.ts) 的 `solveZeroSumMatrix` 和 `validateEquilibrium`。
 
-验证：[solver-pruning.test.js](../../test/solver-pruning.test.js)、[asymmetric-pruning.test.js](../../test/asymmetric-pruning.test.js)、[matrix-game-optimized.test.js](../../test/matrix-game-optimized.test.js)。历史依据：[通用优化](../optimization-records/general-performance.md)、[value-only 决策](../traces/implementations/2026-09-06-value-pruning.md)。
+验证：[solver-pruning.test.ts](../../test/solver-pruning.test.ts)、[asymmetric-pruning.test.ts](../../test/asymmetric-pruning.test.ts)、[matrix-game-optimized.test.ts](../../test/matrix-game-optimized.test.ts)。历史依据：[通用优化](../optimization-records/general-performance.md)、[value-only 决策](../traces/implementations/2026-09-06-value-pruning.md)。
