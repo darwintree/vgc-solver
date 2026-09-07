@@ -53,3 +53,9 @@ case 6 已复现默认 5 秒预算内不收敛；后续键优化的 3 秒目标�
 - [实现决策追踪](traces/implementations)：历史取舍，不作为当前任务指令。
 
 历史验收只描述记录对应的版本、输入和环境，当前性能结论需重新运行 benchmark。
+
+## Champions 单打前十批量筛查
+
+[Champions 筛查](champions-benchmark.md)提供固定使用率快照、独立三档 HP 的两两配对、每 case 10 秒 bounded 搜索、跳过原因和逐例结果。运行 `npm run build` 后执行 `node dist/src/champions-benchmark.js`；性能扫描与功能测试分开运行。
+
+后续两条优化方向和建议的日常六项集合见[benchmark 选例](champions-benchmark-selection.md)。

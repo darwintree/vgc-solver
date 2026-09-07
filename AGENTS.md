@@ -7,7 +7,7 @@
 
 ## 按任务读取
 
-- 选择优化方案前，读 [项目方向与优化原则](docs/architecture.md#项目方向与优化原则)：当前 1v1 工作服务于未来完整单打、双打的通用求解目标；说明方案的可推广性及仍依赖 1v1 的条件。
+- 可扩展性优化：收到此指令或选择求解优化方案前，读 [项目方向与优化原则](docs/architecture.md#项目方向与优化原则)；执行优化时完成其中的[工作流程](docs/architecture.md#可扩展性优化工作流程)。
 - 修改求解器或转移层前，读 [架构与边界](docs/architecture.md)，再沿实际调用路径检查相关实现。
 - 新增或修改 fixture 时，读 [测试局面](docs/cases.md)，确认 HP、招式、原生 PP 和伤害条件。
 - 修改有界搜索时，读 [区间语义与算法](docs/optimization-techniques/bounded-search.md)，区分 exact 合同与 bounded 证书。

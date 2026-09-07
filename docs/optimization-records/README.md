@@ -11,6 +11,7 @@
 | 2026-09-06，原生满 PP | [优化记录](full-pp-optimization.md)、[独立验收](full-pp-review.md) | PP 模板、事件索引与并行；最终记录 search 中位数约 716 ms，total 约 2201 ms |
 | 2026-09-06，有界搜索 | [case 3–5 验收](bounded-fullpp.md) | 15/15 收敛；这是 bounded 误差证书，不是 exact 完整求解 |
 | 2026-09-07，case 6 | [缓存键优化与三秒目标](case6-performance.md) | search 中位数 30.892 → 23.656 s；3 秒达标 0/5 |
+| 2026-09-07，Champions 前十 | [10 秒筛查](champions-2026-09-07.md) | 54 项可测：16 达标、29 未收敛、9 watchdog；另 351 项跳过 |
 
 各轮输入、预算、准备成本和预热不同，不跨轮计算累计加速比。没有单独 A/B 的技术，不从组合结果分摊收益。
 

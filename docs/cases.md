@@ -103,3 +103,7 @@ npm run benchmark -- --case sucker-punch-5 --workers 8
 扩展局面未纳入默认 demo；原始突袭的满 PP 性能数据不代表新增局面的求解时间。
 
 运行参数和 case 6 的已知限时收敛问题见[benchmark 指南](benchmarking.md)。
+
+## Champions 单打使用率前十
+
+新增独立数据驱动的 405 项配对清单（可用配置、独立三档 HP、原生满 PP），输入来源、跳过规则和实例口径见 [Champions 筛查](champions-benchmark.md)。实现见 [`champions-cases.ts`](../src/champions-cases.ts)，与原有 demo 局面分开运行。
