@@ -83,7 +83,7 @@ export interface SearchNode {
 const DEFAULT_LOWER = -1;
 const DEFAULT_UPPER = 1;
 const EPSILON = 1e-12;
-const EAGER_CERTIFICATE_WIDTH = 1e-9;
+const FRONTIER_TIE_EPSILON = 1e-9;
 
 const nativeAdapter = Object.freeze({
   enumerateTurn,
@@ -206,7 +206,7 @@ class BoundedSearch {
     if (isNative) {
       nativeAudit = auditNativeRules(battle);
       this.memoStateKey = createMemoStateKey(battle, stateKey, nativeAudit);
-      this.ppCache = createPPTransitionCache();
+      this.ppCache = createPPTransitionCache({admitOnSecondUse: true});
       this.ppAudit = auditPPBattle(battle, nativeAudit);
       this.eventPlan = createEventPlan(battle, nativeAudit);
     } else {
@@ -220,16 +220,10 @@ class BoundedSearch {
     this.deadline = Number.isFinite(this.options.maxSearchMs)
       ? searchStart + this.options.maxSearchMs
       : Infinity;
-    if (this.options.warmStartRoot && this.options.lazyCells && root.terminal === null) {
-      this._expand(root);
-      for (let i = 0; root.initialized && i < root.actions1.length; i++) {
-        for (let j = 0; j < root.actions2.length; j++) {
-          this._expandCell(root, i, j);
-          if (this._timedOut()) break;
-        }
-        if (this._timedOut()) break;
-      }
-    }
+    // Warm start initializes the root action dimensions. Cell generation is
+    // still owned by the proof frontier, so the default API does not spend
+    // its entire budget on an unrelated root row before descending.
+    if (this.options.warmStartRoot && root.terminal === null) this._expand(root);
     this._backupFrom([root]);
 
     let converged = false;
@@ -258,6 +252,7 @@ class BoundedSearch {
         // Retry the mandated joint frontier before reporting a stall.
         frontier = this._selectFrontier(root, 'joint');
       }
+      if (!frontier) frontier = this._findAnyFrontier();
       if (!frontier) {
         if (!this.stopReason) this.stopReason = this.limitReached ? 'node-limit' : 'stalled';
         break;
@@ -422,42 +417,11 @@ class BoundedSearch {
       return;
     }
     this._initializeNode(node);
-    if (!this.options.lazyCells) {
-      for (let i = 0; i < node.actions1.length; i++) {
-        for (let j = 0; j < node.actions2.length; j++) {
-          this._expandCell(node, i, j);
-          // A bounded node does not need every action pair when the already
-          // generated matrix entries certify its value. Unknown cells retain
-          // [-1, 1] and remain available to the normal frontier selector if a
-          // parent later needs a tighter child interval.
-          this._backupFrom([node]);
-          if (this._hasSufficientCertificate(node) || this._rootHasTargetWidth()) return;
-          if (this._timedOut()) return;
-        }
-      }
-    }
-  }
-
-  /**
-   * Return whether the current node's refreshed interval is narrow enough to
-   * stop an eager cell pass. The interval itself remains the only certificate
-   * used here; convergence is still decided separately at the root.
-   */
-  _hasSufficientCertificate(node: SearchNode) {
-    if (node.terminal !== null) return true;
-    if (!node.initialized || !node.lowerSolution || !node.upperSolution) return false;
-    // The root may use the requested bounded tolerance. A child uses the
-    // tighter scheduler threshold so its remaining uncertainty falls below
-    // the frontier selector's existing 1e-9 gap cutoff.
-    const threshold = node === this.rootNode
-      ? this.options.tolerance + EPSILON
-      : EAGER_CERTIFICATE_WIDTH;
-    return node.upper - node.lower <= threshold;
-  }
-
-  _rootHasTargetWidth() {
-    return !!this.rootNode &&
-      this.rootNode.upper - this.rootNode.lower <= this.options.tolerance + EPSILON;
+    // Cell generation is scheduled by `_selectFrontier`, which lets the
+    // search descend through a promising generated outcome before paying for
+    // unrelated action pairs. Unknown cells remain [-1, 1], so delaying them
+    // cannot strengthen a bounded certificate. The interval contract and
+    // complete action dimensions remain unchanged.
   }
 
   _expandCell(node: SearchNode, i, j) {
@@ -585,18 +549,56 @@ class BoundedSearch {
   _selectFrontier(root: SearchNode, selectionPolicy = this.options.selectionPolicy) {
     const path = new Set();
     let node = root;
+    // A root security proof propagates through positive-probability child
+    // outcomes: refining a lower root certificate requires lower certificates
+    // from every unresolved descendant on that path. Keep this scheduling
+    // direction for the whole traversal; mixed local matrices still use joint
+    // selection.
+    let lowerProof = false;
+    let directionChosen = selectionPolicy !== 'security';
     while (node && node.terminal === null) {
       if (!node.initialized) return {node, initialize: true};
       if (path.has(node)) return null;
       path.add(node);
       this._refresh(node);
+      if (!directionChosen) {
+        if (root.upper >= DEFAULT_UPPER - EPSILON) {
+          // At the global upper ceiling, keep lower proof only when the
+          // pessimistic incumbent row could still reach that ceiling. If its
+          // optimistic floor is already below the root ceiling, prefer upper
+          // proof to test the opponent column that may invalidate it.
+          let incumbent: {i: number; floor: number; mean: number} | null = null;
+          for (let i = 0; i < root.cells.length; i++) {
+            const row = root.cells[i];
+            const floor = Math.min(...row.map(cell => cell.lower));
+            const mean = row.reduce((sum, cell) => sum + cell.lower, 0) / row.length;
+            if (!incumbent || floor > incumbent.floor + FRONTIER_TIE_EPSILON ||
+                (Math.abs(floor - incumbent.floor) <= FRONTIER_TIE_EPSILON &&
+                 mean > incumbent.mean + FRONTIER_TIE_EPSILON)) {
+              incumbent = {i, floor, mean};
+            }
+          }
+          const optimisticFloor = Math.min(...root.cells[incumbent.i].map(cell => cell.upper));
+          lowerProof = optimisticFloor >= root.upper - EPSILON;
+        } else {
+          lowerProof = (this.proofTurn & 1) === 1;
+        }
+        directionChosen = true;
+      }
       const rowStrategy = node.upperSolution?.p1 || [];
       const colStrategy = node.lowerSolution?.p2 || [];
+      const canExpandCell = cell => {
+        if (cell.upper - cell.lower <= 1e-9) return false;
+        if (!cell.outcomes) return true;
+        return cell.outcomes.some(outcome => outcome.utility === null && outcome.child &&
+          outcome.child.upper - outcome.child.lower > 1e-9);
+      };
       const chooseJoint = () => {
         let selected = null;
         for (let i = 0; i < node.cells.length; i++) {
           for (let j = 0; j < node.cells[i].length; j++) {
             const cell = node.cells[i][j];
+            if (!canExpandCell(cell)) continue;
             const gap = cell.upper - cell.lower;
             const score = (rowStrategy[i] || 0) * (colStrategy[j] || 0) * gap;
             if (!selected || score > selected.score + EPSILON ||
@@ -607,11 +609,30 @@ class BoundedSearch {
         }
         return selected;
       };
-      const canExpandCell = cell => {
-        if (cell.upper - cell.lower <= 1e-9) return false;
-        if (!cell.outcomes) return true;
-        return cell.outcomes.some(outcome => outcome.utility === null && outcome.child &&
-          outcome.child.upper - outcome.child.lower > 1e-9);
+      const chooseJointUnexpanded = () => {
+        let selected = null;
+        for (let i = 0; i < node.cells.length; i++) {
+          for (let j = 0; j < node.cells[i].length; j++) {
+            const cell = node.cells[i][j];
+            if (cell.outcomes || cell.upper - cell.lower <= 1e-9) continue;
+            const gap = cell.upper - cell.lower;
+            const score = (rowStrategy[i] || 0) * (colStrategy[j] || 0) * gap;
+            if (!selected || score > selected.score + EPSILON ||
+                (Math.abs(score - selected.score) <= EPSILON && gap > selected.gap)) {
+              selected = {i, j, cell, score, gap};
+            }
+          }
+        }
+        if (!selected || selected.score > EPSILON) return selected;
+        for (let i = 0; i < node.cells.length; i++) {
+          for (let j = 0; j < node.cells[i].length; j++) {
+            const cell = node.cells[i][j];
+            if (!cell.outcomes && cell.upper - cell.lower > selected.gap + EPSILON) {
+              selected = {i, j, cell, score: 0, gap: cell.upper - cell.lower};
+            }
+          }
+        }
+        return selected;
       };
       const chooseSecurityCell = (cells, lowerProof) => {
         let selected = null;
@@ -634,34 +655,41 @@ class BoundedSearch {
         }
         return selected;
       };
+      const lowerPotential = cells =>
+        Math.min(...cells.map(cell => cell.upper)) - Math.min(...cells.map(cell => cell.lower));
+      const upperPotential = cells =>
+        Math.max(...cells.map(cell => cell.upper)) - Math.max(...cells.map(cell => cell.lower));
       let chosen = null;
+      let preferUnexpanded = false;
       if (selectionPolicy === 'security') {
-        const lowerProof = (this.proofTurn & 1) === 1;
         const bestPureRowFloor = Math.max(...node.cells.map(row =>
           Math.min(...row.map(cell => cell.lower))));
         const bestPureColumnCeiling = Math.min(...node.cells[0].map((_, j) =>
           Math.max(...node.cells.map(row => row[j].upper))));
         const lowerMatrixIsMixed = node.lowerSolution.value > bestPureRowFloor + 1e-9;
         const upperMatrixIsMixed = node.upperSolution.value < bestPureColumnCeiling - 1e-9;
-        if ((lowerProof && lowerMatrixIsMixed) || (!lowerProof && upperMatrixIsMixed)) {
-          chosen = chooseJoint();
-        }
-        if (chosen) {
-          // The joint branch below handles support and child selection.
-        } else if (lowerProof) {
+        const mixedImprovement = (lowerProof && lowerMatrixIsMixed) ||
+          (!lowerProof && upperMatrixIsMixed);
+        preferUnexpanded = mixedImprovement;
+        if (!mixedImprovement && lowerProof) {
           const rowStats = node.cells.map(row => ({
             floor: Math.min(...row.map(cell => cell.lower)),
             mean: row.reduce((sum, cell) => sum + cell.lower, 0) / row.length,
           }));
           let row = 0;
           for (let i = 1; i < rowStats.length; i++) {
-            if (rowStats[i].floor > rowStats[row].floor + EPSILON ||
-                (Math.abs(rowStats[i].floor - rowStats[row].floor) <= EPSILON &&
-                 rowStats[i].mean > rowStats[row].mean + EPSILON)) row = i;
+            if (rowStats[i].floor > rowStats[row].floor + FRONTIER_TIE_EPSILON ||
+                (Math.abs(rowStats[i].floor - rowStats[row].floor) <= FRONTIER_TIE_EPSILON &&
+                 rowStats[i].mean > rowStats[row].mean + FRONTIER_TIE_EPSILON)) row = i;
           }
-          const selected = chooseSecurityCell(node.cells[row], true);
-          if (selected) chosen = {...selected, i: row};
-        } else {
+          if (Math.min(...node.cells[row].map(cell => cell.upper)) < DEFAULT_UPPER - EPSILON) {
+            preferUnexpanded = true;
+          }
+          if (lowerPotential(node.cells[row]) > FRONTIER_TIE_EPSILON) {
+            const selected = chooseSecurityCell(node.cells[row], true);
+            if (selected) chosen = {...selected, i: row};
+          }
+        } else if (!mixedImprovement) {
           const columnStats = node.cells[0].map((_, j) => {
             const values = node.cells.map(row => row[j].upper);
             return {
@@ -671,21 +699,30 @@ class BoundedSearch {
           });
           let column = 0;
           for (let j = 1; j < columnStats.length; j++) {
-            if (columnStats[j].ceiling < columnStats[column].ceiling - EPSILON ||
-                (Math.abs(columnStats[j].ceiling - columnStats[column].ceiling) <= EPSILON &&
-                 columnStats[j].mean < columnStats[column].mean - EPSILON)) column = j;
+            if (columnStats[j].ceiling < columnStats[column].ceiling - FRONTIER_TIE_EPSILON ||
+                (Math.abs(columnStats[j].ceiling - columnStats[column].ceiling) <= FRONTIER_TIE_EPSILON &&
+                 columnStats[j].mean < columnStats[column].mean - FRONTIER_TIE_EPSILON)) column = j;
           }
-          const selected = chooseSecurityCell(node.cells.map(row => row[column]), false);
-          if (selected) chosen = {...selected, i: selected.j, j: column};
+          const selectedColumn = node.cells.map(row => row[column]);
+          if (Math.max(...selectedColumn.map(cell => cell.lower)) > DEFAULT_LOWER + EPSILON) {
+            preferUnexpanded = true;
+          }
+          if (upperPotential(selectedColumn) > FRONTIER_TIE_EPSILON) {
+            const selected = chooseSecurityCell(selectedColumn, false);
+            if (selected) chosen = {...selected, i: selected.j, j: column};
+          }
         }
         // If the selected security row/column is already resolved, retain
         // the joint optimistic/pessimistic frontier as a progress fallback.
+        if (preferUnexpanded && (!chosen || chosen.cell.outcomes)) {
+          const unexpanded = chooseJointUnexpanded();
+          if (unexpanded) chosen = unexpanded;
+        }
         if (!chosen || chosen.gap <= 1e-9) chosen = chooseJoint();
       } else {
-        chosen = chooseJoint();
+        chosen = chooseJointUnexpanded() || chooseJoint();
       }
       if (!chosen || chosen.gap <= 1e-9) return null;
-      if (!chosen.cell.outcomes) return {node, i: chosen.i, j: chosen.j};
       // If equilibrium support gives a zero score, the largest gap remains a
       // valid best-first fallback and preserves progress for degenerate games.
       if (chosen.score <= EPSILON) {
@@ -695,6 +732,41 @@ class BoundedSearch {
             if (cell.upper - cell.lower > chosen.gap) chosen = {i, j, cell, gap: cell.upper - cell.lower, score: 0};
           }
         }
+      }
+      // Keep this guard after the zero-support fallback: a defensive
+      // synthetic or future selector may replace a generated choice with an
+      // ungenerated cell while preserving conservative bounds.
+      if (!chosen.cell.outcomes) return {node, i: chosen.i, j: chosen.j};
+      // An outcome that still leaves the complete [-1, 1] interval carries
+      // no directional information. Before descending into that opaque child,
+      // spend one transition on another cell at this node so a useful row or
+      // column certificate can emerge. The preference follows the active
+      // proof direction; joint selection uses the existing support score.
+      const fullyUnknown = chosen.cell.outcomes &&
+        chosen.cell.lower <= DEFAULT_LOWER + EPSILON &&
+        chosen.cell.upper >= DEFAULT_UPPER - EPSILON;
+      if (fullyUnknown) {
+        let sibling = null;
+        const considerCandidate = (i, j) => {
+          const cell = node.cells[i][j];
+          if (cell.outcomes || cell.upper - cell.lower <= 1e-9) return;
+          const preferredAxis = selectionPolicy === 'security' && lowerProof ? 'row' : 'column';
+          const priority = preferredAxis === 'row'
+            ? (i === chosen.i ? 0 : j === chosen.j ? 1 : 2)
+            : (j === chosen.j ? 0 : i === chosen.i ? 1 : 2);
+          const score = (rowStrategy[i] || 0) * (colStrategy[j] || 0);
+          const gap = cell.upper - cell.lower;
+          if (!sibling || priority < sibling.priority ||
+              (priority === sibling.priority &&
+               (score > sibling.score + EPSILON ||
+                (Math.abs(score - sibling.score) <= EPSILON && gap > sibling.gap + EPSILON)))) {
+            sibling = {i, j, priority, score, gap};
+          }
+        };
+        for (let i = 0; i < node.cells.length; i++) {
+          for (let j = 0; j < node.cells[i].length; j++) considerCandidate(i, j);
+        }
+        if (sibling) return {node, i: sibling.i, j: sibling.j};
       }
       let next = null;
       let nextScore = -1;
@@ -710,6 +782,34 @@ class BoundedSearch {
       }
       if (!next) return null;
       node = next;
+    }
+    return null;
+  }
+
+  /**
+   * Recover liveness when a strategy path closes on a cycle or has no
+   * expandable support cell. Every interned node is reachable from the root
+   * through a generated outcome, so a conservative graph scan can select any
+   * remaining uninitialized node or ungenerated cell. This path is only used
+   * after both security and joint selectors fail.
+   */
+  _findAnyFrontier() {
+    for (const node of this.nodes.values()) {
+      if (this._timedOut()) {
+        this.stopReason = 'time';
+        return null;
+      }
+      if (node.terminal !== null) continue;
+      if (node.upper - node.lower <= 1e-9) continue;
+      if (!node.initialized) {
+        return {node, initialize: true};
+      }
+      for (let i = 0; i < node.cells.length; i++) {
+        for (let j = 0; j < node.cells[i].length; j++) {
+          const cell = node.cells[i][j];
+          if (!cell.outcomes && cell.upper - cell.lower > 1e-9) return {node, i, j};
+        }
+      }
     }
     return null;
   }

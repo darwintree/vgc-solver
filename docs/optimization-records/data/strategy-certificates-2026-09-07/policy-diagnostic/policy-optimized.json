@@ -1,0 +1,3184 @@
+{
+  "case": "garchomp-100-vs-archaludon-100",
+  "policy": "P1 Earthquake every turn; P2 adversarial legal replies",
+  "hp": {
+    "p1": "185/185",
+    "p2": "167/167"
+  },
+  "pp": [
+    [
+      {
+        "id": "earthquake",
+        "pp": 16,
+        "maxpp": 16
+      },
+      {
+        "id": "stealthrock",
+        "pp": 32,
+        "maxpp": 32
+      },
+      {
+        "id": "scaleshot",
+        "pp": 32,
+        "maxpp": 32
+      },
+      {
+        "id": "swordsdance",
+        "pp": 32,
+        "maxpp": 32
+      }
+    ],
+    [
+      {
+        "id": "flashcannon",
+        "pp": 16,
+        "maxpp": 16
+      },
+      {
+        "id": "dracometeor",
+        "pp": 8,
+        "maxpp": 8
+      },
+      {
+        "id": "thunderbolt",
+        "pp": 24,
+        "maxpp": 24
+      },
+      {
+        "id": "stealthrock",
+        "pp": 32,
+        "maxpp": 32
+      }
+    ]
+  ],
+  "replies": [
+    {
+      "firstReply": "Flash Cannon (flashcannon)",
+      "firstOutcomes": [
+        {
+          "probability": 0.04166666674427691,
+          "utility": 1,
+          "hp": null
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:35/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:35/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:58/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:58/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:56/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:56/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:55/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:55/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:53/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:53/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:52/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:52/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:50/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:50/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:49/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:49/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:47/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:47/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:46/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:46/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:44/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:44/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:43/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:43/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:41/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:41/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:40/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:40/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:38/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:38/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:37/185 p2:44/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:37/185 p2:44/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:85/185 p2:44/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:85/185 p2:44/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:101/185 p2:44/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:101/185 p2:44/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:100/185 p2:44/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:100/185 p2:44/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:98/185 p2:44/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:98/185 p2:44/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:97/185 p2:44/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:97/185 p2:44/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:95/185 p2:44/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:95/185 p2:44/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:94/185 p2:44/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:94/185 p2:44/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:92/185 p2:44/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:92/185 p2:44/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:91/185 p2:44/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:91/185 p2:44/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:89/185 p2:44/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:89/185 p2:44/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:88/185 p2:44/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:88/185 p2:44/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:86/185 p2:44/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:86/185 p2:44/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:35/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:35/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:58/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:58/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:56/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:56/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:55/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:55/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:53/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:53/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:52/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:52/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:50/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:50/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:49/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:49/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:47/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:47/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:46/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:46/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:44/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:44/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:43/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:43/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:41/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:41/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:40/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:40/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:38/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:38/185 p2:70/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:37/185 p2:70/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:37/185 p2:70/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:85/185 p2:70/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:85/185 p2:70/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:101/185 p2:70/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:101/185 p2:70/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:100/185 p2:70/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:100/185 p2:70/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:98/185 p2:70/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:98/185 p2:70/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:97/185 p2:70/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:97/185 p2:70/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:95/185 p2:70/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:95/185 p2:70/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:94/185 p2:70/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:94/185 p2:70/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:92/185 p2:70/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:92/185 p2:70/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:91/185 p2:70/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:91/185 p2:70/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:89/185 p2:70/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:89/185 p2:70/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:88/185 p2:70/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:88/185 p2:70/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:86/185 p2:70/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:86/185 p2:70/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:35/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:35/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:58/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:58/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:56/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:56/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:55/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:55/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:53/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:53/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:52/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:52/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:50/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:50/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:49/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:49/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:47/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:47/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:46/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:46/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:44/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:44/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:43/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:43/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:41/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:41/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:40/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:40/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:38/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:38/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:37/185 p2:68/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:37/185 p2:68/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:85/185 p2:68/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:85/185 p2:68/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:101/185 p2:68/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:101/185 p2:68/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:100/185 p2:68/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:100/185 p2:68/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:98/185 p2:68/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:98/185 p2:68/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:97/185 p2:68/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:97/185 p2:68/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:95/185 p2:68/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:95/185 p2:68/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:94/185 p2:68/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:94/185 p2:68/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:92/185 p2:68/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:92/185 p2:68/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:91/185 p2:68/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:91/185 p2:68/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:89/185 p2:68/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:89/185 p2:68/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:88/185 p2:68/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:88/185 p2:68/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:86/185 p2:68/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:86/185 p2:68/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:35/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:35/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:58/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:58/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:56/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:56/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:55/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:55/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:53/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:53/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:52/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:52/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:50/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:50/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:49/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:49/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:47/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:47/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:46/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:46/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:44/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:44/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:43/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:43/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:41/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:41/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:40/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:40/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:38/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:38/185 p2:64/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:37/185 p2:64/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:37/185 p2:64/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:85/185 p2:64/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:85/185 p2:64/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:101/185 p2:64/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:101/185 p2:64/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:100/185 p2:64/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:100/185 p2:64/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:98/185 p2:64/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:98/185 p2:64/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:97/185 p2:64/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:97/185 p2:64/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:95/185 p2:64/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:95/185 p2:64/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:94/185 p2:64/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:94/185 p2:64/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:92/185 p2:64/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:92/185 p2:64/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:91/185 p2:64/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:91/185 p2:64/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:89/185 p2:64/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:89/185 p2:64/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:88/185 p2:64/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:88/185 p2:64/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:86/185 p2:64/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:86/185 p2:64/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:35/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:35/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:58/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:58/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:56/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:56/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:55/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:55/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:53/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:53/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:52/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:52/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:50/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:50/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:49/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:49/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:47/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:47/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:46/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:46/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:44/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:44/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:43/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:43/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:41/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:41/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:40/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:40/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:38/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:38/185 p2:62/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:37/185 p2:62/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:37/185 p2:62/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:85/185 p2:62/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:85/185 p2:62/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:101/185 p2:62/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:101/185 p2:62/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:100/185 p2:62/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:100/185 p2:62/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:98/185 p2:62/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:98/185 p2:62/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:97/185 p2:62/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:97/185 p2:62/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:95/185 p2:62/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:95/185 p2:62/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:94/185 p2:62/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:94/185 p2:62/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:92/185 p2:62/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:92/185 p2:62/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:91/185 p2:62/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:91/185 p2:62/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:89/185 p2:62/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:89/185 p2:62/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:88/185 p2:62/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:88/185 p2:62/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:86/185 p2:62/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:86/185 p2:62/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:35/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:35/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:58/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:58/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:56/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:56/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:55/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:55/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:53/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:53/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:52/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:52/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:50/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:50/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:49/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:49/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:47/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:47/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:46/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:46/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:44/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:44/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:43/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:43/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:41/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:41/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:40/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:40/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:38/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:38/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:37/185 p2:58/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:37/185 p2:58/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:85/185 p2:58/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:85/185 p2:58/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:101/185 p2:58/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:101/185 p2:58/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:100/185 p2:58/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:100/185 p2:58/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:98/185 p2:58/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:98/185 p2:58/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:97/185 p2:58/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:97/185 p2:58/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:95/185 p2:58/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:95/185 p2:58/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:94/185 p2:58/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:94/185 p2:58/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:92/185 p2:58/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:92/185 p2:58/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:91/185 p2:58/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:91/185 p2:58/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:89/185 p2:58/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:89/185 p2:58/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:88/185 p2:58/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:88/185 p2:58/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:86/185 p2:58/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:86/185 p2:58/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:35/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:35/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:58/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:58/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:56/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:56/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:55/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:55/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:53/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:53/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:52/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:52/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:50/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:50/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:49/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:49/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:47/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:47/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:46/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:46/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:44/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:44/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:43/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:43/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:41/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:41/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:40/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:40/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:38/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:38/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:37/185 p2:56/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:37/185 p2:56/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:85/185 p2:56/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:85/185 p2:56/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:101/185 p2:56/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:101/185 p2:56/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:100/185 p2:56/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:100/185 p2:56/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:98/185 p2:56/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:98/185 p2:56/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:97/185 p2:56/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:97/185 p2:56/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:95/185 p2:56/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:95/185 p2:56/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:94/185 p2:56/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:94/185 p2:56/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:92/185 p2:56/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:92/185 p2:56/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:91/185 p2:56/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:91/185 p2:56/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:89/185 p2:56/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:89/185 p2:56/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:88/185 p2:56/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:88/185 p2:56/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:86/185 p2:56/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:86/185 p2:56/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:35/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:35/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:58/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:58/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:56/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:56/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:55/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:55/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:53/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:53/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:52/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:52/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:50/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:50/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:49/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:49/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:47/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:47/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:46/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:46/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:44/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:44/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:43/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:43/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:41/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:41/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:40/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:40/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:38/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:38/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:37/185 p2:52/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:37/185 p2:52/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:85/185 p2:52/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:85/185 p2:52/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:101/185 p2:52/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:101/185 p2:52/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:100/185 p2:52/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:100/185 p2:52/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:98/185 p2:52/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:98/185 p2:52/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:97/185 p2:52/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:97/185 p2:52/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:95/185 p2:52/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:95/185 p2:52/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:94/185 p2:52/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:94/185 p2:52/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:92/185 p2:52/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:92/185 p2:52/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:91/185 p2:52/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:91/185 p2:52/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:89/185 p2:52/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:89/185 p2:52/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:88/185 p2:52/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:88/185 p2:52/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:86/185 p2:52/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:86/185 p2:52/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:35/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:35/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:58/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:58/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:56/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:56/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:55/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:55/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:53/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:53/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:52/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:52/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:50/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:50/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:49/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:49/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:47/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:47/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:46/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:46/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:44/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:44/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:43/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:43/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:41/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:41/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:40/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:40/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:38/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:38/185 p2:50/167"
+        },
+        {
+          "probability": 0.000031195746612411336,
+          "utility": null,
+          "hp": "p1:37/185 p2:50/167"
+        },
+        {
+          "probability": 0.000280761719221169,
+          "utility": null,
+          "hp": "p1:37/185 p2:50/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:85/185 p2:50/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:85/185 p2:50/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:101/185 p2:50/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:101/185 p2:50/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:100/185 p2:50/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:100/185 p2:50/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:98/185 p2:50/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:98/185 p2:50/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:97/185 p2:50/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:97/185 p2:50/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:95/185 p2:50/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:95/185 p2:50/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:94/185 p2:50/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:94/185 p2:50/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:92/185 p2:50/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:92/185 p2:50/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:91/185 p2:50/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:91/185 p2:50/167"
+        },
+        {
+          "probability": 0.0014350043413818043,
+          "utility": null,
+          "hp": "p1:89/185 p2:50/167"
+        },
+        {
+          "probability": 0.01291503905907172,
+          "utility": null,
+          "hp": "p1:89/185 p2:50/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:88/185 p2:50/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:88/185 p2:50/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:86/185 p2:50/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:86/185 p2:50/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:35/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:35/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:58/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:58/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:56/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:56/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:55/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:55/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:53/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:53/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:52/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:52/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:50/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:50/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:49/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:49/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:47/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:47/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:46/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:46/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:44/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:44/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:43/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:43/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:41/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:41/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:40/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:40/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:38/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:38/185 p2:46/167"
+        },
+        {
+          "probability": 0.000015597873306205668,
+          "utility": null,
+          "hp": "p1:37/185 p2:46/167"
+        },
+        {
+          "probability": 0.0001403808596105845,
+          "utility": null,
+          "hp": "p1:37/185 p2:46/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:85/185 p2:46/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:85/185 p2:46/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:101/185 p2:46/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:101/185 p2:46/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:100/185 p2:46/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:100/185 p2:46/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:98/185 p2:46/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:98/185 p2:46/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:97/185 p2:46/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:97/185 p2:46/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:95/185 p2:46/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:95/185 p2:46/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:94/185 p2:46/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:94/185 p2:46/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:92/185 p2:46/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:92/185 p2:46/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:91/185 p2:46/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:91/185 p2:46/167"
+        },
+        {
+          "probability": 0.0007175021706909021,
+          "utility": null,
+          "hp": "p1:89/185 p2:46/167"
+        },
+        {
+          "probability": 0.00645751952953586,
+          "utility": null,
+          "hp": "p1:89/185 p2:46/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:88/185 p2:46/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:88/185 p2:46/167"
+        },
+        {
+          "probability": 0.00035875108534545106,
+          "utility": null,
+          "hp": "p1:86/185 p2:46/167"
+        },
+        {
+          "probability": 0.00322875976476793,
+          "utility": null,
+          "hp": "p1:86/185 p2:46/167"
+        }
+      ],
+      "firstSimulatorRuns": 574,
+      "secondReplyCount": 2240,
+      "transitions": 2241,
+      "simulatorRuns": 47614,
+      "outcomeCount": 2801,
+      "guaranteedWinByTwoTurns": true,
+      "refutations": []
+    },
+    {
+      "firstReply": "Draco Meteor (dracometeor)",
+      "firstOutcomes": [
+        {
+          "probability": 0.04166666674427688,
+          "utility": 1,
+          "hp": null
+        },
+        {
+          "probability": 0.0022460937543504157,
+          "utility": null,
+          "hp": "p1:1/185 p2:44/167"
+        },
+        {
+          "probability": 0.05166015624965136,
+          "utility": null,
+          "hp": "p1:1/185 p2:44/167"
+        },
+        {
+          "probability": 0.005989583324480918,
+          "utility": null,
+          "hp": "p1:185/185 p2:44/167"
+        },
+        {
+          "probability": 0.0022460937543504157,
+          "utility": null,
+          "hp": "p1:1/185 p2:70/167"
+        },
+        {
+          "probability": 0.05166015624965136,
+          "utility": null,
+          "hp": "p1:1/185 p2:70/167"
+        },
+        {
+          "probability": 0.005989583324480918,
+          "utility": null,
+          "hp": "p1:185/185 p2:70/167"
+        },
+        {
+          "probability": 0.004492187508700831,
+          "utility": null,
+          "hp": "p1:1/185 p2:68/167"
+        },
+        {
+          "probability": 0.10332031249930272,
+          "utility": null,
+          "hp": "p1:1/185 p2:68/167"
+        },
+        {
+          "probability": 0.011979166648961837,
+          "utility": null,
+          "hp": "p1:185/185 p2:68/167"
+        },
+        {
+          "probability": 0.004492187508700831,
+          "utility": null,
+          "hp": "p1:1/185 p2:64/167"
+        },
+        {
+          "probability": 0.10332031249930272,
+          "utility": null,
+          "hp": "p1:1/185 p2:64/167"
+        },
+        {
+          "probability": 0.011979166648961837,
+          "utility": null,
+          "hp": "p1:185/185 p2:64/167"
+        },
+        {
+          "probability": 0.0022460937543504157,
+          "utility": null,
+          "hp": "p1:1/185 p2:62/167"
+        },
+        {
+          "probability": 0.05166015624965136,
+          "utility": null,
+          "hp": "p1:1/185 p2:62/167"
+        },
+        {
+          "probability": 0.005989583324480918,
+          "utility": null,
+          "hp": "p1:185/185 p2:62/167"
+        },
+        {
+          "probability": 0.004492187508700831,
+          "utility": null,
+          "hp": "p1:1/185 p2:58/167"
+        },
+        {
+          "probability": 0.10332031249930272,
+          "utility": null,
+          "hp": "p1:1/185 p2:58/167"
+        },
+        {
+          "probability": 0.011979166648961837,
+          "utility": null,
+          "hp": "p1:185/185 p2:58/167"
+        },
+        {
+          "probability": 0.004492187508700831,
+          "utility": null,
+          "hp": "p1:1/185 p2:56/167"
+        },
+        {
+          "probability": 0.10332031249930272,
+          "utility": null,
+          "hp": "p1:1/185 p2:56/167"
+        },
+        {
+          "probability": 0.011979166648961837,
+          "utility": null,
+          "hp": "p1:185/185 p2:56/167"
+        },
+        {
+          "probability": 0.004492187508700831,
+          "utility": null,
+          "hp": "p1:1/185 p2:52/167"
+        },
+        {
+          "probability": 0.10332031249930272,
+          "utility": null,
+          "hp": "p1:1/185 p2:52/167"
+        },
+        {
+          "probability": 0.011979166648961837,
+          "utility": null,
+          "hp": "p1:185/185 p2:52/167"
+        },
+        {
+          "probability": 0.004492187508700831,
+          "utility": null,
+          "hp": "p1:1/185 p2:50/167"
+        },
+        {
+          "probability": 0.10332031249930272,
+          "utility": null,
+          "hp": "p1:1/185 p2:50/167"
+        },
+        {
+          "probability": 0.011979166648961837,
+          "utility": null,
+          "hp": "p1:185/185 p2:50/167"
+        },
+        {
+          "probability": 0.0022460937543504157,
+          "utility": null,
+          "hp": "p1:1/185 p2:46/167"
+        },
+        {
+          "probability": 0.05166015624965136,
+          "utility": null,
+          "hp": "p1:1/185 p2:46/167"
+        },
+        {
+          "probability": 0.005989583324480918,
+          "utility": null,
+          "hp": "p1:185/185 p2:46/167"
+        }
+      ],
+      "firstSimulatorRuns": 344,
+      "secondReplyCount": 120,
+      "transitions": 121,
+      "simulatorRuns": 2864,
+      "outcomeCount": 151,
+      "guaranteedWinByTwoTurns": true,
+      "refutations": []
+    },
+    {
+      "firstReply": "Thunderbolt (thunderbolt)",
+      "firstOutcomes": [
+        {
+          "probability": 0.04166666674427688,
+          "utility": 1,
+          "hp": null
+        },
+        {
+          "probability": 0.059895833328482695,
+          "utility": null,
+          "hp": "p1:185/185 p2:44/167"
+        },
+        {
+          "probability": 0.059895833328482695,
+          "utility": null,
+          "hp": "p1:185/185 p2:70/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:68/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:64/167"
+        },
+        {
+          "probability": 0.059895833328482695,
+          "utility": null,
+          "hp": "p1:185/185 p2:62/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:58/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:56/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:52/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:50/167"
+        },
+        {
+          "probability": 0.059895833328482695,
+          "utility": null,
+          "hp": "p1:185/185 p2:46/167"
+        }
+      ],
+      "firstSimulatorRuns": 24,
+      "secondReplyCount": 40,
+      "transitions": 41,
+      "simulatorRuns": 864,
+      "outcomeCount": 51,
+      "guaranteedWinByTwoTurns": true,
+      "refutations": []
+    },
+    {
+      "firstReply": "Stealth Rock (stealthrock)",
+      "firstOutcomes": [
+        {
+          "probability": 0.04166666674427688,
+          "utility": 1,
+          "hp": null
+        },
+        {
+          "probability": 0.059895833328482695,
+          "utility": null,
+          "hp": "p1:185/185 p2:44/167"
+        },
+        {
+          "probability": 0.059895833328482695,
+          "utility": null,
+          "hp": "p1:185/185 p2:70/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:68/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:64/167"
+        },
+        {
+          "probability": 0.059895833328482695,
+          "utility": null,
+          "hp": "p1:185/185 p2:62/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:58/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:56/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:52/167"
+        },
+        {
+          "probability": 0.11979166665696539,
+          "utility": null,
+          "hp": "p1:185/185 p2:50/167"
+        },
+        {
+          "probability": 0.059895833328482695,
+          "utility": null,
+          "hp": "p1:185/185 p2:46/167"
+        }
+      ],
+      "firstSimulatorRuns": 24,
+      "secondReplyCount": 40,
+      "transitions": 41,
+      "simulatorRuns": 864,
+      "outcomeCount": 51,
+      "guaranteedWinByTwoTurns": true,
+      "refutations": []
+    }
+  ],
+  "certificate": {
+    "completeNativeRandomDistributions": true,
+    "depth": 2,
+    "guaranteedWinByTwoTurns": true,
+    "total": {
+      "transitions": 2444,
+      "simulatorRuns": 52206,
+      "outcomes": 3054
+    }
+  }
+}

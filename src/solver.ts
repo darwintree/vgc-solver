@@ -60,7 +60,7 @@ class OneVsOneSolver {
     const nativeAudit = auditNativeRules(battle);
     this.memoStateKey = createMemoStateKey(battle, stateKey, nativeAudit);
     const root = snapshotBattle(battle);
-    this.ppCache = createPPTransitionCache();
+    this.ppCache = createPPTransitionCache({admitOnSecondUse: true});
     this.ppAudit = auditPPBattle(battle, nativeAudit);
     const eventPlan = createEventPlan(battle, nativeAudit);
     // The root's strategy and complete payoff matrix are part of the public result.

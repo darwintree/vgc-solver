@@ -50,8 +50,8 @@ test('expands one ply at a time and certifies an exact DAG', () => {
   const result = new BoundedSolver({adapter, tolerance: 0.02, warmStartRoot: false}).solve('root');
 
   assert.equal(result.converged, true);
-  assert.equal(result.exact, false);
-  assert.equal(result.approximate, true);
+  assert.equal(result.exact, true);
+  assert.equal(result.approximate, false);
   assert.ok(result.lowerBound <= 1);
   assert.ok(result.upperBound >= 1);
   assert.ok(result.lowerBound >= 1 - 1e-8);
@@ -62,7 +62,7 @@ test('expands one ply at a time and certifies an exact DAG', () => {
   for (const row of result.payoffMatrixIntervals) {
     for (const cell of row) assert.ok(cell.lowerBound <= cell.upperBound);
   }
-  assert.deepEqual(result.payoffMatrixIntervals[1][0], {lowerBound: -1, upperBound: 1});
+  assert.deepEqual(result.payoffMatrixIntervals[1][0], {lowerBound: -1, upperBound: -1});
 });
 
 test('eager expansion stops on a pure security certificate and preserves unknown cells', () => {
@@ -179,12 +179,13 @@ test('root tolerance stops a deeper eager pass before child exactness', () => {
   assert.ok(result.upperBound <= 1 + 1e-9);
   assert.ok(result.lowerBound <= exact + 1e-9);
   assert.ok(result.upperBound >= exact - 1e-9);
-  assert.ok(leaf.upper - leaf.lower > 1e-9,
-    'the leaf remains wider than the local scheduler threshold');
   assert.ok(leaf.upper - leaf.lower <= 0.02 + 1e-9,
     'the propagated root certificate is within the requested tolerance');
-  assert.equal(leaf.cells.flat().filter(cell => !cell.outcomes).length, 2,
-    'the unknown leaf row remains available for later refinement');
+  const unknownLeafCells = leaf.cells.flat().filter(cell => !cell.outcomes);
+  assert.ok(unknownLeafCells.length >= 1,
+    'at least one unknown leaf cell remains available for later refinement');
+  assert.ok(unknownLeafCells.every(cell => cell.lower === -1 && cell.upper === 1),
+    'unexpanded leaf cells retain the conservative interval');
 });
 
 test('returns honest bounds when the node limit blocks an unresolved child', () => {
@@ -340,6 +341,8 @@ function securityFrontierNode(lower, upper, lowerValue, upperValue) {
   return {
     terminal: null,
     initialized: true,
+    lower: lowerValue,
+    upper: upperValue,
     cells: lower.map((row, i) => row.map((value, j) => ({
       lower: value,
       upper: upper[i][j],
@@ -385,6 +388,91 @@ test('security proof falls back when its selected row has no expandable cell', (
     [[0.5, 0.5], [0.5, 0.5]],
     0.5, 0.5
   );
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.deepEqual({i: frontier.i, j: frontier.j}, {i: 1, j: 0});
+});
+
+test('lower proof uses row mean after pessimistic floors tie', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 1;
+  const root = securityFrontierNode(
+    [[0.8, 0.8], [0.8, 0.81]],
+    [[0.9, 0.9], [1, 1]],
+    0.8, 0.9
+  );
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.deepEqual({i: frontier.i, j: frontier.j}, {i: 1, j: 0});
+});
+
+test('upper proof prefers the smallest upper column ceiling for a negative game', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 0;
+  const root = securityFrontierNode(
+    [[-0.9, -1], [-0.9, -1]],
+    [[-0.8, 1], [-0.8, 1]],
+    -0.9, -0.8
+  );
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.equal(frontier.j, 0);
+});
+
+test('upper proof treats near-equal pessimistic columns as a scheduling tie', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 0;
+  const root = securityFrontierNode(
+    [
+      [-0.800000000379, -0.800000000279],
+      [-0.800000000500, -0.800000000400],
+    ],
+    [
+      [0, -0.5],
+      [0, -0.5],
+    ],
+    -0.8, 0
+  );
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.equal(frontier.j, 1);
+});
+
+test('upper proof skips a column whose ceiling is locked by an exact cell', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 0;
+  const root = securityFrontierNode(
+    [[1, -1], [-1, -1]],
+    [[1, 1], [1, 1]],
+    -1, 1
+  );
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.equal(frontier.j, 1);
+});
+
+test('lower proof skips a row whose floor is locked by an exact cell', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 1;
+  const root = securityFrontierNode(
+    [[-1, -1], [-1, -1]],
+    [[-1, 0], [1, 1]],
+    -1, 1
+  );
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.equal(frontier.i, 1);
+});
+
+test('global upper direction switches to an upper proof when incumbent cannot reach it', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 1;
+  const root = securityFrontierNode(
+    [[0.4, 0.4], [-1, -1]],
+    [[0.6, 0.6], [1, 1]],
+    0.4, 1
+  );
+  solver.rootNode = root;
   const frontier = solver._selectFrontier(root, 'security');
   assert.deepEqual({i: frontier.i, j: frontier.j}, {i: 1, j: 0});
 });
@@ -453,4 +541,176 @@ test('auto selection switches on a mixed root and resets per solve', () => {
   assert.ok(policies.length > 0);
   assert.ok(policies.every(policy => policy === 'security'));
   assert.equal(solver.autoJoint, false);
+});
+
+test('incremental eager frontier follows a stochastic winning path before unrelated rows', () => {
+  const expanded = [];
+  const adapter = toyAdapter({
+    actions: {
+      root: ['permuted-seed', 'expensive-alternative', 'unused-alternative'],
+      child: ['continue'],
+      deep: ['finish'],
+    },
+    opponentActions: {
+      root: ['first-column', 'unused-column'],
+      child: ['continue'],
+      deep: ['finish'],
+    },
+    transitions: {
+      // The first matrix cell is a stochastic path whose every outcome wins.
+      'root:permuted-seed:first-column': [
+        {probability: 0.75, utility: 1},
+        {probability: 0.25, snapshot: 'deep'},
+      ],
+      // A row certificate must cover every opponent reply, including the
+      // response whose name is deliberately unrelated to the seed action.
+      'root:permuted-seed:unused-column': [
+        {probability: 0.75, utility: 1},
+        {probability: 0.25, snapshot: 'deep'},
+      ],
+      'deep:finish:finish': utility(1),
+    },
+  });
+  const originalEnumerate = adapter.enumerateTurn;
+  adapter.enumerateTurn = (...args) => {
+    expanded.push(`${args[1]}:${args[2]}`);
+    if (args[1] !== 'permuted-seed' && args[0] === 'root') {
+      throw new Error(`unrelated root cell was expanded: ${args[1]}:${args[2]}`);
+    }
+    return originalEnumerate(...args);
+  };
+
+  const result = new BoundedSolver({
+    adapter,
+    lazyCells: false,
+    warmStartRoot: false,
+    tolerance: 0.02,
+  }).solve('root');
+
+  assert.equal(result.converged, true);
+  assert.ok(result.lowerBound >= 1 - 1e-9);
+  assert.ok(result.upperBound <= 1 + 1e-9);
+  assert.ok(expanded.includes('permuted-seed:first-column'));
+  assert.ok(expanded.includes('permuted-seed:unused-column'));
+  assert.ok(expanded.includes('finish:finish'));
+  assert.equal(expanded.filter(entry => entry.startsWith('permuted-seed:')).length, 2);
+  assert.equal(expanded.filter(entry => entry.startsWith('expensive-alternative:')).length, 0);
+  assert.equal(expanded.filter(entry => entry.startsWith('unused-alternative:')).length, 0);
+  assert.equal(result.payoffMatrixIntervals.length, 3);
+  assert.equal(result.payoffMatrixIntervals[0].length, 2);
+  assert.deepEqual(result.payoffMatrixIntervals[1][0], {lowerBound: -1, upperBound: 1});
+});
+
+test('security direction propagates through two-level stochastic descendants', () => {
+  const expanded = [];
+  const adapter = toyAdapter({
+    actions: {
+      root: ['seed', 'expensive-root'],
+      child: ['seed-child', 'expensive-child'],
+      deep: ['finish'],
+    },
+    opponentActions: {
+      root: ['root-c0', 'root-c1'],
+      child: ['child-c0', 'child-c1'],
+      deep: ['finish'],
+    },
+    transitions: {
+      'root:seed:root-c0': snapshot('child'),
+      'root:seed:root-c1': snapshot('child'),
+      'child:seed-child:child-c0': [
+        {probability: 0.75, utility: 1},
+        {probability: 0.25, snapshot: 'deep'},
+      ],
+      'child:seed-child:child-c1': [
+        {probability: 0.75, utility: 1},
+        {probability: 0.25, snapshot: 'deep'},
+      ],
+      'root:expensive-root:root-c0': utility(-1),
+      'root:expensive-root:root-c1': utility(-1),
+      'deep:finish:finish': utility(1),
+    },
+  });
+  const originalEnumerate = adapter.enumerateTurn;
+  adapter.enumerateTurn = (...args) => {
+    expanded.push(`${args[0]}:${args[1]}:${args[2]}`);
+    return originalEnumerate(...args);
+  };
+
+  const result = new BoundedSolver({
+    adapter,
+    lazyCells: false,
+    warmStartRoot: false,
+    tolerance: 0.02,
+  }).solve('root');
+
+  assert.equal(result.converged, true);
+  assert.ok(result.lowerBound >= 1 - 1e-9);
+  assert.ok(result.upperBound <= 1 + 1e-9);
+  assert.ok(expanded.includes('child:seed-child:child-c0'));
+  assert.ok(expanded.includes('child:seed-child:child-c1'));
+  assert.ok(expanded.includes('root:seed:root-c0'));
+  assert.ok(expanded.includes('root:seed:root-c1'));
+  assert.equal(expanded.filter(entry => entry.startsWith('child:')).length, 2);
+  assert.equal(expanded.filter(entry => entry.startsWith('root:seed:')).length, 2);
+});
+
+test('fallback frontier escapes a self-cycle to a useful alternate action', () => {
+  const adapter = toyAdapter({
+    actions: {root: ['loop', 'win']},
+    opponentActions: {root: ['wait']},
+    transitions: {
+      'root:loop:wait': snapshot('root'),
+      'root:win:wait': utility(1),
+    },
+  });
+  const result = new BoundedSolver({
+    adapter,
+    lazyCells: false,
+    warmStartRoot: false,
+    tolerance: 0.02,
+  }).solve('root');
+
+  assert.equal(result.converged, true);
+  assert.ok(result.lowerBound >= 1 - 1e-9);
+  assert.ok(result.upperBound <= 1 + 1e-9);
+  assert.equal(result.stopReason, null);
+});
+
+test('opaque continuation yields to another cell before depth expansion', () => {
+  const expanded = [];
+  const adapter = toyAdapter({
+    actions: {
+      root: ['opaque', 'known-win'],
+      'opaque-state': ['finish'],
+    },
+    opponentActions: {
+      root: ['c0', 'c1'],
+      'opaque-state': ['finish'],
+    },
+    transitions: {
+      'root:opaque:c0': snapshot('opaque-state'),
+      'root:opaque:c1': utility(1),
+      'root:known-win:c0': utility(1),
+      'root:known-win:c1': utility(1),
+      'opaque-state:finish:finish': utility(-1),
+    },
+  });
+  const originalEnumerate = adapter.enumerateTurn;
+  adapter.enumerateTurn = (...args) => {
+    expanded.push(`${args[0]}:${args[1]}:${args[2]}`);
+    return originalEnumerate(...args);
+  };
+
+  const result = new BoundedSolver({
+    adapter,
+    lazyCells: false,
+    warmStartRoot: false,
+    tolerance: 0.02,
+  }).solve('root');
+
+  assert.equal(result.converged, true);
+  assert.ok(result.lowerBound >= 1 - 1e-9);
+  assert.ok(result.upperBound <= 1 + 1e-9);
+  assert.ok(expanded.includes('root:opaque:c1'));
+  assert.ok(!expanded.some(entry => entry.startsWith('opaque-state:')));
 });

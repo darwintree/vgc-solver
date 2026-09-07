@@ -277,10 +277,16 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
     ppCache.cacheMisses++;
   }
 
+  // Solver-scoped admission avoids installing a tracker for a normalized key
+  // that will never recur. The default cache factory retains immediate
+  // capture for direct callers; only explicitly admitting solver caches use
+  // the second-request threshold.
+  const capturePP = ppEligible && cacheKey ? ppCache.shouldCapture(cacheKey) : false;
+
   const pending = [{decisions: [], probability: 1}];
   const outcomes = new Map();
   const templateBranches = [];
-  let cacheSafe = ppEligible;
+  let cacheSafe = capturePP;
 
   while (pending.length) {
     if (isCancelled?.()) return incomplete();
@@ -292,8 +298,8 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
     const battle = restoreBattle(snapshot);
     // Audit and install the PP accessors before simulator optimizations add
     // their private wrappers; event identity remains untouched during replay.
-    const tracker = ppEligible ? installTracker(battle, true) : null;
-    if (ppCache && !tracker) cacheSafe = false;
+    const tracker = capturePP ? installTracker(battle, true) : null;
+    if (capturePP && !tracker) cacheSafe = false;
     installSimulatorOptimizations(battle, {eventPlan: options.eventPlan || null});
     const prng = new BranchingPRNG(branch.decisions, 0, (alternatives, source) => {
       if (isCancelled?.()) throw new TransitionDeadlineExceeded();
@@ -335,9 +341,9 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
       if (tracker && !tracker.finish()) cacheSafe = false;
     }
 
-    if (ppCache && tracker && !tracker.safe) cacheSafe = false;
+    if (capturePP && tracker && !tracker.safe) cacheSafe = false;
     const key = next ? outcomeKey(next) : `terminal:${utility}`;
-    if (ppCache && tracker && captured) {
+    if (capturePP && tracker && captured) {
       templateBranches.push({
         key,
         snapshot: next,
@@ -364,7 +370,7 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
   }
   for (const outcome of result) outcome.probability /= total;
 
-  if (ppCache && cacheSafe && templateBranches.length === runs) {
+  if (capturePP && ppCache && cacheSafe && templateBranches.length === runs) {
     if (isCancelled?.()) return incomplete();
     const inputPP = readOutputPP(snapshot);
     const slotCount = inputPP.length;

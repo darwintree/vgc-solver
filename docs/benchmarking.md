@@ -59,3 +59,5 @@ case 6 已复现默认 5 秒预算内不收敛；后续键优化的 3 秒目标�
 [Champions 筛查](champions-benchmark.md)提供固定使用率快照、独立三档 HP 的两两配对、每 case 10 秒 bounded 搜索、跳过原因和逐例结果。运行 `npm run build` 后执行 `node dist/src/champions-benchmark.js`；性能扫描与功能测试分开运行。
 
 后续两条优化方向和建议的日常六项集合见[benchmark 选例](champions-benchmark-selection.md)。
+
+[策略证书搜索验收](optimization-records/strategy-certificates-2026-09-07.md)记录满血陆鲨／铝钢桥龙的三次冷进程收敛、三个对照及全量回归：29/54 达标，上一轮 24 项全部保持达标。原生输入与 0.02 容差不变；具体版本、prepare/search/total 和未达标项以该记录为准。

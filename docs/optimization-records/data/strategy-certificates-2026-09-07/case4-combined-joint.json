@@ -1,0 +1,211 @@
+{
+  "mode": "bounded",
+  "solver": "bounded",
+  "tolerance": 0.02,
+  "searchMs": 5000,
+  "selectionPolicy": "joint",
+  "backendSamples": [
+    "sync"
+  ],
+  "fixture": "sucker-punch-4",
+  "pp": "fixture-default",
+  "warmupRuns": 0,
+  "runs": 1,
+  "completedRuns": 0,
+  "timing": {
+    "elapsed": {
+      "minMs": 5187.590651,
+      "medianMs": 5187.590651,
+      "maxMs": 5187.590651
+    },
+    "elapsedSearch": {
+      "minMs": 5000.6347080000005,
+      "medianMs": 5000.6347080000005,
+      "maxMs": 5000.6347080000005
+    },
+    "prepare": {
+      "minMs": 179.092714,
+      "medianMs": 179.092714,
+      "maxMs": 179.092714
+    },
+    "convergedElapsed": null,
+    "convergedSearch": null
+  },
+  "result": {
+    "value": 0,
+    "lowerBound": -1,
+    "upperBound": 1,
+    "valueErrorBound": 1,
+    "converged": false,
+    "approximate": true,
+    "isApproximate": true,
+    "exact": false,
+    "stopReason": "time",
+    "p1Strategy": [
+      {
+        "action": "Sucker Punch",
+        "probability": 1
+      },
+      {
+        "action": "Knock Off",
+        "probability": 0
+      },
+      {
+        "action": "Earthquake",
+        "probability": 0
+      }
+    ],
+    "p2Strategy": [
+      {
+        "action": "Protect",
+        "probability": 1
+      },
+      {
+        "action": "Tackle",
+        "probability": 0
+      },
+      {
+        "action": "Hyper Beam",
+        "probability": 0
+      }
+    ],
+    "payoffMatrix": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ]
+    ],
+    "payoffMatrixLower": [
+      [
+        -1,
+        -1,
+        -1
+      ],
+      [
+        -1,
+        -1,
+        -1
+      ],
+      [
+        -1,
+        -1,
+        -1
+      ]
+    ],
+    "payoffMatrixUpper": [
+      [
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1
+      ]
+    ],
+    "payoffMatrixIntervals": [
+      [
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        }
+      ],
+      [
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        }
+      ],
+      [
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        }
+      ]
+    ],
+    "stats": {
+      "expandedStates": 329,
+      "solvedStates": 2821,
+      "discoveredStates": 2821,
+      "transitionCalls": 987,
+      "simulatorRuns": 7785,
+      "memoHits": 3831,
+      "ppCacheHits": 105,
+      "backupUpdates": 2950,
+      "expandedCells": 986,
+      "matrixSolves": 1304,
+      "searchMs": 5000.6347080000005,
+      "prepareMs": 179.092714,
+      "nodes": 2821
+    }
+  },
+  "samples": [
+    {
+      "totalMs": 5187.590651,
+      "backend": "sync",
+      "value": 0,
+      "lowerBound": -1,
+      "upperBound": 1,
+      "valueErrorBound": 1,
+      "converged": false,
+      "prepareMs": 179.092714,
+      "searchMs": 5000.6347080000005,
+      "stats": {
+        "expandedStates": 329,
+        "solvedStates": 2821,
+        "discoveredStates": 2821,
+        "transitionCalls": 987,
+        "simulatorRuns": 7785,
+        "memoHits": 3831,
+        "ppCacheHits": 105,
+        "backupUpdates": 2950,
+        "expandedCells": 986,
+        "matrixSolves": 1304,
+        "searchMs": 5000.6347080000005,
+        "prepareMs": 179.092714,
+        "nodes": 2821
+      }
+    }
+  ]
+}

@@ -71,3 +71,5 @@ node dist/src/champions-benchmark.js garchomp-25-vs-archaludon-25
 ## 后续可扩展性优化结果
 
 [2026-09-07 优化验收](optimization-records/champions-scalability-2026-09-07.md)完成了本集合的三次复测与全量回归：U2 三次在 10 秒内收敛，W1 三次约 70 ms 收敛；全量达标数从 16 增至 24，九项 watchdog 全部恢复返回，原达标项无退化。U1、U3、P2 满血的陆鲨／铝钢桥龙组合及数值边界项仍未达标；保留已解决项作为回归对照。上面的原始选例表保持为当时证据，最新分项计时及区间以该验收记录为准。
+
+随后[策略证书搜索验收](optimization-records/strategy-certificates-2026-09-07.md)将达标数提高到 29/54，原 24 项无退化。满血陆鲨／铝钢桥龙三次 search 为 7.82–8.05 秒，发现地震策略后，其余 12 个根矩阵格保持未知即可完成 0.02 证书；建议保留为策略发现回归项。新增成功还包括西狮海壬 25% 对谜拟丘三档 HP，以及西狮海壬 50% 对谜拟丘 25%。数值边界项因此在未放宽容差的条件下完成收敛；其余 25 项继续作为优化池，完整失败列表见[本轮全量筛查](optimization-records/strategy-certificates-sweep-2026-09-07.md)。

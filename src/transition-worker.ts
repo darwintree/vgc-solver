@@ -56,7 +56,7 @@ parentPort.on('message', message => {
         const battle = guardedBattle;
         if (message.enabled) {
           solvePPAudit = auditPPBattle(battle, true);
-          if (solvePPAudit) solvePP = createPPTransitionCache();
+          if (solvePPAudit) solvePP = createPPTransitionCache({admitOnSecondUse: true});
         }
         solveEventPlan = createEventPlan(battle, true);
       }

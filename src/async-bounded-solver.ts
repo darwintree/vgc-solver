@@ -82,27 +82,10 @@ class AsyncBoundedSolver extends BoundedSearch {
       let result;
       let converged = false;
       const root = this._intern(rootSnapshot);
-      if (this.options.warmStartRoot && this.options.lazyCells && root.terminal === null) {
+      this.rootNode = root;
+      if (this.options.warmStartRoot && root.terminal === null) {
         this._expandAsync(root);
-        if (!root.initialized) {
-          this._backupFrom([root]);
-        }
-        if (root.initialized) {
-          const rootCells = this._allCells(root);
-          for (let index = 0; index < rootCells.length && !this._timedOut(); index += this.batchSize) {
-            await this._expandCellsAsync(root, rootCells.slice(index, index + this.batchSize));
-          }
-        }
-      }
-      if (!this.options.lazyCells && root.terminal === null) {
-        this._expandAsync(root);
-        if (!root.initialized) {
-          this._backupFrom([root]);
-        }
-        if (root.initialized) {
-          const rootCells = this._allCells(root);
-          await this._expandCellsAsync(root, rootCells);
-        }
+        this._backupFrom([root]);
       }
       this._backupFrom([root]);
       while (true) {
@@ -122,6 +105,7 @@ class AsyncBoundedSolver extends BoundedSearch {
         if (!frontier && selectionPolicy === 'security') {
           frontier = this._selectFrontier(root, 'joint');
         }
+        if (!frontier) frontier = this._findAnyFrontier();
         if (!frontier) {
           if (!this.stopReason) this.stopReason = this.limitReached ? 'node-limit' : 'stalled';
           break;
@@ -131,9 +115,6 @@ class AsyncBoundedSolver extends BoundedSearch {
           if (!frontier.node.initialized) {
             this.stopReason = this.stopReason || 'time';
             break;
-          }
-          if (!this.options.lazyCells) {
-            await this._expandCellsAsync(frontier.node, this._allCells(frontier.node));
           }
         } else {
           await this._expandCellsAsync(frontier.node, this._cellBatch(frontier));
@@ -183,14 +164,6 @@ class AsyncBoundedSolver extends BoundedSearch {
     }
     const width = Math.max(1, Math.min(this.workerCount, this.batchSize, candidates.length));
     return candidates.slice(0, width);
-  }
-
-  _allCells(node) {
-    const cells = [];
-    for (let i = 0; i < node.actions1.length; i++) {
-      for (let j = 0; j < node.actions2.length; j++) cells.push({i, j});
-    }
-    return cells;
   }
 
   async _expandCellsAsync(node: SearchNode, cells: {i: number; j: number}[]) {

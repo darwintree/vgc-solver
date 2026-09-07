@@ -26,6 +26,29 @@ test('full-PP Tackle/Tackle root preserves every native successor and probabilit
   assertSameDistribution(native, replayed);
 });
 
+test('solver admission skips one-off tracking and captures on the second normalized request', () => {
+  const snapshot = snapshotBattle(suckerPunchOHKOTwoHKOGame().battle);
+  const action = {command: 'move 2'};
+  const native = enumerateNative(snapshot, action, action);
+  const cache = createPPTransitionCache({admitOnSecondUse: true});
+
+  const first = enumerateTurn(snapshot, action, action, {ppCache: cache});
+  assert.equal(cache.templates.size, 0);
+  assert.ok(first.simulatorRuns > 0);
+  assertSameDistribution(native, first);
+
+  const second = enumerateTurn(snapshot, action, action, {ppCache: cache});
+  assert.equal(second.cacheHits, 0);
+  assert.ok(second.simulatorRuns > 0);
+  assert.equal(cache.templates.size, 1);
+  assertSameDistribution(native, second);
+
+  const third = enumerateTurn(snapshot, action, action, {ppCache: cache});
+  assert.equal(third.cacheHits, 1);
+  assert.equal(third.simulatorRuns, 0);
+  assertSameDistribution(native, third);
+});
+
 test('PP key buckets only move-slot PP without changing the snapshot', () => {
   const snapshot = snapshotBattle(createBattle(
     {species: 'Mew', moves: ['splash', 'protect']},
@@ -118,6 +141,28 @@ test('PP template rejects a changed exhaustion branch and remains exact', () => 
   assertSameDistribution(native, candidate);
 });
 
+test('admitted PP templates still reject the exhausted bucket at the cutoff', () => {
+  const battle = createBattle(
+    {species: 'Snorlax', moves: ['tackle', 'protect']},
+    {species: 'Pikachu', moves: ['tackle', 'protect']},
+  );
+  const initial = snapshotBattle(battle);
+  const p1 = {command: 'move 1'};
+  const p2 = {command: 'move 1'};
+  const cache = createPPTransitionCache({admitOnSecondUse: true});
+  const high = withPP(initial, 0, 0, 0, 2);
+  const low = withPP(initial, 0, 0, 0, 1);
+
+  enumerateTurn(high, p1, p2, {ppCache: cache});
+  enumerateTurn(high, p1, p2, {ppCache: cache});
+  const candidate = enumerateTurn(low, p1, p2, {ppCache: cache});
+  const native = enumerateTurn(low, p1, p2);
+
+  assert.equal(candidate.cacheHits, 0);
+  assert.ok(candidate.simulatorRuns > 0);
+  assertSameDistribution(native, candidate);
+});
+
 test('unsupported getMoves callback path does not create a PP template', () => {
   const battle = createBattle(
     {species: 'Snorlax', moves: ['return', 'protect']},
@@ -127,6 +172,25 @@ test('unsupported getMoves callback path does not create a PP template', () => {
   const result = enumerateTurn(snapshotBattle(battle), {command: 'move 1'}, {command: 'move 1'}, {ppCache: cache});
   assert.ok(result.simulatorRuns > 0);
   assert.equal(cache.templates.size, 0);
+});
+
+test('admission does not install an unsafe template after repeated unsupported requests', () => {
+  const battle = createBattle(
+    {species: 'Snorlax', moves: ['return', 'protect']},
+    {species: 'Pikachu', moves: ['tackle', 'protect']},
+  );
+  const snapshot = snapshotBattle(battle);
+  const action = {command: 'move 1'};
+  const cache = createPPTransitionCache({admitOnSecondUse: true});
+
+  const first = enumerateTurn(snapshot, action, action, {ppCache: cache});
+  const second = enumerateTurn(snapshot, action, action, {ppCache: cache});
+  assert.ok(first.simulatorRuns > 0);
+  assert.ok(second.simulatorRuns > 0);
+  assert.equal(cache.templates.size, 0);
+  const third = enumerateTurn(snapshot, action, action, {ppCache: cache});
+  assert.ok(third.simulatorRuns > 0);
+  assert.equal(third.cacheHits, 0);
 });
 
 test('PP templates stay exact across item and PP-consuming move mechanisms', () => {

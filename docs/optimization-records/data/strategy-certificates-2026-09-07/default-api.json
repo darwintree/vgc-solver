@@ -1,0 +1,227 @@
+{
+  "gitCommit": "286c7f1",
+  "case": "garchomp-100-vs-archaludon-100",
+  "node": "v24.20.0",
+  "backend": "sync",
+  "workers": 0,
+  "warmup": 0,
+  "runs": 1,
+  "pp": "native maximum",
+  "lazyCells": "default true",
+  "warmStartRoot": "default true",
+  "totalMs": 8064.462723000001,
+  "result": {
+    "value": 0.9901109482325471,
+    "lowerBound": 0.9802218964650942,
+    "upperBound": 1,
+    "valueErrorBound": 0.009889051767452917,
+    "converged": true,
+    "approximate": true,
+    "isApproximate": true,
+    "exact": false,
+    "stopReason": null,
+    "p1Strategy": [
+      {
+        "action": "Earthquake",
+        "probability": 1
+      },
+      {
+        "action": "Stealth Rock",
+        "probability": 0
+      },
+      {
+        "action": "Scale Shot",
+        "probability": 0
+      },
+      {
+        "action": "Swords Dance",
+        "probability": 0
+      }
+    ],
+    "p2Strategy": [
+      {
+        "action": "Flash Cannon",
+        "probability": 1
+      },
+      {
+        "action": "Draco Meteor",
+        "probability": 0
+      },
+      {
+        "action": "Thunderbolt",
+        "probability": 0
+      },
+      {
+        "action": "Stealth Rock",
+        "probability": 0
+      }
+    ],
+    "payoffMatrix": [
+      [
+        0.9901109482825469,
+        0.991015624935131,
+        0.9999999999520833,
+        0.9999999999520833
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "payoffMatrixLower": [
+      [
+        0.9802218965650942,
+        0.9820312498702618,
+        0.9999999999041667,
+        0.9999999999041667
+      ],
+      [
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      [
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      [
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    ],
+    "payoffMatrixUpper": [
+      [
+        0.9999999999999996,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "payoffMatrixIntervals": [
+      [
+        {
+          "lowerBound": 0.9802218965650942,
+          "upperBound": 0.9999999999999996
+        },
+        {
+          "lowerBound": 0.9820312498702618,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": 0.9999999999041667,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": 0.9999999999041667,
+          "upperBound": 1
+        }
+      ],
+      [
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        }
+      ],
+      [
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        }
+      ],
+      [
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        },
+        {
+          "lowerBound": -1,
+          "upperBound": 1
+        }
+      ]
+    ],
+    "stats": {
+      "expandedStates": 405,
+      "solvedStates": 611,
+      "discoveredStates": 611,
+      "transitionCalls": 1620,
+      "simulatorRuns": 34902,
+      "memoHits": 0,
+      "ppCacheHits": 0,
+      "backupUpdates": 4455,
+      "expandedCells": 1620,
+      "matrixSolves": 2429,
+      "searchMs": 7895.138250999999,
+      "prepareMs": 160.93553599999996,
+      "nodes": 611
+    }
+  }
+}

@@ -40,6 +40,12 @@
 
 PP 读写如果来自未审计途径，或者 Transform 替换了招式槽位、队伍位置身份改变，就拒绝模板。Leppa 恢复、Spite、Grudge 等机制不能因为招式列表表面相同就复用。模板命中只省下一步模拟；PP=3 与 PP=5 的后继仍按真实剩余 PP 分别求解。
 
+### 求解器中的模板准入
+
+solver 和 worker 使用第二次请求才捕获的准入策略。第一次遇到某个归一化状态与行动键时，仍完整执行原生转移以及已有的随机分支、事件和 PP 规则优化，但不安装 PP tracker，也不建立模板。第二次遇到相同键时，才安装 tracker；只有这一整次枚举通过完整的槽位身份、PP 读写、输出形状和分支消耗检查，才允许保存模板。第三次及以后才可能命中模板，并且每次命中仍检查 PP 区间、槽位形状和后继 PP 重放条件。
+
+这样会为可能只出现一次的搜索状态省掉 tracker 安装和捕获成本，代价是一个确实会复用的键要多做一次原生重放。direct `createPPTransitionCache()` 调用继续采用首次请求立即捕获的兼容行为；准入只由 solver 和 worker 创建的 solve-scoped cache 开启。准入集合按不同归一化键保存“已经见过一次”的记录，随着本次求解发现新键而增长，并在 cache clear 时清空；这里没有固定的内存上界承诺。
+
 ## 例子三：键只需要读数据，不需要复制整场战斗
 
 PP 查找键要把正 PP 改成统一标记 1。如果一个快照同时含天气状态和 Pokémon 招式槽位，生成键时只复制“根 → sides → Pokémon → moveSlots/baseMoveSlots”的路径，并在新槽位中替换 PP；天气子树不改动，可直接读取后序列化。原快照仍保持原生 PP。
@@ -50,13 +56,13 @@ PP 查找键要把正 PP 改成统一标记 1。如果一个快照同时含天�
 
 ## 正确性边界与推广
 
-memo、PP 模板和键的对象缓存按次 solve 重建，不跨规则变更借用旧答案。键缓存以快照对象身份复用的前提是该快照在搜索期间不被修改。
+memo、PP 模板、键和模板准入集合按次 solve 重建，不跨规则变更借用旧答案。键缓存以快照对象身份复用的前提是该快照在搜索期间不被修改。
 
 相对顺序与路径复制不依赖固定行动数；PP 区间方法可推广到其他有限资源，但必须重新建立其读写合同。当前 PP 身份检查覆盖队伍位置与槽位，而完整单打／双打的自动行动空间仍未实现；现有特殊机制与双打测试是局部语义证据。
 
 ## 实现与证据索引
 
 - [native-memo-key.ts](../../src/native-memo-key.ts)：`effectOrderContext`、`privateSnapshotKey`、按改动路径归一化。
-- [pp-transition-cache.ts](../../src/pp-transition-cache.ts)：`installTracker`、区间与消耗、`ppBaseKey`；[showdown-adapter.ts](../../src/showdown-adapter.ts)：模板查找／建立、快照隔离与 outcome key 复用。
+- [pp-transition-cache.ts](../../src/pp-transition-cache.ts)：`installTracker`、区间与消耗、`ppBaseKey`、二次请求准入；[showdown-adapter.ts](../../src/showdown-adapter.ts)：模板查找／建立、快照隔离与 outcome key 复用；[solver.ts](../../src/solver.ts)、[bounded-solver.ts](../../src/bounded-solver.ts) 和 [transition-worker.ts](../../src/transition-worker.ts)：solver／worker cache 的准入配置。
 - 验证：[native-memo-key.test.ts](../../test/native-memo-key.test.ts)、[pp-transition-cache.test.ts](../../test/pp-transition-cache.test.ts)、[pp-cache-semantic.test.ts](../../test/pp-cache-semantic.test.ts)、[snapshot-serialization.test.ts](../../test/snapshot-serialization.test.ts)。
 - 历史：[满 PP 优化](../optimization-records/full-pp-optimization.md)、[case 6 键优化](../optimization-records/case6-performance.md)。case 6 的 23.4% 为三项键优化的组合观测，不能分摊为单项收益。

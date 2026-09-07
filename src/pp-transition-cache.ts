@@ -397,24 +397,35 @@ function makeCacheKey(snapshot, action1, action2, stateKey, cache) {
 
 class PPTransitionCache {
   declare templates: Map<string, PPTemplate>;
+  declare admissions: Set<string>;
   declare baseKeys: WeakMap<object, string>;
   declare shapes: WeakMap<object, string>;
+  declare admitOnSecondUse: boolean;
   declare cacheHits: number;
   declare cacheMisses: number;
   declare rejected: number;
 
-  constructor() {
+  constructor(options: {admitOnSecondUse?: boolean} = {}) {
     this.templates = new Map();
+    this.admissions = new Set();
     this.baseKeys = new WeakMap();
     this.shapes = new WeakMap();
+    this.admitOnSecondUse = options.admitOnSecondUse === true;
     this.cacheHits = 0;
     this.cacheMisses = 0;
     this.rejected = 0;
   }
   clear() {
     this.templates.clear();
+    this.admissions.clear();
     this.baseKeys = new WeakMap();
     this.shapes = new WeakMap();
+  }
+  shouldCapture(key: string): boolean {
+    if (!this.admitOnSecondUse) return true;
+    if (this.admissions.has(key)) return true;
+    this.admissions.add(key);
+    return false;
   }
   baseKey(snapshot: Snapshot, stateKey: StateKey): string {
     let key = this.baseKeys.get(snapshot);
@@ -434,7 +445,9 @@ class PPTransitionCache {
   }
 }
 
-function createPPTransitionCache() { return new PPTransitionCache(); }
+function createPPTransitionCache(options: {admitOnSecondUse?: boolean} = {}) {
+  return new PPTransitionCache(options);
+}
 
 function auditPPBattle(battle, nativeAudit = undefined) {
   return nativeMethodsAreUsable(battle, nativeAudit) ? PP_AUDIT_TOKEN : null;
