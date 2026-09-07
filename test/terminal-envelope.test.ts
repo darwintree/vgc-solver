@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createTerminalEnvelope} from '../src/terminal-envelope';
+import {auditNativeRules} from '../src/native-rules';
 import {BoundedSolver} from '../src/bounded-solver';
 import {createBattle, legalActions, refreshMoveRequest, setHP, snapshotBattle} from '../src/showdown-adapter';
 import {BranchingPRNG} from '../src/branching-prng';
@@ -161,5 +162,43 @@ test('a first-move defense increase invalidates the response damage lower bound'
     assert.equal(envelope(battle), null);
   } finally {
     definition.selfBoost = original;
+  }
+});
+
+
+test('native callbacks relocated to another event slot do not enter the envelope', () => {
+  const battle = createBattle({species: 'Garchomp', level: 50, ability: 'Rough Skin', item: 'Focus Sash',
+    moves: ['Water Gun']}, {species: 'Blissey', level: 50, ability: 'Stamina', item: 'Sitrus Berry',
+    moves: ['Mud-Slap']});
+  setHP(battle, 'p1', 1);
+  refreshMoveRequest(battle);
+  assert.ok(envelope(battle));
+  const item: any = battle.dex.items.get('focussash');
+  const descriptor = Object.getOwnPropertyDescriptor(item, 'onAfterMoveSecondarySelf');
+  try {
+    item.onAfterMoveSecondarySelf = (battle.dex.items.get('sitrusberry') as any).onEat;
+    // The broad native audit promises callback origin, not event semantics.
+    assert.equal(auditNativeRules(battle), true);
+    assert.equal(createTerminalEnvelope(battle), null);
+    battle.makeChoices('move 1', 'move 1');
+    assert.equal(battle.ended, false);
+    assert.ok(battle.p1.active[0].hp > 1, 'healing before the response defeats the initial-HP KO claim');
+  } finally {
+    if (descriptor) Object.defineProperty(item, 'onAfterMoveSecondarySelf', descriptor);
+    else delete item.onAfterMoveSecondarySelf;
+  }
+});
+
+
+test('numeric event callbacks are not mistaken for event-order metadata', () => {
+  const battle = position();
+  const item: any = battle.dex.items.get('focussash');
+  const descriptor = Object.getOwnPropertyDescriptor(item, 'onFractionalPriority');
+  try {
+    item.onFractionalPriority = 1;
+    assert.equal(createTerminalEnvelope(battle), null);
+  } finally {
+    if (descriptor) Object.defineProperty(item, 'onFractionalPriority', descriptor);
+    else delete item.onFractionalPriority;
   }
 });

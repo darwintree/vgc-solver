@@ -9,20 +9,32 @@ export interface TerminalEnvelope {lower: number; upper: number}
 // These native callbacks have a deliberately small monotonicity proof:
 // Stamina only raises Defense; Sitrus only heals its living holder; Rough
 // Skin is inert for our non-contact moves; Focus Sash is inert below full HP.
-// Identity admission is separate from the general native-source audit.
-const abilityHooks = new Set([
+// Admission binds both identity and event slot: a native healing callback
+// moved to AfterMoveSecondarySelf would otherwise invalidate the HP proof.
+// This is separate from the general native-source audit.
+const abilityHooks = new Map([['onDamagingHit', new Set([
   (Dex.abilities.get('stamina') as any).onDamagingHit,
   (Dex.abilities.get('roughskin') as any).onDamagingHit,
-]);
+])]]);
 const berry = Dex.items.get('sitrusberry') as any;
 const sash = Dex.items.get('focussash') as any;
-const itemHooks = new Set([berry.onUpdate, berry.onTryEatItem, berry.onEat, sash.onDamage]);
-const noHooks = new Set();
+const itemHooks = new Map([
+  ['onUpdate', new Set([berry.onUpdate])],
+  ['onTryEatItem', new Set([berry.onTryEatItem])],
+  ['onEat', new Set([berry.onEat])],
+  ['onDamage', new Set([sash.onDamage])],
+]);
+const noHooks = new Map();
 
-function admittedHooks(effect, allowed: Set<any>) {
-  return Object.entries(effect).every(([key, value]) =>
-    !key.startsWith('on') || value === undefined ||
-    (typeof value === 'number' && /(?:Priority|Order|SubOrder)$/.test(key)) || allowed.has(value));
+function admittedHooks(effect, allowed: Map<string, Set<any>>) {
+  return Object.entries(effect).every(([key, value]) => {
+    if (!key.startsWith('on') || value === undefined) return true;
+    if (allowed.get(key)?.has(value)) return true;
+    // Numeric event callbacks such as onFractionalPriority are not sorting
+    // metadata. A suffix is metadata only for an admitted handler slot.
+    const event = key.replace(/(?:Priority|SubOrder|Order)$/, '');
+    return typeof value === 'number' && event !== key && allowed.get(event)?.has(effect[event]);
+  });
 }
 
 function plainBoosts(effect) {

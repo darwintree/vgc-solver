@@ -37,3 +37,20 @@ Reason:
 
 Follow-up:
 未覆盖规则一律保持已有转移路径。是否扩大支持由实测收益与独立证明决定。
+
+
+### 3. 审查发现原生回调搬移破坏单调性
+
+Type: CONFLICT
+
+Context:
+交叉审查指出仅匹配函数 identity 不限制事件槽：把原生 Sitrus.onEat 放在 FocusSash.onAfterMoveSecondarySelf，会在先手行动后回复 HP，却绕过只检查 onUpdate 的先手回复排除。通用 native audit 的合同只保证回调原生来源。
+
+Decision:
+承认缺陷，准入改为事件名与函数 identity 同时匹配；不收紧通用 native audit。补充原生回调搬移仍通过 native audit、却被包络拒绝的反例，且用原生回合证明先手回复后实际存活。
+
+Reason:
+单调性依赖回调何时触发，不能只根据函数体判断。事件槽绑定在拥有包络语义的模块内，避免改变其他原生优化的准入合同。
+
+Follow-up:
+重新运行类型、构建、相关包络守卫测试后才能采用修正版本。
