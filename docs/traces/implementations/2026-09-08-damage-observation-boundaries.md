@@ -23,3 +23,21 @@ Follow-up:
 Native-distribution tests and standalone performance comparison are pending the root agent's serialized validation slot.
 
 Validation update: Node.js v24.20.0; `npm run typecheck`, `npm run build`, and `node --test dist/test/simulator-optimizations.test.js dist/test/native-distribution.test.js` pass. Full regression and standalone performance measurement remain coordinated by the root agent. Custom move.onDamage raw observers retain their native full-state distribution; custom spreadMoveHit wrappers retain native randomization.
+
+### 2. Recognize one audited constant final-damage modifier
+
+Type: unresolved-implementation-decision
+
+Context:
+Life Orb prevents existing post-tail grouping because ModifyDamage is nonempty, even though its pinned callback only chains a constant modifier. Executing arbitrary callbacks speculatively would create new side effects and random draws.
+
+Decision:
+Predict only an exactly identified native Life Orb callback when it is the sole ModifyDamage handler, is an Item handler belonging to the attacker, and the relevant native modifier and item-suppression methods retain their identities. Evaluate the native pure ignoringItem predicate and use modifier 1 when suppressed. Keep other callbacks and multiple handlers on the existing raw-damage grouping path.
+
+Reason:
+The native callback updates the fresh event modifier from 1 to 5324/4096 without returning a replacement damage. Prediction applies native Battle.modify at the original final-modifier position after STAB, effectiveness, and burn, before bypass-Protect and minimum-damage handling. It preserves the simulator's fixed-point rounding. Actual native callback execution and item recoil remain unchanged. This is a rule-capability audit, independent of any benchmark case or species; it does not generalize to arbitrary modifiers or Disguise.
+
+Follow-up:
+Source-only candidate while the root agent benchmarks the previous commit; validation will use full native distributions at low, threshold, and surviving HP, item suppression, an extra Reflect handler, and a custom raw-observing callback.
+
+Validation update: Node.js v24.20.0; typecheck, build, simulator-optimizations and native-distribution tests pass, including the new Life Orb comparisons. Performance measurement and full regression remain coordinated by the root agent.

@@ -1,9 +1,10 @@
 import type {TransitionOptions} from './types';
+import type {ModdedItemDataTable} from '@pkmn/sim';
 import * as path from 'node:path';
 import {Battle, Dex, Pokemon} from '@pkmn/sim';
 import {installEmptyEventOptimization, isNativeFindEventHandlers} from './empty-events';
 import {installResidualOptimization} from './residual-optimization';
-import {hasNoEventHandlers} from './event-plan';
+import {hasNoEventHandlers, hasPossibleEvent} from './event-plan';
 
 let NativeBattleActions;
 let NativeClampIntRange;
@@ -37,9 +38,21 @@ const nativeBattle = Object.freeze({
   clampIntRange: NativeClampIntRange,
   singleEvent: Battle.prototype.singleEvent,
   modify: Battle.prototype.modify,
+  chainModify: Battle.prototype.chainModify,
   suppressingAbility: Battle.prototype.suppressingAbility,
+  getAllActive: Battle.prototype.getAllActive,
   pokemonDamage: Pokemon.prototype.damage,
+  getItem: Pokemon.prototype.getItem,
+  getAbility: Pokemon.prototype.getAbility,
+  hasItem: Pokemon.prototype.hasItem,
+  hasAbility: Pokemon.prototype.hasAbility,
+  ignoringItem: Pokemon.prototype.ignoringItem,
+  ignoringAbility: Pokemon.prototype.ignoringAbility,
 });
+// This audited callback only chains the constant Gen 9 final-damage modifier.
+// Recognize the callback by identity, not an item name in the current battle.
+const nativeLifeOrbModifier = (Dex.items.get('lifeorb') as
+  ModdedItemDataTable[keyof ModdedItemDataTable]).onModifyDamage;
 // @pkmn/sim's pinned battle formats install Math.trunc as the native damage
 // truncator. Mapping all 16 rolls calls the truncator 32 times while building
 // alternatives, so custom truncators must stay on the native path.
@@ -159,6 +172,27 @@ function installDamageOptimization(battle, eventPlan = null) {
       `damage:${baseDamage}`);
   };
 
+  const finalDamageModifier = (source, target) => {
+    if (hasPossibleEvent(eventPlan, battle, 'ModifyDamage') === false) return 1;
+    const handlers = battle.findEventHandlers(source, 'ModifyDamage', target);
+    if (handlers.length === 0) return 1;
+    if (handlers.length !== 1 || handlers[0].callback !== nativeLifeOrbModifier ||
+        handlers[0].effect.effectType !== 'Item' || handlers[0].effectHolder !== source ||
+        battle.chainModify !== nativeBattle.chainModify ||
+        source.getItem !== nativeBattle.getItem ||
+        source.getAbility !== nativeBattle.getAbility ||
+        source.hasItem !== nativeBattle.hasItem ||
+        source.hasAbility !== nativeBattle.hasAbility ||
+        source.ignoringItem !== nativeBattle.ignoringItem ||
+        source.ignoringAbility !== nativeBattle.ignoringAbility ||
+        battle.getAllActive !== nativeBattle.getAllActive) return null;
+    // Native runEvent suppresses an Item handler through ignoringItem before
+    // invoking it. The fixed callback returns undefined and only updates the
+    // fresh event.modifier, initially 1, to 5324/4096. The real callback still
+    // executes once in modifyDamage; prediction never invokes it speculatively.
+    return source.ignoringItem() ? 1 : 5324 / 4096;
+  };
+
   const canProbeTail = context => {
     const {source, target, move} = context;
     if (!source || !target || !move || !context.parentMove || target.hp <= 0 || target.volatiles?.substitute ||
@@ -207,12 +241,13 @@ function installDamageOptimization(battle, eventPlan = null) {
     // only receives the actual HP loss returned by spreadDamage, after the
     // saturation represented by our key; its callbacks cannot see the raw
     // roll. Both events still execute natively, including contact retaliation.
-    return noHandlers('ModifySTAB', source, target) &&
+    if (!(noHandlers('ModifySTAB', source, target) &&
       noHandlers('Type', source, null) &&
       noHandlers('Type', target, null) &&
       noHandlers('Effectiveness', target, null) &&
-      noHandlers('ModifyDamage', source, target) &&
-      noHandlers('Damage', target, source);
+      noHandlers('Damage', target, source))) return false;
+    context.finalModifier = finalDamageModifier(source, target);
+    return context.finalModifier !== null;
   };
 
   const optimizedRandomizer = function(baseDamage) {
@@ -251,6 +286,9 @@ function installDamageOptimization(battle, eventPlan = null) {
           }
           if (burnedPhysical) damage = nativeBattle.modify.call(battle, damage, 0.5);
           if (battle.gen === 5 && !damage) damage = 1;
+          if (context.finalModifier !== 1) {
+            damage = nativeBattle.modify.call(battle, damage, context.finalModifier);
+          }
           if (bypassProtect) damage = nativeBattle.modify.call(battle, damage, 0.25);
           if (battle.gen !== 5 && !damage) return 1;
           return tr(damage);

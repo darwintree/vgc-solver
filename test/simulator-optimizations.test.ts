@@ -1,4 +1,4 @@
-import type {PRNG, PokemonSet} from '@pkmn/sim';
+import type {ModdedItemDataTable, PRNG, PokemonSet} from '@pkmn/sim';
 import type {Mutable} from './helpers/types';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -238,10 +238,10 @@ test('post-tail saturation preserves resisted and threshold-crossing damage', ()
   assert.ok(crossing.optimized.outcomes.length > 1);
 });
 
-function contactBattleWithReserve(defense: Partial<PokemonSet> = {}) {
+function contactBattleWithReserve(defense: Partial<PokemonSet> = {}, attacker: Partial<PokemonSet> = {}) {
   const battle = new Battle({
     formatid: toID('gen9customgame'), seed: '1,2,3,4',
-    p1: {name: 'P1', team: [{species: 'Mew', moves: ['Tackle']}] as PokemonSet[]},
+    p1: {name: 'P1', team: [{species: 'Mew', ...attacker, moves: ['Tackle']}] as PokemonSet[]},
     p2: {name: 'P2', team: [
       {species: 'Garchomp', ...defense, moves: ['Splash']},
       {species: 'Snorlax', moves: ['Splash']},
@@ -309,4 +309,48 @@ test('weather damage adjustment preserves the complete nonterminal roll distribu
   assertSameDistribution(native, optimized);
   assert.ok(optimized.outcomes.every(outcome => outcome.snapshot));
   assert.ok(optimized.simulatorRuns < native.simulatorRuns);
+});
+
+test('Life Orb final rounding and suppression preserve complete native distributions', () => {
+  for (const configuration of ['active', 'klutz', 'magicroom', 'reflect']) {
+    for (const hp of [1, 30, 100]) {
+      const battle = contactBattleWithReserve({}, {
+        item: 'Life Orb', ability: configuration === 'klutz' ? 'Klutz' : 'Synchronize',
+      });
+      setHP(battle, 'p2', hp);
+      if (configuration === 'magicroom') {
+        battle.field.addPseudoWeather('magicroom', battle.p1.active[0]);
+      }
+      if (configuration === 'reflect') {
+        battle.p2.addSideCondition('reflect', battle.p2.active[0]);
+      }
+      refreshMoveRequest(battle);
+      const snapshot = snapshotBattle(battle);
+      const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+      const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+      assertSameDistribution(native, optimized);
+      assert.ok(optimized.outcomes.every(outcome => outcome.snapshot));
+      if (hp === 1 && configuration !== 'reflect') {
+        assert.ok(optimized.simulatorRuns < native.simulatorRuns);
+      }
+    }
+  }
+});
+
+test('custom final damage callbacks preserve their raw damage observations', () => {
+  const item = Dex.items.get('lifeorb') as ModdedItemDataTable[keyof ModdedItemDataTable];
+  const original = item.onModifyDamage;
+  item.onModifyDamage = function(damage, source) {
+    source.hp = damage + 100;
+    return this.chainModify([5324, 4096]);
+  };
+  try {
+    const snapshot = snapshotBattle(contactBattleWithReserve({}, {item: 'Life Orb'}));
+    const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    assertSameDistribution(native, optimized);
+    assert.ok(optimized.outcomes.length > 1);
+  } finally {
+    item.onModifyDamage = original;
+  }
 });
