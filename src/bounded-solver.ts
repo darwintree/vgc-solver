@@ -431,7 +431,7 @@ class BoundedSearch {
           // [-1, 1] and remain available to the normal frontier selector if a
           // parent later needs a tighter child interval.
           this._backupFrom([node]);
-          if (this._hasSufficientCertificate(node)) return;
+          if (this._hasSufficientCertificate(node) || this._rootHasTargetWidth()) return;
           if (this._timedOut()) return;
         }
       }
@@ -453,6 +453,11 @@ class BoundedSearch {
       ? this.options.tolerance + EPSILON
       : EAGER_CERTIFICATE_WIDTH;
     return node.upper - node.lower <= threshold;
+  }
+
+  _rootHasTargetWidth() {
+    return !!this.rootNode &&
+      this.rootNode.upper - this.rootNode.lower <= this.options.tolerance + EPSILON;
   }
 
   _expandCell(node: SearchNode, i, j) {

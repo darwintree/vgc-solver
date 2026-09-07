@@ -83,3 +83,18 @@ Reason:
 根保留 `.02` 可继续减少 Champions 根层工作；非根 `1e-9` 与现有 frontier selector 的 child-gap cutoff 对齐，该节点对父节点的未证实收益质量至多约 `1e-9`，远低于 bounded tolerance。每个 cell 后必须通过 `_backupFrom` 传播，而不是只刷新当前节点；否则后续外层 backup 看不到端点已在展开期间变化，深层祖先会保留 stale 区间。适用性仍需用深层混合策略、共享后继、循环和节点限额 toy 图验证。
 
 Follow-up: 暂不在主代理的性能测量窗口运行测试；测量后比较根-only 版本与此版本的 expandedCells、search 时间和全套正确性。
+
+### 7. 根达到目标后的 child eager 提前结束
+
+Type: unresolved-implementation-decision
+
+Context:
+第二版每格 backup 已能把 child 的收窄传播到根；但当前 child 仍按自身 `1e-9` 调度阈值继续展开，即使根已经达到用户 tolerance。规范要求保持根的 convergence 合同，同时允许停止对当前返回不再有贡献的工作。
+
+Decision:
+每格 `_backupFrom` 后额外检查 root 的实际区间宽度；若根已达到用户 tolerance，则立即结束当前 child 的 eager pass。外层 solve loop 继续执行既有根 convergence 判断。非根自身的 `1e-9` 阈值保持不变。
+
+Reason:
+根区间已是返回证书，继续缩小当前 child 不会改变本次 bounded 结果是否收敛；该检查只减少后续转移生成，不修改任何区间端点或 convergence 比较。新增三层 toy 图使用 leaf 实际值 `.995/.985/-0.5/-0.25`，独立矩阵 exact 值为 `.985`，验证返回区间夹住 exact 且 leaf 保留两格未展开未知行。
+
+Follow-up: 需在 Champions 基准中比较 root-only 与全局 root-stop 的 expandedCells、search 和收敛状态。

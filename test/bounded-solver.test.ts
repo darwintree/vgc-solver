@@ -139,6 +139,54 @@ test('deep eager nodes stop at the scheduler-width threshold', () => {
   assert.equal(result.approximate, true, 'the leaf retains two unknown cells');
 });
 
+test('root tolerance stops a deeper eager pass before child exactness', () => {
+  const adapter = toyAdapter({
+    actions: {
+      root: ['enter'],
+      middle: ['enter'],
+      leaf: ['winning-row', 'unknown-row'],
+    },
+    opponentActions: {
+      root: ['wait'],
+      middle: ['wait'],
+      leaf: ['c0', 'c1'],
+    },
+    transitions: {
+      'root:enter:wait': snapshot('middle'),
+      'middle:enter:wait': snapshot('leaf'),
+      'leaf:winning-row:c0': utility(0.995),
+      'leaf:winning-row:c1': utility(0.985),
+      'leaf:unknown-row:c0': utility(-0.5),
+      'leaf:unknown-row:c1': utility(-0.25),
+    },
+  });
+  const solver = new BoundedSolver({
+    adapter,
+    lazyCells: false,
+    tolerance: 0.02,
+    warmStartRoot: false,
+  });
+  const result = solver.solve('root');
+  const leaf = solver.nodes.get('leaf');
+  const exact = solveZeroSumMatrix([
+    [0.995, 0.985],
+    [-0.5, -0.25],
+  ]).value;
+
+  assert.ok(leaf);
+  assert.equal(result.converged, true);
+  assert.ok(result.lowerBound >= 0.985 - 1e-9);
+  assert.ok(result.upperBound <= 1 + 1e-9);
+  assert.ok(result.lowerBound <= exact + 1e-9);
+  assert.ok(result.upperBound >= exact - 1e-9);
+  assert.ok(leaf.upper - leaf.lower > 1e-9,
+    'the leaf remains wider than the local scheduler threshold');
+  assert.ok(leaf.upper - leaf.lower <= 0.02 + 1e-9,
+    'the propagated root certificate is within the requested tolerance');
+  assert.equal(leaf.cells.flat().filter(cell => !cell.outcomes).length, 2,
+    'the unknown leaf row remains available for later refinement');
+});
+
 test('returns honest bounds when the node limit blocks an unresolved child', () => {
   const adapter = toyAdapter({
     actions: {root: ['wait']},
