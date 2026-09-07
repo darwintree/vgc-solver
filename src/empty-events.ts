@@ -1,5 +1,5 @@
 import {Battle} from '@pkmn/sim';
-import {hasPossibleEvent} from './event-plan';
+import {consumeEventPlanCheck, hasPossibleEvent, registerEventPlanWrapper} from './event-plan';
 
 // This optimization is deliberately tied to the exact event-dispatch methods
 // shipped by the pinned simulator. A format or mod can replace any of these
@@ -24,17 +24,19 @@ function isNativeFindEventHandlers(battle) {
     wrappedFindEventHandlers.get(battle) === battle.findEventHandlers);
 }
 
-function isNativeEventMethod(battle, name) {
-  if (!battle) return false;
-  if (name === 'findEventHandlers') return isNativeFindEventHandlers(battle);
-  return battle[name] === nativeMethods[name];
-}
-
 function hasNativeEventMethods(battle, includeEachEvent = true) {
-  if (battle.gen !== 9) return false;
-  return Object.keys(nativeMethods).every(name =>
-    (!includeEachEvent && name === 'eachEvent') || isNativeEventMethod(battle, name)
-  );
+  if (!battle || battle.gen !== 9) return false;
+  if (includeEachEvent && battle.eachEvent !== nativeMethods.eachEvent) return false;
+  return isNativeFindEventHandlers(battle) &&
+    battle.runEvent === nativeMethods.runEvent &&
+    battle.speedSort === nativeMethods.speedSort &&
+    battle.findPokemonEventHandlers === nativeMethods.findPokemonEventHandlers &&
+    battle.findSideEventHandlers === nativeMethods.findSideEventHandlers &&
+    battle.findFieldEventHandlers === nativeMethods.findFieldEventHandlers &&
+    battle.findBattleEventHandlers === nativeMethods.findBattleEventHandlers &&
+    battle.getCallback === nativeMethods.getCallback &&
+    battle.resolvePriority === nativeMethods.resolvePriority &&
+    battle.getAllActive === nativeMethods.getAllActive;
 }
 
 function canSkipEachEvent(battle, eventid, eventPlan) {
@@ -81,11 +83,13 @@ function installEmptyEventOptimization(battle, eventPlan = null) {
           !hasNativeEventMethods(this, false)) {
         return originalFindEventHandlers.call(this, target, eventName, source);
       }
-      if (hasPossibleEvent(eventPlan, this, eventName) === false) return [];
+      const consumed = consumeEventPlanCheck(this, eventPlan, eventName);
+      if (consumed === null && hasPossibleEvent(eventPlan, this, eventName) === false) return [];
       return originalFindEventHandlers.call(this, target, eventName, source);
     };
     battle.findEventHandlers = optimizedFindEventHandlers;
     wrappedFindEventHandlers.set(battle, optimizedFindEventHandlers);
+    registerEventPlanWrapper(battle, optimizedFindEventHandlers);
   }
   return true;
 }
