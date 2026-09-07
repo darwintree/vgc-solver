@@ -97,3 +97,5 @@ cell.upper = Σ completedProbability × child.upper + remainingProbability
 游标在随机调用的合作式截止处中断时，会保存当前已选择的前缀及其当前质量；此前放入队列的兄弟前缀保持独立，恢复时不会重复其概率质量。每次 advance 的 simulatorRuns 计入累计 stats；expandedCells 只在第一次接受该格时增加。单次模拟器调用仍不能被任意抢占。
 
 自定义 adapter 可以提供可选 createTurnCursor，未提供时保留完整 enumerateTurn 合同；普通 complete:false 返回仍表示转移不完整、不能被当作 partial 分布。exact 和 worker 路径继续使用完整 enumerateTurn。本候选的原生游标暂不使用 PP 转移模板，有重复 PP 局面的性能退化风险；大量近等概率叶仍需要大量重放，需以独立性能测量评估。
+
+接受渐进转移时，概率验证的总质量包含已完成 outcomes 与 remainingProbability。总和在既有数值容差内但不恰为一时，两部分统一除以该总质量；不会只按已探索部分归一化。这保持完整概率划分，并避免允许的总和误差超过节点数值保护余量后产生过紧区间。

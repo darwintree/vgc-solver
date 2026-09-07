@@ -135,3 +135,31 @@ test('node-limited cumulative transition acceptance keeps missing children unkno
   assert.ok(result.lowerBound <= 0.2 && result.lowerBound > 0.19999999);
   assert.equal(result.upperBound, 1);
 });
+
+for (const utility of [-1, 1]) {
+  for (const error of [-5e-10, 5e-10]) {
+    test(`partial mass normalization encloses both remainder completions (${utility}, ${error})`, () => {
+      const completed = 0.75 + error;
+      const remaining = 0.25;
+      const total = completed + remaining;
+      const solver = new BoundedSolver({tolerance: 0.6, adapter: {
+        legalActions: () => ['a'],
+        enumerateTurn: () => { throw new Error('cursor adapter expected'); },
+        createTurnCursor: () => ({advance: () => ({
+          outcomes: [{utility, probability: completed}],
+          remainingProbability: remaining, complete: false, simulatorRuns: 1,
+        })}),
+      }});
+      const result = solver.solve('root');
+      const lowerCompletion = (utility * completed - remaining) / total;
+      const upperCompletion = (utility * completed + remaining) / total;
+      assert.equal(result.converged, true);
+      assert.equal(result.exact, false);
+      // No comparison epsilon: the admitted probability error exceeds the
+      // solver's numerical guard, so that guard must not hide a bad endpoint.
+      assert.ok(result.lowerBound <= lowerCompletion);
+      assert.ok(result.upperBound >= upperCompletion);
+      assert.ok(Math.abs(result.value - utility * completed / total) < 1e-10);
+    });
+  }
+}

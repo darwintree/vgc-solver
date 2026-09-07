@@ -416,13 +416,14 @@ class BoundedSearch {
     if (!(total > 0) || Math.abs(total - 1) > 1e-9) {
       throw new Error(`Transition probabilities sum to ${total}, not 1`);
     }
-    if (!progressive || transition.complete) {
-      for (const outcome of outcomes) outcome.probability /= total;
-    }
+    // Normalize the whole probability partition, including the unexplored
+    // mass. Conditioning only on completed outcomes would invent evidence;
+    // leaving an admitted sum error uncorrected could narrow a certificate.
+    for (const outcome of outcomes) outcome.probability /= total;
     const cell = node.cells[i][j];
     if (!cell.outcomes) this.stats.expandedCells++;
     cell.outcomes = outcomes;
-    cell.remainingProbability = remaining;
+    cell.remainingProbability = remaining / total;
     if (transition.complete) cell.cursor = null;
   }
 
