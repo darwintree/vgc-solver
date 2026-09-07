@@ -43,4 +43,4 @@ P1 固定选 A 就能保证 +1，而任何策略不可能超过 +1，所以这�
 
 实现索引：[solver.js](../../src/solver.js) 的 `ensureCell`／`resolveCell`、极值与鞍点检查；[async-solver.js](../../src/async-solver.js) 的异步价值求解；[matrix-game.js](../../src/matrix-game.js) 的 `solveZeroSumMatrix` 和 `validateEquilibrium`。
 
-验证：[solver-pruning.test.js](../../test/solver-pruning.test.js)、[asymmetric-pruning.test.js](../../test/asymmetric-pruning.test.js)、[matrix-game-optimized.test.js](../../test/matrix-game-optimized.test.js)。历史依据：[通用优化](../optimization-records/general-performance.md)、[value-only 决策](../optimization-records/traces/2026-09-06-value-pruning.md)。
+验证：[solver-pruning.test.js](../../test/solver-pruning.test.js)、[asymmetric-pruning.test.js](../../test/asymmetric-pruning.test.js)、[matrix-game-optimized.test.js](../../test/matrix-game-optimized.test.js)。历史依据：[通用优化](../optimization-records/general-performance.md)、[value-only 决策](../traces/implementations/2026-09-06-value-pruning.md)。

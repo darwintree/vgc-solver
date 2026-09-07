@@ -50,6 +50,6 @@ case 6 已复现默认 5 秒预算内不收敛；后续键优化的 3 秒目标�
 ## 其他历史记录
 
 - [满 PP 优化](optimization-records/full-pp-optimization.md)与[独立验收](optimization-records/full-pp-review.md)：优化准入条件与正确性证据。
-- [实现决策追踪](optimization-records/traces)：历史取舍，不作为当前任务指令。
+- [实现决策追踪](traces/implementations)：历史取舍，不作为当前任务指令。
 
 历史验收只描述记录对应的版本、输入和环境，当前性能结论需重新运行 benchmark。

@@ -39,7 +39,7 @@ node src/benchmark.js --solver bounded --case sucker-punch-6 --workers 9 --warmu
 
 完整验证命令 `node --test --test-concurrency=4` 重跑后 149/149 通过（42.735 秒）。首次运行 148/149 通过，原有 `worker-backed full-PP interval contains the exact reference` 在 5 秒预算内未收敛，价值区间断言未失败；该用例随后单独运行通过（用例总耗时 2.317 秒），未修改其预算或断言。此限时检查存在本轮观测到的波动，不应把重跑通过当作性能稳定性保证。
 
-误差预算前沿、延后昂贵 cell、跨节点异步流水三类候选未形成足够的收敛净收益证据，未合入主代码，也未增加配置选项。实验取舍见[实现记录](traces/2026-09-07-case6-performance.md)。
+误差预算前沿、延后昂贵 cell、跨节点异步流水三类候选未形成足够的收敛净收益证据，未合入主代码，也未增加配置选项。实验取舍见[实现记录](../traces/implementations/2026-09-07-case6-performance.md)。
 
 本轮只减少了每次转移的辅助成本，仍需同样的搜索工作量。要继续逼近 3 秒，应进一步验证减少必要展开或复用已证明结果的通用方法；当前实验不足以证明哪一种方案能达标。
 

@@ -68,7 +68,7 @@ Type: tradeoff
 
 Context: 三秒目标仍未实现，需要区分可交付的局部改进和未完成的性能目标。
 
-Decision: 保留通过原生语义对照的键生成优化，如实记录 3 秒达标数为 0/5。主代理预热 3 次、正式 5 次的原版／新版 search 中位数为 30.892／23.656 秒，全部正式样本区间、策略、矩阵和非计时搜索统计一致。原始样本见 [case6-key-optimization.json](../data/case6-key-optimization.json)。
+Decision: 保留通过原生语义对照的键生成优化，如实记录 3 秒达标数为 0/5。主代理预热 3 次、正式 5 次的原版／新版 search 中位数为 30.892／23.656 秒，全部正式样本区间、策略、矩阵和非计时搜索统计一致。原始样本见 [case6-key-optimization.json](../../optimization-records/data/case6-key-optimization.json)。
 
 Reason: 本轮观测到约 23.4% 中位数耗时下降，但系统负载有波动，不能据此宣称固定倍率，更不能声称达到 3 秒。
 

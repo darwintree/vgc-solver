@@ -39,4 +39,4 @@
 - [event-plan.js](../../src/event-plan.js)：`createEventPlan`、`hasPossibleEvent`；[empty-events.js](../../src/empty-events.js)：整批空分发及可信 wrapper 身份。
 - [residual-optimization.js](../../src/residual-optimization.js)：`isIndependentDurationHandler`、`installResidualOptimization`。
 - 验证：[event-plan.test.js](../../test/event-plan.test.js)、[empty-events.test.js](../../test/empty-events.test.js)、[residual-optimization.test.js](../../test/residual-optimization.test.js)。
-- 历史：[满 PP 优化](../optimization-records/full-pp-optimization.md)、[满 PP 决策](../optimization-records/traces/2026-09-06-sucker-punch-full-pp.md)。
+- 历史：[满 PP 优化](../optimization-records/full-pp-optimization.md)、[满 PP 决策](../traces/implementations/2026-09-06-sucker-punch-full-pp.md)。
