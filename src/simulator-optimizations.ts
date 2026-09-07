@@ -1,5 +1,5 @@
 import type {TransitionOptions} from './types';
-import type {ModdedItemDataTable} from '@pkmn/sim';
+import type {ModdedAbilityDataTable, ModdedItemDataTable} from '@pkmn/sim';
 import * as path from 'node:path';
 import {Battle, Dex, Pokemon} from '@pkmn/sim';
 import {installEmptyEventOptimization, isNativeFindEventHandlers} from './empty-events';
@@ -53,6 +53,11 @@ const nativeBattle = Object.freeze({
 // Recognize the callback by identity, not an item name in the current battle.
 const nativeLifeOrbModifier = (Dex.items.get('lifeorb') as
   ModdedItemDataTable[keyof ModdedItemDataTable]).onModifyDamage;
+const disguise = Dex.abilities.get('disguise') as ModdedAbilityDataTable[keyof ModdedAbilityDataTable];
+const nativeDisguiseCallbacks = Object.freeze({
+  Damage: disguise.onDamage,
+  Effectiveness: disguise.onEffectiveness,
+});
 // @pkmn/sim's pinned battle formats install Math.trunc as the native damage
 // truncator. Mapping all 16 rolls calls the truncator 32 times while building
 // alternatives, so custom truncators must stay on the native path.
@@ -193,6 +198,18 @@ function installDamageOptimization(battle, eventPlan = null) {
     return source.ignoringItem() ? 1 : 5324 / 4096;
   };
 
+  const noDamageObserver = (eventid, target, source) => {
+    if (hasPossibleEvent(eventPlan, battle, eventid) === false) return true;
+    const handlers = battle.findEventHandlers(target, eventid, source);
+    if (handlers.length === 0) return true;
+    // In the pinned callbacks, every other species returns undefined before
+    // inspecting damage, running immunity, or changing ability state. This
+    // includes busted forms and Disguise copied to an unrelated species.
+    const species = target.species?.id;
+    if (!species || species === 'mimikyu' || species === 'mimikyutotem') return false;
+    return handlers.every(handler => handler.callback === nativeDisguiseCallbacks[eventid]);
+  };
+
   const canProbeTail = context => {
     const {source, target, move} = context;
     if (!source || !target || !move || !context.parentMove || target.hp <= 0 || target.volatiles?.substitute ||
@@ -244,8 +261,8 @@ function installDamageOptimization(battle, eventPlan = null) {
     if (!(noHandlers('ModifySTAB', source, target) &&
       noHandlers('Type', source, null) &&
       noHandlers('Type', target, null) &&
-      noHandlers('Effectiveness', target, null) &&
-      noHandlers('Damage', target, source))) return false;
+      noDamageObserver('Effectiveness', target, null) &&
+      noDamageObserver('Damage', target, source))) return false;
     context.finalModifier = finalDamageModifier(source, target);
     return context.finalModifier !== null;
   };
@@ -272,7 +289,11 @@ function installDamageOptimization(battle, eventPlan = null) {
           source.getTypes(false, true).includes(type);
         if (isSTAB) stab = 1.5;
         if (source.terastallized === type && source.getTypes(false, true).includes(type)) stab = 2;
-        const typeMod = battle.clampIntRange(target.runEffectiveness(move), -6, 6);
+        // All Effectiveness handlers are absent or audited no-ops. Compute
+        // the native type sum directly so prediction never invokes callbacks.
+        const typeMod = battle.clampIntRange(target.getTypes().reduce(
+          (sum, targetType) => sum + battle.dex.getEffectiveness(move, targetType), 0
+        ), -6, 6);
         const bypassProtect = target.getMoveHitData(move).bypassProtect;
         const burnedPhysical = source.status === 'brn' && move.category === 'Physical' &&
           !source.hasAbility('guts') && (battle.gen < 6 || move.id !== 'facade');

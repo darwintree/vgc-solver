@@ -1,4 +1,4 @@
-import type {ModdedItemDataTable, PRNG, PokemonSet} from '@pkmn/sim';
+import type {ModdedAbilityDataTable, ModdedItemDataTable, PRNG, PokemonSet} from '@pkmn/sim';
 import type {Mutable} from './helpers/types';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -241,7 +241,7 @@ test('post-tail saturation preserves resisted and threshold-crossing damage', ()
 function contactBattleWithReserve(defense: Partial<PokemonSet> = {}, attacker: Partial<PokemonSet> = {}) {
   const battle = new Battle({
     formatid: toID('gen9customgame'), seed: '1,2,3,4',
-    p1: {name: 'P1', team: [{species: 'Mew', ...attacker, moves: ['Tackle']}] as PokemonSet[]},
+    p1: {name: 'P1', team: [{species: 'Mew', moves: ['Tackle'], ...attacker}] as PokemonSet[]},
     p2: {name: 'P2', team: [
       {species: 'Garchomp', ...defense, moves: ['Splash']},
       {species: 'Snorlax', moves: ['Splash']},
@@ -352,5 +352,43 @@ test('custom final damage callbacks preserve their raw damage observations', () 
     assert.ok(optimized.outcomes.length > 1);
   } finally {
     item.onModifyDamage = original;
+  }
+});
+
+test('Disguise state predicates preserve native distributions across intact and busted forms', () => {
+  for (const species of ['Mimikyu', 'Mimikyu-Totem', 'Mimikyu-Busted', 'Mimikyu-Busted-Totem', 'Snorlax']) {
+    for (const hp of [1, 100]) {
+      const battle = contactBattleWithReserve({species, ability: 'Disguise'}, {moves: ['Smart Strike']});
+      assert.equal(battle.p2.active[0].species.id, toID(species));
+      setHP(battle, 'p2', hp);
+      refreshMoveRequest(battle);
+      const snapshot = snapshotBattle(battle);
+      const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+      const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+      assertSameDistribution(native, optimized);
+      assert.ok(optimized.outcomes.every(outcome => outcome.snapshot));
+      assert.ok(optimized.simulatorRuns < native.simulatorRuns);
+    }
+  }
+});
+
+test('custom Disguise effectiveness observers execute only through the native path', () => {
+  const ability = Dex.abilities.get('disguise') as ModdedAbilityDataTable[keyof ModdedAbilityDataTable];
+  const original = ability.onEffectiveness;
+  ability.onEffectiveness = function(typeMod, target) {
+    target.hp--;
+  };
+  try {
+    const battle = contactBattleWithReserve(
+      {species: 'Mimikyu-Busted', ability: 'Disguise'}, {moves: ['Smart Strike']}
+    );
+    setHP(battle, 'p2', 100);
+    refreshMoveRequest(battle);
+    const snapshot = snapshotBattle(battle);
+    const native = enumerateNative(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    const optimized = enumerateTurn(snapshot, {command: 'move 1'}, {command: 'move 1'});
+    assertSameDistribution(native, optimized);
+  } finally {
+    ability.onEffectiveness = original;
   }
 });

@@ -41,3 +41,21 @@ Follow-up:
 Source-only candidate while the root agent benchmarks the previous commit; validation will use full native distributions at low, threshold, and surviving HP, item suppression, an extra Reflect handler, and a custom raw-observing callback.
 
 Validation update: Node.js v24.20.0; typecheck, build, simulator-optimizations and native-distribution tests pass, including the new Life Orb comparisons. Performance measurement and full regression remain coordinated by the root agent.
+
+### 3. Prove inactive Disguise callbacks from their native state predicate
+
+Type: unresolved-implementation-decision
+
+Context:
+Disguise callbacks remain registered after its forme change and keep the generic empty-event guard false. The root agent requested investigation of this rule-level no-op condition after the first two independent candidates.
+
+Decision:
+Allow only the exactly captured native Disguise Damage and Effectiveness callbacks when the target species is neither mimikyu nor mimikyutotem. Keep intact forms and every other callback on the conservative path. Compute the predicted effectiveness sum directly from native type effectiveness after proving handlers empty or inert, avoiding speculative callback execution.
+
+Reason:
+Both pinned callbacks return undefined for every other species before observing raw damage, invoking immunity, or modifying state. The condition follows the simulator's ability rule, including copied Disguise and both busted forms; it is unrelated to benchmark case selection. Actual callbacks still execute natively. The direct type sum also respects existing no-Type-handler, no-move-Effectiveness-handler, no-Tera-Shell, and no-terastallization guards.
+
+Follow-up:
+Source-only until the root agent's next validation window. Full native distribution tests cover both intact and busted forms, a copied ability, low and surviving HP, and a custom effectiveness observer.
+
+Validation update: Node.js v24.20.0; typecheck, build, simulator-optimizations and native-distribution tests pass. Full regression and performance remain coordinated by the root agent.
