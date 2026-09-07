@@ -114,6 +114,27 @@ test('time and fresh solve contexts are independent', () => {
   assert.equal(loss.stats.nodes, 1);
 });
 
+test('an incomplete transition remains an unknown bounded cell', () => {
+  const adapter = {
+    snapshotBattle: state => state,
+    restoreBattle: state => state,
+    stateKey: state => String(state),
+    terminalUtility: () => null,
+    legalActions: () => ['wait'],
+    enumerateTurn: () => ({outcomes: [], simulatorRuns: 7, complete: false}),
+  };
+  const solver = new BoundedSolver({adapter, tolerance: 0});
+  const result = solver.solve({id: 'root'});
+
+  assert.equal(result.converged, false);
+  assert.equal(result.stopReason, 'transition-incomplete');
+  assert.equal(result.payoffMatrixIntervals.length, 1);
+  assert.equal(result.payoffMatrixIntervals[0].length, 1);
+  assert.deepEqual(result.payoffMatrixIntervals[0][0], {lowerBound: -1, upperBound: 1});
+  assert.equal(solver.stats.transitionCalls, 1);
+  assert.equal(solver.stats.simulatorRuns, 7);
+});
+
 test('native adapter interval contains the exact two-PP baseline', () => {
   const {battle} = suckerPunchGame();
   for (const side of battle.sides) {

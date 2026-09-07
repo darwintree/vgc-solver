@@ -10,8 +10,9 @@ async function measure(fixture) {
     let stderr = '';
     let result;
     child.stderr.on('data', data => { stderr = (stderr + data).slice(-4000); });
-    // An individual native transition cannot be interrupted by the bounded deadline.
-    // A process watchdog prevents one pathological case from blocking the sweep.
+    // Native transitions observe the bounded deadline at cooperative random
+    // branch boundaries; a currently executing simulator call is not preempted.
+    // A process watchdog still prevents one pathological case from blocking the sweep.
     const timer = setTimeout(() => child.kill('SIGKILL'), 30000);
     child.on('message', message => { result = message; });
     child.on('error', error => { result = {status: 'error', error: error.message}; });

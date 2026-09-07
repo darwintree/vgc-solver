@@ -215,6 +215,13 @@ function terminalUtility(battle: Battle): number | null {
   return 0;
 }
 
+class TransitionDeadlineExceeded extends Error {
+  constructor() {
+    super('Transition deadline reached');
+    this.name = 'TransitionDeadlineExceeded';
+  }
+}
+
 /**
  * Enumerate exactly the finite random calls made while resolving one turn.
  * Each replay starts from the same serialized Showdown state.
@@ -222,6 +229,11 @@ function terminalUtility(battle: Battle): number | null {
  */
 function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2Action: Pick<Action, 'command'>, options: TransitionOptions = {}): Transition {
   const maxRuns = options.maxSimulatorRunsPerTransition ?? 100000;
+  const deadline = Number.isFinite(options.deadline) ? options.deadline : null;
+  const isCancelled = deadline === null ? null : () => performance.now() >= deadline;
+  let runs = 0;
+  const incomplete = (): Transition => ({outcomes: [], simulatorRuns: runs, complete: false});
+  if (isCancelled?.()) return incomplete();
   const outcomeKey = options.outcomeKey ?? stateKey;
   const ppCache = options.ppCache;
   let ppEligible = false;
@@ -245,6 +257,7 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
         const replayed = [];
         let replayable = true;
         for (const outcomeTemplate of template.outcomes) {
+          if (isCancelled?.()) return incomplete();
           const outcome = outcomeTemplate.snapshot
             ? {snapshot: cloneJSON(outcomeTemplate.snapshot)}
             : {utility: outcomeTemplate.utility};
@@ -267,10 +280,10 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
   const pending = [{decisions: [], probability: 1}];
   const outcomes = new Map();
   const templateBranches = [];
-  let runs = 0;
   let cacheSafe = ppEligible;
 
   while (pending.length) {
+    if (isCancelled?.()) return incomplete();
     if (++runs > maxRuns) {
       throw new Error(`Random branch limit (${maxRuns}) exceeded`);
     }
@@ -283,6 +296,7 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
     if (ppCache && !tracker) cacheSafe = false;
     installSimulatorOptimizations(battle, {eventPlan: options.eventPlan || null});
     const prng = new BranchingPRNG(branch.decisions, 0, (alternatives, source) => {
+      if (isCancelled?.()) throw new TransitionDeadlineExceeded();
       for (let index = 1; index < alternatives.length; index++) {
         const alternative = alternatives[index];
         const probability = branch.probability * alternative.probability;
@@ -303,6 +317,7 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
     let captured;
     try {
       battle.makeChoices(p1Action.command, p2Action.command);
+      if (isCancelled?.()) throw new TransitionDeadlineExceeded();
       if (prng.cursor !== prng.decisions.length) {
         throw new Error('Random replay completed without consuming its full prefix');
       }
@@ -313,6 +328,9 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
         captured = tracker.capture();
         if (next && (slotShape(next) !== inputShape || !tracker.identityIntact())) tracker.markUnsafe();
       }
+    } catch (error) {
+      if (error instanceof TransitionDeadlineExceeded) return incomplete();
+      throw error;
     } finally {
       if (tracker && !tracker.finish()) cacheSafe = false;
     }
@@ -347,12 +365,14 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
   for (const outcome of result) outcome.probability /= total;
 
   if (ppCache && cacheSafe && templateBranches.length === runs) {
+    if (isCancelled?.()) return incomplete();
     const inputPP = readOutputPP(snapshot);
     const slotCount = inputPP.length;
     const intervals = Array.from({length: slotCount}, () => ({min: 0, max: Infinity}));
     const grouped = new Map();
     let templateValid = true;
     for (const branch of templateBranches) {
+      if (isCancelled?.()) return incomplete();
       if (!branch.intervals || branch.intervals.length !== slotCount ||
           !branch.deltas || branch.deltas.length !== slotCount ||
           !intersectPPIntervals(intervals, branch.intervals)) {
@@ -378,8 +398,10 @@ function enumerateTurn(snapshot: Snapshot, p1Action: Pick<Action, 'command'>, p2
       outcome.guards.push(branch.deltas);
     }
     if (templateValid) {
+      if (isCancelled?.()) return incomplete();
       const total = [...grouped.values()].reduce((sum, outcome) => sum + outcome.probability, 0);
       for (const outcome of grouped.values()) {
+        if (isCancelled?.()) return incomplete();
         outcome.probability /= total;
         const deltas = outcome.guards[0] || Array(slotCount).fill(0);
         if (outcome.guards.some(candidate => candidate.length !== deltas.length ||

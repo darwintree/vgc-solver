@@ -2,12 +2,35 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {suckerPunchGame} from '../src/cases';
 import {
+  createPPTransitionCache,
   enumerateTurn,
   legalActions,
   restoreBattle,
   snapshotBattle,
   stateKey,
 } from '../src/showdown-adapter';
+
+test('cooperative deadline abandons a native transition at a branch boundary', () => {
+  const {battle} = suckerPunchGame();
+  const snapshot = snapshotBattle(battle);
+  const p1 = legalActions(battle, 0)[1];
+  const p2 = legalActions(battle, 1)[1];
+  const cache = createPPTransitionCache();
+  const nativeNow = performance.now;
+  const clock = [0, 0, 1];
+  performance.now = () => clock.shift() ?? 1;
+  let result;
+  try {
+    result = enumerateTurn(snapshot, p1, p2, {ppCache: cache, deadline: 0.5});
+  } finally {
+    performance.now = nativeNow;
+  }
+
+  assert.equal(result.complete, false);
+  assert.deepEqual(result.outcomes, []);
+  assert.equal(result.simulatorRuns, 1);
+  assert.equal(cache.templates.size, 0);
+});
 
 test('state keys ignore logs and PRNG history without changing the snapshot', () => {
   const snapshot = snapshotBattle(suckerPunchGame().battle);

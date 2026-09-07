@@ -20,7 +20,9 @@ export interface BoundedAdapter {
   stateKey?: (snapshot: any) => string;
   terminalUtility?: (battle: any) => number | null;
   legalActions?: (battle: any, side: number) => (Action | string | number)[];
-  enumerateTurn: (snapshot: any, p1: any, p2: any, options?: any) => {outcomes: Transition['outcomes']; simulatorRuns?: number; cacheHits?: number};
+  enumerateTurn: (snapshot: any, p1: any, p2: any, options?: any) => {
+    outcomes: Transition['outcomes']; simulatorRuns?: number; cacheHits?: number; complete?: boolean;
+  };
 }
 export interface BoundedOptions extends SolverOptions {
   tolerance?: number;
@@ -242,6 +244,7 @@ class BoundedSearch {
         this.stopReason = 'time';
         break;
       }
+      if (this.stopReason) break;
       const selectionPolicy = this._selectionPolicyForRoot(root);
       if (selectionPolicy === 'security') this.proofTurn++;
       let frontier = this._selectFrontier(root, selectionPolicy);
@@ -329,6 +332,7 @@ class BoundedSearch {
     if (this.adapter !== nativeAdapter) return {};
     return {
       maxSimulatorRunsPerTransition: this.options.maxSimulatorRunsPerTransition,
+      deadline: this.deadline,
       eventPlan: this.eventPlan,
       ppCache: this.ppCache,
       ppAudit: this.ppAudit,
@@ -375,6 +379,10 @@ class BoundedSearch {
     this.stats.transitionCalls++;
     this.stats.simulatorRuns += transition.simulatorRuns || 0;
     this.stats.ppCacheHits += transition.cacheHits || 0;
+    if (transition.complete === false) {
+      this.stopReason = this._timedOut() ? 'time' : 'transition-incomplete';
+      return;
+    }
     if (!Array.isArray(transition.outcomes) || !transition.outcomes.length) {
       throw new Error('A transition must have at least one outcome');
     }
@@ -513,7 +521,7 @@ class BoundedSearch {
     const queued = new Set(queue);
     let updates = 0;
     while (queue.length) {
-      if ((updates & 63) === 0 && this._timedOut()) {
+      if (updates > 0 && (updates & 63) === 0 && this._timedOut()) {
         this.stopReason = 'time';
         break;
       }

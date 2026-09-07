@@ -115,6 +115,7 @@ class AsyncBoundedSolver extends BoundedSearch {
           this.stopReason = 'time';
           break;
         }
+        if (this.stopReason) break;
         const selectionPolicy = this._selectionPolicyForRoot(root);
         if (selectionPolicy === 'security') this.proofTurn++;
         let frontier = this._selectFrontier(root, selectionPolicy);
@@ -199,6 +200,7 @@ class AsyncBoundedSolver extends BoundedSearch {
       jobs.push({i, j, promise: this.pool.run(
         node.snapshot, node.actions1[i] as import('./types').Action, node.actions2[j] as import('./types').Action, {
           maxSimulatorRunsPerTransition: this.options.maxSimulatorRunsPerTransition,
+          deadline: this.deadline,
           outcomeKeyMode: this.memoStateKey.private ? 'private' : undefined,
           // Route each action pair by its transient row-major rank. This is
           // only a worker-affinity hint; state identity and semantics remain

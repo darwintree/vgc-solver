@@ -31,7 +31,7 @@ npm run benchmark -- --solver bounded --case sucker-punch-3 --workers 9 --warmup
 
 有界结果的 `value` 是区间中点，`valueErrorBound` 是区间宽度的一半。`converged` 表示在给定误差目标内完成了区间收窄；预算耗尽的 run 仍返回实际 elapsed 时间和当前安全区间，但不会计入 `completedRuns`。输出中的 `timing.elapsed` 汇总所有 run，`timing.convergedElapsed` 只汇总已收敛 run；`elapsedSearch`、`convergedSearch` 和 `prepare` 分别报告搜索和准备阶段的实际时间。区间可能表示期望效用而不是纯胜率；在胜／负／平效用为 `+1/-1/0` 时，`(V + 1) / 2` 才是“胜利加半个平局”的分数，不能直接称为胜率。
 
-算法及 API／CLI 配置差异见[有界搜索技术](optimization-techniques/bounded-search.md)，case 3–5 的历史验收见[优化记录](optimization-records/bounded-fullpp.md)。预算检查发生在转移和 backup 之间，单次转移不会被强行中断，实际搜索耗时可能略超预算。
+算法及 API／CLI 配置差异见[有界搜索技术](optimization-techniques/bounded-search.md)，case 3–5 的历史验收见[优化记录](optimization-records/bounded-fullpp.md)。预算检查发生在转移和 backup 之间，并在原生转移的随机分支边界协作截止；当前模拟器调用不能被抢占，实际搜索耗时可能略超预算。
 
 ## 并行 benchmark 口径
 

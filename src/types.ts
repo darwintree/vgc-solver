@@ -38,6 +38,8 @@ export interface WorkerOptions {
 }
 export interface TransitionOptions {
   maxSimulatorRunsPerTransition?: number;
+  /** Absolute performance.now() deadline for cooperative bounded cancellation. */
+  deadline?: number;
   outcomeKey?: StateKey;
   ppCache?: PPTransitionCache;
   ppAudit?: symbol;
@@ -54,6 +56,8 @@ export interface Transition {
   outcomes: Outcome[];
   simulatorRuns: number;
   cacheHits?: number;
+  /** False means the transition was abandoned before a complete distribution existed. */
+  complete?: boolean;
 }
 export interface ExactCell {
   outcomes: Outcome[];

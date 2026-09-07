@@ -5,7 +5,7 @@ import {AsyncBoundedSolver} from '../src/async-bounded-solver';
 import {BoundedSolver} from '../src/bounded-solver';
 import {TransitionPool} from '../src/transition-pool';
 import {suckerPunchCoverageGame, suckerPunchGame, trivialPriorityKO} from '../src/cases';
-import {refreshMoveRequest, setMovePP} from '../src/showdown-adapter';
+import {legalActions, refreshMoveRequest, setMovePP, snapshotBattle} from '../src/showdown-adapter';
 
 test('worker-backed full-PP interval contains the exact reference', async () => {
   const exactValue = 0.601097268633219;
@@ -178,6 +178,22 @@ test('zero search budget exits before root warm-start cell access', async () => 
     assert.equal(result.stopReason, 'time');
     assert.equal(result.lowerBound, -1);
     assert.equal(result.upperBound, 1);
+  } finally {
+    await pool.close();
+  }
+});
+
+test('worker forwards an expired transition deadline', async () => {
+  const {battle} = suckerPunchGame();
+  const pool = new TransitionPool(1);
+  try {
+    const snapshot = snapshotBattle(battle);
+    const p1 = legalActions(battle, 0)[0];
+    const p2 = legalActions(battle, 1)[0];
+    const transition = await pool.run(snapshot, p1, p2, {deadline: performance.now() - 1});
+    assert.equal(transition.complete, false);
+    assert.deepEqual(transition.outcomes, []);
+    assert.equal(transition.simulatorRuns, 0);
   } finally {
     await pool.close();
   }
