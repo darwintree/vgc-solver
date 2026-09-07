@@ -81,3 +81,19 @@ upper-solution 的 P1 概率
 该算法针对当前一只 active 对一只 active、有限 PP 和有限离散随机分支的 1v1 状态图。它不是完整单打换人、队伍选择、双打或完整 Simultaneous Move Alpha-Beta（SMAB）求解器；真正可再生的循环需要独立的不动点随机博弈算法。规则审计、双精度矩阵、状态序列化和随机等价优化依赖固定的 `@pkmn/sim` 版本，升级后必须重新验证。
 
 本轮实测见[策略证书搜索记录](../optimization-records/strategy-certificates-2026-09-07.md)，不把单个 case 的成绩外推到其他局面。运行口径见[benchmark 指南](../benchmarking.md)；实现索引见 [bounded-solver.ts](../../src/bounded-solver.ts) 的 `_cellBounds`、`_refresh`、`_backupFrom`、`_selectFrontier`、`_findAnyFrontier`，以及 [async-bounded-solver.ts](../../src/async-bounded-solver.ts) 的批次展开。验证包括 [bounded-solver.test.ts](../../test/bounded-solver.test.ts)、[bounded-stochastic.test.ts](../../test/bounded-stochastic.test.ts)、[bounded-strategy-proof.test.ts](../../test/bounded-strategy-proof.test.ts) 和 [bounded-native-certificate.test.ts](../../test/bounded-native-certificate.test.ts)。
+
+
+## 同步渐进式转移候选
+
+同步原生 bounded 搜索以可续跑游标逐批生成随机转移；每批最多 32 次整回合重放，并使用 25 ms 合作式截止。游标按待处理随机前缀的概率选择下一次重放，仍从原始回合 snapshot 重放，不保存回合中间的模拟器状态。每次返回累计完成的 outcomes 与尚未完成的概率质量 `remainingProbability`，已完成的质量不会单独归一化：
+
+```text
+cell.lower = Σ completedProbability × child.lower − remainingProbability
+cell.upper = Σ completedProbability × child.upper + remainingProbability
+```
+
+这些 partial 格可以参与上下界矩阵证明。只有 remainingProbability 为零、游标完成且所有后继 exact 时才允许 exactCertified。搜索可以在证书足够时结束，保留未枚举的概率质量；这不等同于省略概率分支。调度比较 `2 × remainingProbability` 与最大的 `child.probability × child.width`，选择继续枚举该格或沿已生成后继下降；其他行动格仍由现有矩阵证明调度选择。
+
+游标在随机调用的合作式截止处中断时，会保存当前已选择的前缀及其当前质量；此前放入队列的兄弟前缀保持独立，恢复时不会重复其概率质量。每次 advance 的 simulatorRuns 计入累计 stats；expandedCells 只在第一次接受该格时增加。单次模拟器调用仍不能被任意抢占。
+
+自定义 adapter 可以提供可选 createTurnCursor，未提供时保留完整 enumerateTurn 合同；普通 complete:false 返回仍表示转移不完整、不能被当作 partial 分布。exact 和 worker 路径继续使用完整 enumerateTurn。本候选的原生游标暂不使用 PP 转移模板，有重复 PP 局面的性能退化风险；大量近等概率叶仍需要大量重放，需以独立性能测量评估。

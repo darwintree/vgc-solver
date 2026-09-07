@@ -10,6 +10,7 @@ import {
 } from './showdown-adapter';
 import {createMemoStateKey, privateSnapshotKey} from './native-memo-key';
 import {createPPTransitionCache, auditPPBattle} from './pp-transition-cache';
+import {createTurnCursor, type TransitionCursor} from './progressive-transition';
 import {createEventPlan} from './event-plan';
 import {auditNativeRules} from './native-rules';
 
@@ -20,6 +21,7 @@ export interface BoundedAdapter {
   stateKey?: (snapshot: any) => string;
   terminalUtility?: (battle: any) => number | null;
   legalActions?: (battle: any, side: number) => (Action | string | number)[];
+  createTurnCursor?: (snapshot: any, p1: any, p2: any, options?: any) => TransitionCursor;
   enumerateTurn: (snapshot: any, p1: any, p2: any, options?: any) => {
     outcomes: Transition['outcomes']; simulatorRuns?: number; cacheHits?: number; complete?: boolean;
   };
@@ -58,6 +60,8 @@ interface BoundedOutcome {
   child: SearchNode | null;
 }
 interface BoundedCell {
+  cursor?: TransitionCursor | null;
+  remainingProbability?: number;
   outcomes: BoundedOutcome[] | null;
   lower: number;
   upper: number;
@@ -86,6 +90,7 @@ const EPSILON = 1e-12;
 const FRONTIER_TIE_EPSILON = 1e-9;
 
 const nativeAdapter = Object.freeze({
+  createTurnCursor,
   enumerateTurn,
   legalActions,
   restoreBattle,
@@ -378,11 +383,17 @@ class BoundedSearch {
     this.stats.transitionCalls++;
     this.stats.simulatorRuns += transition.simulatorRuns || 0;
     this.stats.ppCacheHits += transition.cacheHits || 0;
-    if (transition.complete === false) {
+    const progressive = transition.remainingProbability !== undefined;
+    const remaining = progressive ? Number(transition.remainingProbability) : 0;
+    if (!Number.isFinite(remaining) || remaining < 0 || remaining > 1 ||
+        (progressive && transition.complete && remaining !== 0)) {
+      throw new Error(`Invalid remaining transition probability: ${remaining}`);
+    }
+    if (transition.complete === false && !progressive) {
       this.stopReason = this._timedOut() ? 'time' : 'transition-incomplete';
       return;
     }
-    if (!Array.isArray(transition.outcomes) || !transition.outcomes.length) {
+    if (!Array.isArray(transition.outcomes) || !transition.outcomes.length && remaining === 0) {
       throw new Error('A transition must have at least one outcome');
     }
     const outcomes = [];
@@ -401,13 +412,18 @@ class BoundedSearch {
       if (child) child.parents.add(node);
       outcomes.push({probability, child, utility: null});
     }
-    const total = outcomes.reduce((sum, outcome) => sum + outcome.probability, 0);
+    const total = remaining + outcomes.reduce((sum, outcome) => sum + outcome.probability, 0);
     if (!(total > 0) || Math.abs(total - 1) > 1e-9) {
       throw new Error(`Transition probabilities sum to ${total}, not 1`);
     }
-    for (const outcome of outcomes) outcome.probability /= total;
-    node.cells[i][j].outcomes = outcomes;
-    this.stats.expandedCells++;
+    if (!progressive || transition.complete) {
+      for (const outcome of outcomes) outcome.probability /= total;
+    }
+    const cell = node.cells[i][j];
+    if (!cell.outcomes) this.stats.expandedCells++;
+    cell.outcomes = outcomes;
+    cell.remainingProbability = remaining;
+    if (transition.complete) cell.cursor = null;
   }
 
   _expand(node: SearchNode) {
@@ -427,9 +443,15 @@ class BoundedSearch {
   _expandCell(node: SearchNode, i, j) {
     if (node.terminal !== null || !node.initialized) return;
     const cell = node.cells[i][j];
-    if (cell.outcomes) return;
+    if (cell.outcomes && !cell.cursor) return;
     if (this._timedOut()) {
       this.stopReason = 'time';
+      return;
+    }
+    if (this.adapter.createTurnCursor) {
+      cell.cursor ||= this.adapter.createTurnCursor(node.snapshot, node.actions1[i], node.actions2[j], this._transitionOptions());
+      const progress = cell.cursor.advance({maxRuns: 32, deadline: Math.min(this.deadline, performance.now() + 25)});
+      this._acceptTransition(node, i, j, progress);
       return;
     }
     const runTransition = this.adapter.enumerateTurn || enumerateTurn;
@@ -446,8 +468,8 @@ class BoundedSearch {
     if (!cell.outcomes) return;
     const oldLower = cell.lower;
     const oldUpper = cell.upper;
-    let lower = 0;
-    let upper = 0;
+    let lower = -(cell.remainingProbability || 0);
+    let upper = cell.remainingProbability || 0;
     for (const outcome of cell.outcomes) {
       let childLower = outcome.utility;
       let childUpper = outcome.utility;
@@ -475,7 +497,7 @@ class BoundedSearch {
       for (const cell of row) matrixChanged = this._cellBounds(cell) || matrixChanged;
     }
     const previousExact = node.exactCertified;
-    const exactCertified = node.cells.every(row => row.every(cell => cell.outcomes &&
+    const exactCertified = node.cells.every(row => row.every(cell => cell.outcomes && !cell.cursor && !cell.remainingProbability &&
       cell.outcomes.every(outcome => outcome.utility !== null ||
         (outcome.child && outcome.child.exactCertified))));
     if (!matrixChanged) {
@@ -589,7 +611,7 @@ class BoundedSearch {
       const colStrategy = node.lowerSolution?.p2 || [];
       const canExpandCell = cell => {
         if (cell.upper - cell.lower <= 1e-9) return false;
-        if (!cell.outcomes) return true;
+        if (!cell.outcomes || cell.cursor) return true;
         return cell.outcomes.some(outcome => outcome.utility === null && outcome.child &&
           outcome.child.upper - outcome.child.lower > 1e-9);
       };
@@ -780,6 +802,9 @@ class BoundedSearch {
           nextScore = score;
         }
       }
+      if (chosen.cell.cursor && 2 * chosen.cell.remainingProbability >= nextScore) {
+        return {node, i: chosen.i, j: chosen.j};
+      }
       if (!next) return null;
       node = next;
     }
@@ -807,7 +832,7 @@ class BoundedSearch {
       for (let i = 0; i < node.cells.length; i++) {
         for (let j = 0; j < node.cells[i].length; j++) {
           const cell = node.cells[i][j];
-          if (!cell.outcomes && cell.upper - cell.lower > 1e-9) return {node, i, j};
+          if ((!cell.outcomes || cell.cursor) && cell.upper - cell.lower > 1e-9) return {node, i, j};
         }
       }
     }
