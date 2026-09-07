@@ -87,7 +87,7 @@ function admittedState(battle) {
   return battle.sides.every(side => side.pokemon.length === 1 && side.active.length === 1 &&
     !Object.keys(side.sideConditions).length && !Object.keys(side.slotConditions?.[0] || {}).length &&
     side.active.every(pokemon => pokemon.hp > 0 && pokemon.level <= 100 && !pokemon.status &&
-      !pokemon.terastallized && !pokemon.transformed && pokemon.types.length <= 2 &&
+      !pokemon.terastallized && !pokemon.transformed && !pokemon.addedType && pokemon.getTypes().length <= 2 &&
       !Object.keys(pokemon.volatiles).length &&
       admittedHooks(pokemon.getAbility(), abilityHooks) &&
       admittedHooks(pokemon.getItem(), itemHooks) && admittedHooks(pokemon.baseSpecies, noHooks)));

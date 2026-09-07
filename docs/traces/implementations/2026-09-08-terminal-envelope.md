@@ -54,3 +54,20 @@ Reason:
 
 Follow-up:
 重新运行类型、构建、相关包络守卫测试后才能采用修正版本。
+
+
+### 4. 伤害溢出证明显式拒绝附加属性
+
+Type: interpretation
+
+Context:
+审查指出 Pokemon.types 不包含 addedType，而 getTypes() 会返回第三属性；原始溢出上界只允许最多两种属性的四倍克制。
+
+Decision:
+准入显式拒绝 addedType，并检查 getTypes() 的实际属性数量。新增没有 volatile 的原生 addType 负例。
+
+Reason:
+这是缩小包络证明适用域，不能用 stored types 数量代替原生实际属性数量。固定 Champions 输入不受影响。
+
+Follow-up:
+None.

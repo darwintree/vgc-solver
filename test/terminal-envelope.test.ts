@@ -202,3 +202,12 @@ test('numeric event callbacks are not mistaken for event-order metadata', () => 
     else delete item.onFractionalPriority;
   }
 });
+
+
+test('an added third type is outside the damage-overflow certificate domain', () => {
+  const battle = position();
+  battle.p1.active[0].addType('Ghost');
+  assert.equal(battle.p1.active[0].getTypes().length, 3);
+  assert.equal(Object.keys(battle.p1.active[0].volatiles).length, 0);
+  assert.equal(createTerminalEnvelope(battle), null);
+});
