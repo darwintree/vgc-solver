@@ -32,7 +32,7 @@ npm run benchmark -- --case sucker-punch --pp 8
 子状态在必胜行或纯鞍点证书成立时停止展开，其余状态补齐矩阵求解。
 根节点仍返回完整收益矩阵和双方策略。随机树与状态空间仍可能随局面复杂度迅速增长。
 
-## 三个测试局面
+## 基础测试局面
 
 ### 1. Trivial
 
@@ -108,23 +108,67 @@ P2 守住／撞击 = 0.9823436931471409 / 0.0176563068528591
 `npm run benchmark` 默认运行满 PP 突袭局面，输出完整求解耗时、均衡结果和搜索统计，
 当前 total 包含 fixture 创建；prepare 和 search 分项另行输出。每次运行均创建新的求解器、memo 和 PP cache，
 没有沿用上次的求解缓存。
-`--case` 可选 `sucker-punch`、`leftovers`、`trivial`；`--pp N` 仅覆盖本次运行的剩余 PP，允许 0。
+`--case` 可选 `sucker-punch`、`sucker-punch-1` 至 `sucker-punch-6`、`leftovers`、`trivial`；`--pp N` 仅覆盖本次运行的剩余 PP，允许 0。
 历史统一 PP 测量中，5 PP 中位数从本轮基线的 3.54 秒降至 0.82 秒，约快 4.31 倍；
 8 PP 中位数约 1.96 秒。剩饭／守住中位数约 0.65 秒。全量测试已通过。
 方法、正确性证据及限制见 [通用优化记录](docs/general-performance.md)；此前两轮数据见 [历史性能记录](docs/performance.md)。
 
-当前正式 workers8 验收使用：
+## 有界 benchmark
+
+benchmark 默认使用 exact 求解器。需要明确传入 `--solver bounded` 才会启用有界区间搜索，例如：
 
 ```bash
-npm run benchmark -- --case sucker-punch --workers 8 --warmup 1 --runs 5
+npm run benchmark -- --solver bounded --case sucker-punch-3 --workers 9 --warmup 3 --runs 5 --tolerance .02
 ```
 
-5 次正式 run 全部走 `worker-async`，每次执行 2,235 次 simulator runs；使用 8 个 CPU 工作线程。
-search 耗时为 `846.586675, 802.019790, 712.497389, 710.694522, 715.999764 ms`，
-中位数 **715.999764 ms**（min `710.694522`，max `846.586675`）；prepare 中位数
-`1398.338961 ms`，total 中位数 `2201.062423 ms`，poolReady 为 `1371.879399 ms`。
-search 已低于 1 秒，total 包含 fixture 创建和固定准备成本，仍高于 1 秒。
-根状态收益矩阵、双方策略与基线一致，独立逐项核对了 1,273 个状态价值；完整测试及满 PP async 回归已通过。
+`--tolerance W` 指返回区间 `[lowerBound, upperBound]` 的最大宽度，默认是 `0.02`；`--search-ms N` 可为每次 bounded search 设置非负的毫秒预算，benchmark 默认预算为 `5000` 毫秒。`--selection-policy` 可选 `auto`（默认）、`security` 或 `joint`。`auto` 只根据当前根矩阵的纯策略安全界与混合矩阵值选择证明前沿：纯策略足以证明时使用 security，检测到混合均衡后使用 joint；它不读取局面名称或招式。`--tolerance`、`--search-ms` 和 `--selection-policy` 只接受 bounded 模式，exact 模式传入这些选项会报错。满 PP 局面和 fixture 的默认输入保持不变，除非显式使用已有的 `--pp N` 覆盖。
+
+有界结果的 `value` 是区间中点，`valueErrorBound` 是区间宽度的一半。`converged` 表示在给定误差目标内完成了区间收窄；预算耗尽的 run 仍返回实际 elapsed 时间和当前安全区间，但不会计入 `completedRuns`。输出中的 `timing.elapsed` 汇总所有 run，`timing.convergedElapsed` 只汇总已收敛 run；`elapsedSearch`、`convergedSearch` 和 `prepare` 分别报告搜索和准备阶段的实际时间。区间可能表示期望效用而不是纯胜率；在胜／负／平效用为 `+1/-1/0` 时，`(V + 1) / 2` 才是“胜利加半个平局”的分数，不能直接称为胜率。
+
+完整的算法说明、满 PP 向量、原始样本和验收口径见[有界搜索说明与满 PP 验收](docs/bounded-search.md)及其[紧凑 JSON 数据](docs/benchmarks/bounded-fullpp.json)。当前正式验收分别运行：
+
+```bash
+node src/benchmark.js --solver bounded --case sucker-punch-3 --workers 9 --warmup 3 --runs 5
+node src/benchmark.js --solver bounded --case sucker-punch-4 --workers 9 --warmup 3 --runs 5
+node src/benchmark.js --solver bounded --case sucker-punch-5 --workers 9 --warmup 3 --runs 5
+```
+
+15 次正式 run 全部收敛并走 `worker` backend。单位为毫秒；total 包含 prepare，search 是区间搜索本身。
+
+| 局面 | 根区间 | value | total min / median / max | search min / median / max |
+| --- | --- | --- | --- | --- |
+| `sucker-punch-3` | `[0.6277676317, 0.6477311925]` | `0.6377494121` | `2989.035 / 3028.871 / 3192.204` | `1785.217 / 1831.342 / 1933.907` |
+| `sucker-punch-4` | `[-0.8000000005, -0.7812500001]` | `-0.7906250003` | `1323.604 / 1368.457 / 1582.912` | `152.465 / 166.629 / 176.949` |
+| `sucker-punch-5` | `[-0.8000000005, -0.7812500000]` | `-0.7906250003` | `1707.421 / 1764.039 / 2012.746` | `538.785 / 565.184 / 591.166` |
+
+验证命令 `node --test --test-concurrency=4` 通过 29 个测试文件，失败数为 0。
+
+## 突袭扩展局面
+
+五个新增局面按顺序累积，均使用最大 PP，保留原始物种、等级、性格和能力。P1 为低速 Kingambit，P2 为高速 Electrode。
+
+| benchmark case | P1 HP | P2 HP | 本步变化 |
+| --- | --- | --- | --- |
+| `sucker-punch-1` | 6 | 1 | P2：守住／撞击／高科技光炮；撞击普通命中为 2HKO，强攻击为 OHKO |
+| `sucker-punch-2` | 6 | 1 | P2 强攻击换为 90% 命中的破坏光线 |
+| `sucker-punch-3` | 6 | 1 | P1 新增优先级 0 的地震 |
+| `sucker-punch-4` | 6 | 130 | P1 原有拍落变成 2HKO，地震仍为 OHKO |
+| `sucker-punch-5` | 6 | 130 | P1 新增守住，双方都能保护 |
+| `sucker-punch-6` | 6 | 56 | 与第 4 项并行：P1 用撞击替换拍落，突袭为 OHKO，撞击为 2HKO；不累加第 5 项的守住 |
+
+新增招式的满 PP：高科技光炮／破坏光线各 8，地震 16，守住 16。原有突袭 8、拍落 32、撞击 56。
+撞击非暴击伤害为 3–4，暴击可能一击击倒 6 HP；拍落非暴击伤害为 70–84，暴击为 106–126，均无法一击击倒 130 HP。
+这里使用自定义对局允许的原生招式组合，不限定物种学习面。100%／90% 强攻击通过两个不同的原生招式表达，以避免全局规则修改；二者命中均立即结束对局，因此破坏光线的休息回合不可达。
+第 6 项使用原生撞击替换拍落，目标为 56 HP；突袭伤害为 76–90（暴击 114–135），成功发动并命中时恒定 OHKO，撞击伤害为 29–35（暴击 44–52），普通命中两次必定击倒且单次不会 OHKO。其满 PP 向量为 P1 `[8, 56, 16]`、P2 `[16, 56, 8]`。
+
+可单独运行新增局面，默认所有招式均为满 PP：
+
+```bash
+npm run benchmark -- --case sucker-punch-1 --workers 8
+npm run benchmark -- --case sucker-punch-5 --workers 8
+```
+
+扩展局面未纳入默认 demo；原始突袭的满 PP 性能数据不代表新增局面的求解时间。
 
 ## 文件结构
 
@@ -140,7 +184,7 @@ src/transition-pool.js   常驻工作线程池与批量派发
 src/pp-transition-cache.js  受审计的 PP 转移模板复用
 src/event-plan.js        事件处理函数索引
 src/stock-rule-profile.js  跨线程规则一致性检查
-src/cases.js             三个测试局面
+src/cases.js             基础局面与五个突袭扩展局面
 src/demo.js              命令行输出
 src/benchmark.js         局面及 PP 可选的性能基准
 ```

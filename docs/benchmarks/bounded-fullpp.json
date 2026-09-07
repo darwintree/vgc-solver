@@ -1,0 +1,66 @@
+{
+  "commands": [
+    "node src/benchmark.js --solver bounded --case sucker-punch-3 --workers 9 --warmup 3 --runs 5",
+    "node src/benchmark.js --solver bounded --case sucker-punch-4 --workers 9 --warmup 3 --runs 5",
+    "node src/benchmark.js --solver bounded --case sucker-punch-5 --workers 9 --warmup 3 --runs 5"
+  ],
+  "date": "2026-09-07",
+  "timezone": "Asia/Shanghai",
+  "node": "v24.20.0",
+  "platform": "Linux x64; i5-13600K; 20 logical CPUs; 52.953 GiB RAM",
+  "options": {
+    "solver": "bounded",
+    "tolerance": 0.02,
+    "searchMs": 5000,
+    "selectionPolicy": "auto",
+    "workers": 9,
+    "batchSize": 8,
+    "warmupRuns": 3,
+    "runs": 5,
+    "backend": "worker"
+  },
+  "cases": [
+    {
+      "case": "sucker-punch-3",
+      "fullPP": {"p1": [8, 32, 16], "p2": [16, 56, 8]},
+      "value": 0.637749412072619,
+      "interval": [0.6277676316507269, 0.6477311924945112],
+      "elapsedSamplesMs": [3192.20361, 3116.798006, 3028.871251, 2989.035127, 3016.260184],
+      "searchSamplesMs": [1933.907211, 1858.53711, 1831.341542, 1785.216739, 1825.620024],
+      "prepareSamplesMs": [1257.681281, 1257.721766, 1197.029667, 1203.331748, 1190.281941],
+      "elapsedMs": {"min": 2989.035127, "median": 3028.871251, "max": 3192.203611},
+      "searchMs": {"min": 1785.216739, "median": 1831.341542, "max": 1933.90721},
+      "prepareMs": {"min": 1190.281941, "median": 1203.331748, "max": 1257.721766}
+    },
+    {
+      "case": "sucker-punch-4",
+      "fullPP": {"p1": [8, 32, 16], "p2": [16, 56, 8]},
+      "value": -0.7906250003104797,
+      "interval": [-0.8000000004793968, -0.7812500001415625],
+      "elapsedSamplesMs": [1582.911763, 1368.456634, 1323.603697, 1360.529449, 1371.167975],
+      "searchSamplesMs": [166.628738, 161.859389, 152.465402, 176.949075, 172.879163],
+      "prepareSamplesMs": [1415.331866, 1205.394949, 1170.375116, 1182.948226, 1197.431618],
+      "elapsedMs": {"min": 1323.603697, "median": 1368.456634, "max": 1582.911763},
+      "searchMs": {"min": 152.465402, "median": 166.628738, "max": 176.949075},
+      "prepareMs": {"min": 1170.375116, "median": 1197.431618, "max": 1415.331866}
+    },
+    {
+      "case": "sucker-punch-5",
+      "fullPP": {"p1": [8, 32, 16, 16], "p2": [16, 56, 8]},
+      "value": -0.7906250002604797,
+      "interval": [-0.8000000004793968, -0.7812500000415625],
+      "elapsedSamplesMs": [1813.065872, 1764.039025, 2012.745923, 1707.420983, 1754.981359],
+      "searchSamplesMs": [591.166016, 581.417117, 565.183778, 548.012119, 538.785017],
+      "prepareSamplesMs": [1221.022994, 1181.873062, 1446.763641, 1158.715957, 1215.577969],
+      "elapsedMs": {"min": 1707.420983, "median": 1764.039025, "max": 2012.745923},
+      "searchMs": {"min": 538.785017, "median": 565.183778, "max": 591.166016},
+      "prepareMs": {"min": 1158.715957, "median": 1215.577969, "max": 1446.763641}
+    }
+  ],
+  "verification": {
+    "allRunsConverged": true,
+    "completedRuns": 5,
+    "tests": "node --test --test-concurrency=4",
+    "testResult": "29 files passed, 0 failed"
+  }
+}

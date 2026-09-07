@@ -101,8 +101,100 @@ function suckerPunchGame() {
   };
 }
 
+function suckerPunchVariant(stage) {
+  const kingambit = {
+    species: 'Kingambit',
+    level: 50,
+    ability: 'Defiant',
+    nature: 'Brave',
+    ivs: IVS,
+    evs: EVS,
+    moves: ['Sucker Punch', 'Knock Off'],
+  };
+  const electrode = {
+    species: 'Electrode',
+    level: 50,
+    ability: 'Soundproof',
+    nature: 'Timid',
+    ivs: IVS,
+    evs: EVS,
+    moves: ['Protect', 'Tackle', stage === 1 ? 'Techno Blast' : 'Hyper Beam'],
+  };
+  if (stage >= 3) kingambit.moves.push('Earthquake');
+  if (stage >= 5) kingambit.moves.push('Protect');
+
+  const battle = createBattle(kingambit, electrode);
+  setHP(battle, 'p1', 6);
+  setHP(battle, 'p2', stage >= 4 ? 130 : 1);
+  // Tackle deals 3..4 ordinary damage here, so it is a 2HKO at 6 HP;
+  // a critical hit can still OHKO. Do not assert a 2HKO on every branch.
+  refreshMoveRequest(battle);
+  return {
+    name: `Sucker Punch variant ${stage}`,
+    expected: 'maximum PP; benchmark fixture',
+    battle,
+  };
+}
+
+function suckerPunchTwoHKOGame() {
+  return suckerPunchVariant(1);
+}
+
+function suckerPunchAccuracyGame() {
+  return suckerPunchVariant(2);
+}
+
+function suckerPunchCoverageGame() {
+  return suckerPunchVariant(3);
+}
+
+function suckerPunchBulkyTargetGame() {
+  return suckerPunchVariant(4);
+}
+
+function suckerPunchBothProtectGame() {
+  return suckerPunchVariant(5);
+}
+
+function suckerPunchOHKOTwoHKOGame() {
+  const kingambit = {
+    species: 'Kingambit',
+    level: 50,
+    ability: 'Defiant',
+    nature: 'Brave',
+    ivs: IVS,
+    evs: EVS,
+    moves: ['Sucker Punch', 'Tackle', 'Earthquake'],
+  };
+  const electrode = {
+    species: 'Electrode',
+    level: 50,
+    ability: 'Soundproof',
+    nature: 'Timid',
+    ivs: IVS,
+    evs: EVS,
+    moves: ['Protect', 'Tackle', 'Hyper Beam'],
+  };
+
+  const battle = createBattle(kingambit, electrode);
+  setHP(battle, 'p1', 6);
+  setHP(battle, 'p2', 56);
+  refreshMoveRequest(battle);
+  return {
+    name: 'Sucker Punch OHKO / Tackle 2HKO',
+    expected: 'maximum PP; benchmark fixture',
+    battle,
+  };
+}
+
 module.exports = {
   leftoversThreeHKO,
+  suckerPunchAccuracyGame,
+  suckerPunchBothProtectGame,
+  suckerPunchBulkyTargetGame,
+  suckerPunchCoverageGame,
   suckerPunchGame,
+  suckerPunchOHKOTwoHKOGame,
+  suckerPunchTwoHKOGame,
   trivialPriorityKO,
 };
