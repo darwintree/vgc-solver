@@ -26,3 +26,17 @@
 - 转移优化用原生与优化分布对照验证；求解器改动验证价值或区间证书。沿用 Node.js 内置测试工具。
 - 性能测量与测试分开运行，避免资源争抢。报告版本、命令、PP、workers、预热与样本数、backend、收敛状态，并分开列出 prepare、search、total；功能测试通过不等于限时收敛达标。
 - 仅文档改动时检查相对链接、命令与实现的一致性，无需重复运行完整求解测试。README 保持快速开始与文档导航，详细说明和实验结果放在 `docs/`。
+
+## Agent skills
+
+### Issue tracker
+
+管理 issue 前读 `docs/agents/issue-tracker.md`；本仓库使用 dot-issues，存放于 `.issues/`。
+
+### Triage labels
+
+执行 triage 前读 `docs/agents/triage-labels.md`，按其中映射使用标签。
+
+### Domain docs
+
+探索代码前读 `docs/agents/domain.md`；采用 single-context 布局。
