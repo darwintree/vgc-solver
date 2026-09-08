@@ -1,0 +1,36 @@
+✔ two-action checkpoints preserve native setup and attack probability (228.923792ms)
+✔ damage checkpoints preserve concrete correlated HP, recoil and Disguise state (231.195856ms)
+✔ a completed multi-hit action retains Stamina and post-move boosts (933.730843ms)
+✔ secondary status and berry updates precede the checkpoint (1120.479544ms)
+✔ Encore can replace a queued move before the native suffix continues (154.123343ms)
+✔ canceling after checkpoint creation retains the residual prefix mass (197.318379ms)
+✔ evicting a checkpoint falls back to the original full prefix (233.179822ms)
+✔ factory admission rejects custom rules and fabricated cache objects (2464.187287ms)
+✔ State method replacement declines cached resume, and wrappers restore on exceptions (184.177109ms)
+✔ a forced-switch request remains a full concrete decision boundary (205.958512ms)
+✔ status-only suffixes keep full replay and its complete probability (2673.608134ms)
+✔ default API reaches a 32-level stochastic policy with non-first actions (11.701881ms)
+✔ lazy=false proves the mirrored 32-level negative chain (9.952016ms)
+✔ symmetric negative utility reaches the upper-proof endpoint (0.332364ms)
+✔ every adversarial response is covered, including a rare refutation (0.720612ms)
+✔ shared descendants retain the exact DAG certificate (0.53515ms)
+✔ a pure cycle stays unknown, while a useful alternate row can certify around it (0.31677ms)
+✔ partial probability remains adversarial uncertainty and can certify before completion (0.303659ms)
+✔ resuming a partial transition replaces cumulative mass and certifies completion (0.172387ms)
+✔ generated child evidence can precede resuming a partial transition (0.635705ms)
+✔ native one-replay batches preserve all repeated-Protect probability (2412.687227ms)
+✔ cancellation after splitting a prefix restores only the active residual mass (2416.220873ms)
+✔ a cursor enforces the total simulator limit across batches (2.119011ms)
+✔ node-limited cumulative transition acceptance keeps missing children unknown (0.276128ms)
+✔ partial mass normalization encloses both remainder completions (-1, -5e-10) (0.152889ms)
+✔ partial mass normalization encloses both remainder completions (-1, 5e-10) (0.05281ms)
+✔ partial mass normalization encloses both remainder completions (1, -5e-10) (0.040777ms)
+✔ partial mass normalization encloses both remainder completions (1, 5e-10) (0.035074ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14050.204664

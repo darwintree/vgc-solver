@@ -61,3 +61,6 @@ case 6 已复现默认 5 秒预算内不收敛；后续键优化的 3 秒目标�
 后续两条优化方向和建议的日常六项集合见[benchmark 选例](champions-benchmark-selection.md)。
 
 [策略证书搜索验收](optimization-records/strategy-certificates-2026-09-07.md)记录满血陆鲨／铝钢桥龙的三次冷进程收敛、三个对照及全量回归：29/54 达标，上一轮 24 项全部保持达标。原生输入与 0.02 容差不变；具体版本、prepare/search/total 和未达标项以该记录为准。
+
+
+本轮[游戏见解与可扩展搜索记录](optimization-records/game-insight-search-2026-09-08.md)在原生满PP、workers=0、每例独立冷进程、无预热、10秒search／0.02口径下，复现基线29/54；最终测量提交 `bb78629`（代码 `a5a116c`）为 **50/54达标，4项未达标，351跳过，0 error／watchdog**，基线29项与首次组合49项均无分类回归。完整258/258功能测试通过。用户已要求停止继续探索，54/54目标未达成；四个剩余项的安全区间与prepare/search/total见记录首节。此次全量为每例单样本；4项未达标局面和2项重点收敛局面各共3次冷测，分类一致。其余48项未作本轮三次重复；标准 `sucker-punch` 与 `leftovers` 基线/最终各3次也均收敛，时间略增；后者沿用fixture的4/1PP，不能混作Champions满PP成绩。全部分项数据见实验记录，不能将功能通过或一次筛查当作跨环境性能保证。

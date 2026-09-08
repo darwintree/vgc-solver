@@ -1,9 +1,10 @@
 import type {TransitionOptions} from './types';
+import type {ModdedAbilityDataTable, ModdedItemDataTable} from '@pkmn/sim';
 import * as path from 'node:path';
 import {Battle, Dex, Pokemon} from '@pkmn/sim';
 import {installEmptyEventOptimization, isNativeFindEventHandlers} from './empty-events';
 import {installResidualOptimization} from './residual-optimization';
-import {hasNoEventHandlers} from './event-plan';
+import {hasNoEventHandlers, hasPossibleEvent} from './event-plan';
 
 let NativeBattleActions;
 let NativeClampIntRange;
@@ -37,8 +38,32 @@ const nativeBattle = Object.freeze({
   clampIntRange: NativeClampIntRange,
   singleEvent: Battle.prototype.singleEvent,
   modify: Battle.prototype.modify,
+  chainModify: Battle.prototype.chainModify,
   suppressingAbility: Battle.prototype.suppressingAbility,
+  getAllActive: Battle.prototype.getAllActive,
   pokemonDamage: Pokemon.prototype.damage,
+  getItem: Pokemon.prototype.getItem,
+  getAbility: Pokemon.prototype.getAbility,
+  hasItem: Pokemon.prototype.hasItem,
+  hasAbility: Pokemon.prototype.hasAbility,
+  ignoringItem: Pokemon.prototype.ignoringItem,
+  ignoringAbility: Pokemon.prototype.ignoringAbility,
+  hasType: Pokemon.prototype.hasType,
+  runImmunity: Pokemon.prototype.runImmunity,
+  isGrounded: Pokemon.prototype.isGrounded,
+  typesGet: Dex.types.get,
+  typesIsName: Dex.types.isName,
+  getImmunity: Dex.ModdedDex.prototype.getImmunity,
+  getEffectiveness: Dex.ModdedDex.prototype.getEffectiveness,
+});
+// This audited callback only chains the constant Gen 9 final-damage modifier.
+// Recognize the callback by identity, not an item name in the current battle.
+const nativeLifeOrbModifier = (Dex.items.get('lifeorb') as
+  ModdedItemDataTable[keyof ModdedItemDataTable]).onModifyDamage;
+const disguise = Dex.abilities.get('disguise') as ModdedAbilityDataTable[keyof ModdedAbilityDataTable];
+const nativeDisguiseCallbacks = Object.freeze({
+  Damage: disguise.onDamage,
+  Effectiveness: disguise.onEffectiveness,
 });
 // @pkmn/sim's pinned battle formats install Math.trunc as the native damage
 // truncator. Mapping all 16 rolls calls the truncator 32 times while building
@@ -136,6 +161,7 @@ function installDamageOptimization(battle, eventPlan = null) {
   const actionPrototype = NativeBattleActions.prototype;
   if (!actions || actions.constructor.prototype !== actionPrototype ||
       actions.getSpreadDamage !== actionPrototype.getSpreadDamage ||
+      actions.spreadMoveHit !== actionPrototype.spreadMoveHit ||
       actions.getDamage !== actionPrototype.getDamage ||
       actions.modifyDamage !== actionPrototype.modifyDamage) return false;
 
@@ -156,6 +182,71 @@ function installDamageOptimization(battle, eventPlan = null) {
     if (!prng || typeof prng.randomMapped !== 'function') return null;
     return prng.randomMapped(0, 16, roll => rawDamage(baseDamage, roll),
       `damage:${baseDamage}`);
+  };
+
+  const nativeItemQueries = pokemon =>
+    pokemon.getItem === nativeBattle.getItem &&
+    pokemon.getAbility === nativeBattle.getAbility &&
+    pokemon.hasItem === nativeBattle.hasItem &&
+    pokemon.hasAbility === nativeBattle.hasAbility &&
+    pokemon.ignoringItem === nativeBattle.ignoringItem &&
+    pokemon.ignoringAbility === nativeBattle.ignoringAbility;
+
+  const finalDamageModifier = (source, target) => {
+    if (hasPossibleEvent(eventPlan, battle, 'ModifyDamage') === false) return 1;
+    const handlers = battle.findEventHandlers(source, 'ModifyDamage', target);
+    if (handlers.length === 0) return 1;
+    if (handlers.length !== 1 || handlers[0].callback !== nativeLifeOrbModifier ||
+        handlers[0].effect.effectType !== 'Item' || handlers[0].effectHolder !== source ||
+        battle.chainModify !== nativeBattle.chainModify ||
+        !nativeItemQueries(source) ||
+        battle.getAllActive !== nativeBattle.getAllActive) return null;
+    // Native runEvent suppresses an Item handler through ignoringItem before
+    // invoking it. The fixed callback returns undefined and only updates the
+    // fresh event.modifier, initially 1, to 5324/4096. The real callback still
+    // executes once in modifyDamage; prediction never invokes it speculatively.
+    return source.ignoringItem() ? 1 : 5324 / 4096;
+  };
+
+  const noDamageObserver = (eventid, target, source) => {
+    if (hasPossibleEvent(eventPlan, battle, eventid) === false) return true;
+    const handlers = battle.findEventHandlers(target, eventid, source);
+    if (handlers.length === 0) return true;
+    // In the pinned callbacks, every other species returns undefined before
+    // inspecting damage, running immunity, or changing ability state. This
+    // includes busted forms and Disguise copied to an unrelated species.
+    const species = target.species?.id;
+    if (!species || species === 'mimikyu' || species === 'mimikyutotem') return false;
+    return handlers.every(handler => handler.callback === nativeDisguiseCallbacks[eventid]);
+  };
+
+  const absorbsRandomDamage = ({source, target, parentMove}) => {
+    if (parentMove.effectType !== 'Move' ||
+        !['mimikyu', 'mimikyutotem'].includes(target.species?.id) ||
+        target.ability !== 'disguise' || !target.isActive || target.transformed ||
+        battle.activeMove?.ignoreAbility ||
+        !nativeItemQueries(source) || !nativeItemQueries(target) ||
+        target.runImmunity !== nativeBattle.runImmunity ||
+        target.isGrounded !== nativeBattle.isGrounded ||
+        target.hasType !== nativeBattle.hasType ||
+        battle.getAllActive !== nativeBattle.getAllActive ||
+        battle.dex.types.get !== nativeBattle.typesGet ||
+        battle.dex.types.isName !== nativeBattle.typesIsName ||
+        battle.dex.getImmunity !== nativeBattle.getImmunity) return false;
+    const ability = target.getAbility();
+    if (!ability.flags.cantsuppress ||
+        !noHandlers('NegateImmunity', target, null)) return false;
+    for (const eventid of ['Damage', 'Effectiveness']) {
+      const handlers = battle.findEventHandlers(target, eventid, eventid === 'Damage' ? source : null);
+      if (handlers.length !== 1 || handlers[0].effect !== ability ||
+          handlers[0].effect.effectType !== 'Ability' || handlers[0].effectHolder !== target ||
+          handlers[0].callback !== nativeDisguiseCallbacks[eventid]) return false;
+    }
+    // Active, untransformed, cantsuppress + no ability-ignoring move ensures
+    // runEvent invokes the sole native Damage callback. It replaces every
+    // roll with zero and sets the same busted flag. Native execution still
+    // performs that callback, forme change, self-damage, and later actions.
+    return true;
   };
 
   const canProbeTail = context => {
@@ -181,8 +272,9 @@ function installDamageOptimization(battle, eventPlan = null) {
         battle.clampIntRange !== nativeBattle.clampIntRange ||
         battle.singleEvent !== nativeBattle.singleEvent ||
         battle.modify !== nativeBattle.modify ||
+        actions.spreadMoveHit !== actionPrototype.spreadMoveHit ||
         battle.suppressingAbility !== nativeBattle.suppressingAbility ||
-        battle.dex.getEffectiveness !== Dex.ModdedDex.prototype.getEffectiveness ||
+        battle.dex.getEffectiveness !== nativeBattle.getEffectiveness ||
         target.damage !== nativeBattle.pokemonDamage ||
         target.runEffectiveness !== Pokemon.prototype.runEffectiveness ||
         target.getMoveHitData !== Pokemon.prototype.getMoveHitData ||
@@ -201,14 +293,21 @@ function installDamageOptimization(battle, eventPlan = null) {
     // These are all post-randomizer observations or transformations. A
     // nonempty list means a callback may inspect a different raw value or
     // mutate state during one of the probes, so the native path is required.
-    return noHandlers('ModifySTAB', source, target) &&
+    // WeatherModifyDamage has already run before randomizer. DamagingHit
+    // only receives the actual HP loss returned by spreadDamage, after the
+    // saturation represented by our key; its callbacks cannot see the raw
+    // roll. Both events still execute natively, including contact retaliation.
+    if (!(noHandlers('ModifySTAB', source, target) &&
       noHandlers('Type', source, null) &&
-      noHandlers('Type', target, null) &&
-      noHandlers('Effectiveness', target, null) &&
-      noHandlers('WeatherModifyDamage', source, target) &&
-      noHandlers('ModifyDamage', source, target) &&
-      noHandlers('Damage', target, source) &&
-      noHandlers('DamagingHit', target, source);
+      noHandlers('Type', target, null))) return false;
+    context.damageAbsorbed = false;
+    if (!(noDamageObserver('Effectiveness', target, null) &&
+        noDamageObserver('Damage', target, source))) {
+      context.damageAbsorbed = absorbsRandomDamage(context);
+      if (!context.damageAbsorbed) return false;
+    }
+    context.finalModifier = finalDamageModifier(source, target);
+    return context.finalModifier !== null;
   };
 
   const optimizedRandomizer = function(baseDamage) {
@@ -226,6 +325,7 @@ function installDamageOptimization(battle, eventPlan = null) {
     const hp = target.hp;
     let tail;
     const group = roll => {
+      if (context.damageAbsorbed) return 0;
       if (!tail) {
         const type = move.type || '???';
         let stab = 1;
@@ -233,7 +333,11 @@ function installDamageOptimization(battle, eventPlan = null) {
           source.getTypes(false, true).includes(type);
         if (isSTAB) stab = 1.5;
         if (source.terastallized === type && source.getTypes(false, true).includes(type)) stab = 2;
-        const typeMod = battle.clampIntRange(target.runEffectiveness(move), -6, 6);
+        // All Effectiveness handlers are absent or audited no-ops. Compute
+        // the native type sum directly so prediction never invokes callbacks.
+        const typeMod = battle.clampIntRange(target.getTypes().reduce(
+          (sum, targetType) => sum + battle.dex.getEffectiveness(move, targetType), 0
+        ), -6, 6);
         const bypassProtect = target.getMoveHitData(move).bypassProtect;
         const burnedPhysical = source.status === 'brn' && move.category === 'Physical' &&
           !source.hasAbility('guts') && (battle.gen < 6 || move.id !== 'facade');
@@ -247,6 +351,9 @@ function installDamageOptimization(battle, eventPlan = null) {
           }
           if (burnedPhysical) damage = nativeBattle.modify.call(battle, damage, 0.5);
           if (battle.gen === 5 && !damage) damage = 1;
+          if (context.finalModifier !== 1) {
+            damage = nativeBattle.modify.call(battle, damage, context.finalModifier);
+          }
           if (bypassProtect) damage = nativeBattle.modify.call(battle, damage, 0.25);
           if (battle.gen !== 5 && !damage) return 1;
           return tr(damage);

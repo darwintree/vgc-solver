@@ -4,11 +4,13 @@
 
 一回合里的随机调用形成概率树。完整枚举不等于必须为每个原始随机整数创建一份后继：如果若干随机值经过规则执行后无法被区分，就能将其概率相加，仅执行一个代表分支。这里没有采样，也不丢弃小概率。
 
-当前采用三个层次：
+完整转移采用三个层次：
 
 1. 遇到尚未决定的随机调用，让一个候选在当前对局继续，其余候选携带决定前缀入栈，从回合起点重放。已经走过的前缀只校验并消费决定，不重建概率表。这样避免为了发现每个中间分叉而额外恢复一次对局；不是保存任意中间 Battle 的回滚系统。
 2. 在随机调用处，根据已证明的可观察结果合并整数桶。例如副作用只观察真假，伤害取整可能把多个 roll 映射到相同整数。
 3. 回合结束后，同一后继状态合并概率；终局只保留效用与概率，不再创建无用途的对局快照。非终局仍需要完整状态继续求解。
+
+同步 native bounded 还可将同一随机树分批推进：按待处理前缀的概率优先重放，返回累计完成分布和剩余质量。它没有把已完成部分单独归一化成完整分布，也没有按低概率阈值删枝；剩余质量如何参与矩阵证明见[有界搜索](bounded-search.md#同步渐进式转移)。exact、worker 和不提供游标的自定义 adapter 仍使用完整枚举。
 
 ## 例子一：12.5% 阈值不等于 12.5 个整数桶
 
@@ -38,11 +40,24 @@
 
 不能只因两个分支“都击倒目标”就合并：反伤、吸血、伤害记录及回调都可能让后继不同。终局按效用聚合成立，是因为求解目标只消费该终局效用；如果未来返回逐条战报或采用不同终局奖励，必须重新判断这一接口边界。
 
+事件是否阻止合并还取决于观察位置：WeatherModifyDamage 在 randomizer 之前已经执行；DamagingHit 的参数、lastDamage 和后续累计伤害来自 spreadDamage 返回的实际扣血量。因此这两个事件可以保留原生执行，同时允许其前后满足其他守卫的伤害合并。后者额外要求原生 spreadMoveHit，避免自定义包装器暴露尚未截断的伤害；ModifyDamage、Damage 等仍可能观察原始伤害的回调继续阻止饱和合并。粗糙皮肤、凸凸头盔及两者组合的对照使用后备队员保留非终局完整状态，验证接触反伤与概率分布。
+
+ModifyDamage 的一个受审计例外是生命宝珠的原生固定倍率回调：仅当它是攻击方的唯一 Item handler、回调和相关原生方法身份匹配时，预测最终倍率 5324/4096；道具被 Klutz 或 Magic Room 等原生规则抑制时倍率为 1。预测仍用原生 modify，在烧伤之后、穿透守住修正之前执行相同固定点取整。真实回调和生命宝珠反伤照常执行；多个 handler 或自定义回调继续回退，不推测任意回调的结果。
+
+画皮破损后仍有 Damage／Effectiveness handler，但固定版本的两个原生回调对非 mimikyu、mimikyutotem 形态直接返回 undefined。按精确回调身份和原生状态条件证明无作用后，可以继续合并；未满足下述吸收证明的完整画皮和自定义回调仍走原路径。有效性预测直接计算原生属性表的总和，避免提前调用这些回调；真实执行仍保留画皮能力状态与形态变化。
+
+完整画皮还有单独的吸收证明：目标活跃且未变身、持有不可压制的原生画皮、当前招式不忽略特性、Damage／Effectiveness 均只有目标的原生画皮 handler，而且此前没有未审计的原始伤害观察者时，每个伤害 roll 都被 Damage handler 改为 0，并写入相同的 busted 标记。这时仅枚举一个原始代表 roll，由原生引擎执行破损、扣除自身 HP、多段后续命中和后续行动；不是直接返回零伤害跳过规则。免疫查询要求原生方法且 NegateImmunity 为空，Mold Breaker、变身特性抑制、额外回调等不满足守卫时回退。双边后备队员的完整分布对照覆盖了反伤、后续行动击倒攻击方以及画皮破损后的第二次命中。
+
+上述生命宝珠／画皮回调及用于预测的 Dex 属性／免疫查询身份在模块载入时固定捕获，避免把运行时已替换的查询当作原生实现。自定义观察者、额外 handler 或方法替换不满足守卫时继续使用未采用该捷径的路径。升级固定模拟器版本后须重新核对这些身份、调用顺序及完整后继分布。
+
+终局包络中的伤害端点范围是另一种证明：仅在更窄的原生准入范围和无溢出条件下，用两个 roll 端点分别覆盖非暴击与暴击伤害。它只产生安全区间，不替代随机分布，也不改变此处实际枚举的代表分支；边界见[一回合终局包络](bounded-search.md#一回合终局包络)。
+
 原理可用于任何有限随机博弈；具体守卫绑定固定模拟器版本。完整转移分布对照比只检查最终价值更容易发现错误合并。
 
 ## 实现与证据索引
 
 - [branching-prng.ts](../../src/branching-prng.ts)：`_take`、`randomMapped`、`randomGrouped`、32 位桶概率；[showdown-adapter.ts](../../src/showdown-adapter.ts)：`enumerateTurn` 的就地分叉与后继聚合。
+- [progressive-transition.ts](../../src/progressive-transition.ts)：概率优先前缀、累计后继、合作式中断与恢复；[progressive-transition.test.ts](../../test/progressive-transition.test.ts) 验证部分质量和完整分布。
 - [simulator-optimizations.ts](../../src/simulator-optimizations.ts)：`nativeChance`、`installDamageOptimization` 的分组与回退。
 - 验证：[branching-prng.test.ts](../../test/branching-prng.test.ts)、[simulator-optimizations.test.ts](../../test/simulator-optimizations.test.ts)、[native-distribution.test.ts](../../test/native-distribution.test.ts)。
 - 历史：[通用优化](../optimization-records/general-performance.md)、[伤害饱和取舍](../traces/implementations/2026-09-06-damage-saturation.md)。较早通用优化记录仅描述当时的原始伤害合并，后续才加入受守卫的饱和合并。

@@ -1,0 +1,130 @@
+✔ cumulative rounding preserves the final certificate (-1, -5e-10, -8e-10) (3.057155ms)
+✖ cumulative rounding preserves the final certificate (-1, -5e-10, 0) (0.646053ms)
+✖ cumulative rounding preserves the final certificate (-1, -5e-10, 8e-10) (0.243634ms)
+✔ cumulative rounding preserves the final certificate (-1, 5e-10, -8e-10) (0.172903ms)
+✔ cumulative rounding preserves the final certificate (-1, 5e-10, 0) (0.224622ms)
+✖ cumulative rounding preserves the final certificate (-1, 5e-10, 8e-10) (0.212294ms)
+✔ cumulative rounding preserves the final certificate (1, -5e-10, -8e-10) (0.136819ms)
+✖ cumulative rounding preserves the final certificate (1, -5e-10, 0) (0.164216ms)
+✖ cumulative rounding preserves the final certificate (1, -5e-10, 8e-10) (0.196438ms)
+✔ cumulative rounding preserves the final certificate (1, 5e-10, -8e-10) (0.190032ms)
+✔ cumulative rounding preserves the final certificate (1, 5e-10, 0) (0.132914ms)
+✖ cumulative rounding preserves the final certificate (1, 5e-10, 8e-10) (0.126941ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 6
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 519.70578
+
+✖ failing tests:
+
+test at dist/test/progressive-transition.test.js:169:37
+✖ cumulative rounding preserves the final certificate (-1, -5e-10, 0) (0.646053ms)
+  AssertionError [ERR_ASSERTION]: -0.50000000065 < -0.5
+      at TestContext.<anonymous> (/tmp/pokemon-partial-rounding-pr/dist/test/progressive-transition.test.js:194:34)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dist/test/progressive-transition.test.js:169:37
+✖ cumulative rounding preserves the final certificate (-1, -5e-10, 8e-10) (0.243634ms)
+  AssertionError [ERR_ASSERTION]: -0.50000000065 < -0.49999999879999996
+      at TestContext.<anonymous> (/tmp/pokemon-partial-rounding-pr/dist/test/progressive-transition.test.js:194:34)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dist/test/progressive-transition.test.js:169:37
+✖ cumulative rounding preserves the final certificate (-1, 5e-10, 8e-10) (0.212294ms)
+  AssertionError [ERR_ASSERTION]: -0.49999999915 < -0.49999999879999996
+      at TestContext.<anonymous> (/tmp/pokemon-partial-rounding-pr/dist/test/progressive-transition.test.js:194:34)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dist/test/progressive-transition.test.js:169:37
+✖ cumulative rounding preserves the final certificate (1, -5e-10, 0) (0.164216ms)
+  AssertionError [ERR_ASSERTION]: 0.50000000065 > 0.5
+      at TestContext.<anonymous> (/tmp/pokemon-partial-rounding-pr/dist/test/progressive-transition.test.js:193:34)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dist/test/progressive-transition.test.js:169:37
+✖ cumulative rounding preserves the final certificate (1, -5e-10, 8e-10) (0.196438ms)
+  AssertionError [ERR_ASSERTION]: 0.50000000065 > 0.49999999879999996
+      at TestContext.<anonymous> (/tmp/pokemon-partial-rounding-pr/dist/test/progressive-transition.test.js:193:34)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dist/test/progressive-transition.test.js:169:37
+✖ cumulative rounding preserves the final certificate (1, 5e-10, 8e-10) (0.126941ms)
+  AssertionError [ERR_ASSERTION]: 0.49999999915 > 0.49999999879999996
+      at TestContext.<anonymous> (/tmp/pokemon-partial-rounding-pr/dist/test/progressive-transition.test.js:193:34)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

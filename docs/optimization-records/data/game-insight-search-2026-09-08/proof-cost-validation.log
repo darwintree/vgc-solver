@@ -1,0 +1,55 @@
+
+> pokemon-1v1-endgame-solver-demo@0.1.0 typecheck
+> tsc --noEmit
+
+
+> pokemon-1v1-endgame-solver-demo@0.1.0 build
+> tsc
+
+✔ bounded native certificate covers full-PP case4 (6633.875191ms)
+✔ bounded native certificate covers full-PP case5 (30273.265811ms)
+✔ case4 and case5 roots retain maximum PP (1.026145ms)
+✔ expands one ply at a time and certifies an exact DAG (1.011115ms)
+✔ eager expansion stops on a pure security certificate and preserves unknown cells (0.341715ms)
+✔ deep eager nodes stop at the scheduler-width threshold (0.32035ms)
+✔ root tolerance stops a deeper eager pass before child exactness (0.338698ms)
+✔ returns honest bounds when the node limit blocks an unresolved child (0.288758ms)
+✔ does not claim convergence for a regenerative cycle (0.232573ms)
+✔ time and fresh solve contexts are independent (0.27334ms)
+✔ an incomplete transition remains an unknown bounded cell (0.199464ms)
+✔ native adapter interval contains the exact two-PP baseline (418.697108ms)
+✔ random small DAG intervals contain the matrix-game value (9.083031ms)
+✔ security ordering returns to mixed support after a pure proof path (0.338217ms)
+✔ security lower proof chooses the selected row floor constraint (0.197271ms)
+✔ security upper proof chooses the selected column ceiling constraint (0.087279ms)
+✔ security proof falls back when its selected row has no expandable cell (0.104037ms)
+✔ lower proof uses row mean after pessimistic floors tie (0.072389ms)
+✔ upper proof prefers the smallest upper column ceiling for a negative game (0.053472ms)
+✔ upper proof treats near-equal pessimistic columns as a scheduling tie (0.045722ms)
+✔ upper proof skips a column whose ceiling is locked by an exact cell (0.062938ms)
+✔ lower proof skips a row whose floor is locked by an exact cell (0.045596ms)
+✔ global upper direction switches to an upper proof when incumbent cannot reach it (0.084175ms)
+✔ security scheduling preserves bounds on a small interval DAG (0.396201ms)
+✔ auto selection switches on a mixed root and resets per solve (0.371848ms)
+✔ incremental eager frontier follows a stochastic winning path before unrelated rows (0.295408ms)
+✔ security direction propagates through two-level stochastic descendants (0.278191ms)
+✔ fallback frontier escapes a self-cycle to a useful alternate action (0.214793ms)
+✔ opaque continuation yields to another cell before depth expansion (0.20691ms)
+✔ bounded search certifies rectangular stochastic DAGs with shared successors (231.900008ms)
+✔ default API reaches a 32-level stochastic policy with non-first actions (5.634418ms)
+✔ lazy=false proves the mirrored 32-level negative chain (6.654988ms)
+✔ symmetric negative utility reaches the upper-proof endpoint (0.261728ms)
+✔ every adversarial response is covered, including a rare refutation (0.175351ms)
+✔ shared descendants retain the exact DAG certificate (0.24449ms)
+✔ a pure cycle stays unknown, while a useful alternate row can certify around it (0.179469ms)
+✔ joint scheduling alternates cheap proof obligations with ordinary support work (0.330926ms)
+✔ joint work allocation certifies a mixed game with cheap utility -1 (0.66362ms)
+✔ joint work allocation certifies a mixed game with cheap utility 1 (0.658333ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 38125.171487

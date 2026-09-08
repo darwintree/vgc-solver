@@ -10,8 +10,12 @@ import {
 } from './showdown-adapter';
 import {createMemoStateKey, privateSnapshotKey} from './native-memo-key';
 import {createPPTransitionCache, auditPPBattle} from './pp-transition-cache';
+import {createTurnCursor, type TransitionCursor} from './progressive-transition';
 import {createEventPlan} from './event-plan';
 import {auditNativeRules} from './native-rules';
+import {createTerminalEnvelope} from './terminal-envelope';
+
+const PROBABILITY_SUM_TOLERANCE = 1e-9;
 
 export interface BoundedAdapter {
   // Custom adapters may use primitive state IDs and action IDs.
@@ -20,6 +24,7 @@ export interface BoundedAdapter {
   stateKey?: (snapshot: any) => string;
   terminalUtility?: (battle: any) => number | null;
   legalActions?: (battle: any, side: number) => (Action | string | number)[];
+  createTurnCursor?: (snapshot: any, p1: any, p2: any, options?: any) => TransitionCursor;
   enumerateTurn: (snapshot: any, p1: any, p2: any, options?: any) => {
     outcomes: Transition['outcomes']; simulatorRuns?: number; cacheHits?: number; complete?: boolean;
   };
@@ -58,6 +63,8 @@ interface BoundedOutcome {
   child: SearchNode | null;
 }
 interface BoundedCell {
+  cursor?: TransitionCursor | null;
+  remainingProbability?: number;
   outcomes: BoundedOutcome[] | null;
   lower: number;
   upper: number;
@@ -86,6 +93,7 @@ const EPSILON = 1e-12;
 const FRONTIER_TIE_EPSILON = 1e-9;
 
 const nativeAdapter = Object.freeze({
+  createTurnCursor,
   enumerateTurn,
   legalActions,
   restoreBattle,
@@ -121,6 +129,7 @@ function createStats() {
     matrixSolves: 0,
     searchMs: 0,
     prepareMs: 0,
+    terminalEnvelopes: 0,
   };
 }
 
@@ -150,6 +159,7 @@ class BoundedSearch {
   declare proofTurn: number;
   declare autoJoint: boolean;
   declare rootNode: SearchNode | null;
+  declare terminalEnvelope: ReturnType<typeof createTerminalEnvelope>;
 
   constructor(options: BoundedOptions = {}) {
     this.options = {
@@ -192,6 +202,7 @@ class BoundedSearch {
     this.proofTurn = 0;
     this.autoJoint = false;
     this.rootNode = null;
+    this.terminalEnvelope = null;
   }
 
   /** Solve a battle, returning a certified interval around the value. */
@@ -205,6 +216,7 @@ class BoundedSearch {
     let nativeAudit;
     if (isNative) {
       nativeAudit = auditNativeRules(battle);
+      this.terminalEnvelope = createTerminalEnvelope(battle, nativeAudit);
       this.memoStateKey = createMemoStateKey(battle, stateKey, nativeAudit);
       this.ppCache = createPPTransitionCache({admitOnSecondUse: true});
       this.ppAudit = auditPPBattle(battle, nativeAudit);
@@ -364,12 +376,17 @@ class BoundedSearch {
     if (!node.actions1.length || !node.actions2.length) {
       throw new Error('BoundedSolver requires at least one legal action per player');
     }
-    node.cells = Array.from({length: node.actions1.length}, () =>
-      Array.from({length: node.actions2.length}, () => ({
-        outcomes: null,
-        lower: DEFAULT_LOWER,
-        upper: DEFAULT_UPPER,
-      })));
+    const terminalEnvelope = this.terminalEnvelope?.(node.snapshot, this.deadline);
+    node.cells = Array.from({length: node.actions1.length}, (_, i) =>
+      Array.from({length: node.actions2.length}, (_, j) => {
+        const envelope = terminalEnvelope?.(node.actions1[i] as Action, node.actions2[j] as Action);
+        if (envelope) this.stats.terminalEnvelopes++;
+        return {
+          outcomes: null,
+          lower: envelope?.lower ?? DEFAULT_LOWER,
+          upper: envelope?.upper ?? DEFAULT_UPPER,
+        };
+      }));
     node.initialized = true;
     this.stats.expandedStates++;
   }
@@ -378,11 +395,17 @@ class BoundedSearch {
     this.stats.transitionCalls++;
     this.stats.simulatorRuns += transition.simulatorRuns || 0;
     this.stats.ppCacheHits += transition.cacheHits || 0;
-    if (transition.complete === false) {
+    const progressive = transition.remainingProbability !== undefined;
+    const remaining = progressive ? Number(transition.remainingProbability) : 0;
+    if (!Number.isFinite(remaining) || remaining < 0 || remaining > 1 ||
+        (progressive && transition.complete && remaining !== 0)) {
+      throw new Error(`Invalid remaining transition probability: ${remaining}`);
+    }
+    if (transition.complete === false && !progressive) {
       this.stopReason = this._timedOut() ? 'time' : 'transition-incomplete';
       return;
     }
-    if (!Array.isArray(transition.outcomes) || !transition.outcomes.length) {
+    if (!Array.isArray(transition.outcomes) || !transition.outcomes.length && remaining === 0) {
       throw new Error('A transition must have at least one outcome');
     }
     const outcomes = [];
@@ -401,13 +424,23 @@ class BoundedSearch {
       if (child) child.parents.add(node);
       outcomes.push({probability, child, utility: null});
     }
-    const total = outcomes.reduce((sum, outcome) => sum + outcome.probability, 0);
-    if (!(total > 0) || Math.abs(total - 1) > 1e-9) {
+    const completed = outcomes.reduce((sum, outcome) => sum + outcome.probability, 0);
+    const total = remaining + completed;
+    if (!(total > 0) || Math.abs(total - 1) > PROBABILITY_SUM_TOLERANCE) {
       throw new Error(`Transition probabilities sum to ${total}, not 1`);
     }
-    for (const outcome of outcomes) outcome.probability /= total;
-    node.cells[i][j].outcomes = outcomes;
-    this.stats.expandedCells++;
+    // A later cumulative batch may have a different admitted total. For an
+    // incomplete batch use the largest possible final total and leave the
+    // residual unknown, so monotone bounds contain every final normalization.
+    // Complete transitions retain normalization by their actual total.
+    const incomplete = progressive && !transition.complete;
+    const denominator = incomplete ? 1 + PROBABILITY_SUM_TOLERANCE : total;
+    for (const outcome of outcomes) outcome.probability /= denominator;
+    const cell = node.cells[i][j];
+    if (!cell.outcomes) this.stats.expandedCells++;
+    cell.outcomes = outcomes;
+    cell.remainingProbability = incomplete ? Math.max(0, 1 - completed / denominator) : remaining / total;
+    if (transition.complete) cell.cursor = null;
   }
 
   _expand(node: SearchNode) {
@@ -427,9 +460,15 @@ class BoundedSearch {
   _expandCell(node: SearchNode, i, j) {
     if (node.terminal !== null || !node.initialized) return;
     const cell = node.cells[i][j];
-    if (cell.outcomes) return;
+    if (cell.outcomes && !cell.cursor) return;
     if (this._timedOut()) {
       this.stopReason = 'time';
+      return;
+    }
+    if (this.adapter.createTurnCursor) {
+      cell.cursor ||= this.adapter.createTurnCursor(node.snapshot, node.actions1[i], node.actions2[j], this._transitionOptions());
+      const progress = cell.cursor.advance({maxRuns: 32, deadline: Math.min(this.deadline, performance.now() + 25)});
+      this._acceptTransition(node, i, j, progress);
       return;
     }
     const runTransition = this.adapter.enumerateTurn || enumerateTurn;
@@ -446,8 +485,8 @@ class BoundedSearch {
     if (!cell.outcomes) return;
     const oldLower = cell.lower;
     const oldUpper = cell.upper;
-    let lower = 0;
-    let upper = 0;
+    let lower = -(cell.remainingProbability || 0);
+    let upper = cell.remainingProbability || 0;
     for (const outcome of cell.outcomes) {
       let childLower = outcome.utility;
       let childUpper = outcome.utility;
@@ -475,7 +514,7 @@ class BoundedSearch {
       for (const cell of row) matrixChanged = this._cellBounds(cell) || matrixChanged;
     }
     const previousExact = node.exactCertified;
-    const exactCertified = node.cells.every(row => row.every(cell => cell.outcomes &&
+    const exactCertified = node.cells.every(row => row.every(cell => cell.outcomes && !cell.cursor && !cell.remainingProbability &&
       cell.outcomes.every(outcome => outcome.utility !== null ||
         (outcome.child && outcome.child.exactCertified))));
     if (!matrixChanged) {
@@ -589,7 +628,7 @@ class BoundedSearch {
       const colStrategy = node.lowerSolution?.p2 || [];
       const canExpandCell = cell => {
         if (cell.upper - cell.lower <= 1e-9) return false;
-        if (!cell.outcomes) return true;
+        if (!cell.outcomes || cell.cursor) return true;
         return cell.outcomes.some(outcome => outcome.utility === null && outcome.child &&
           outcome.child.upper - outcome.child.lower > 1e-9);
       };
@@ -780,6 +819,9 @@ class BoundedSearch {
           nextScore = score;
         }
       }
+      if (chosen.cell.cursor && 2 * chosen.cell.remainingProbability >= nextScore) {
+        return {node, i: chosen.i, j: chosen.j};
+      }
       if (!next) return null;
       node = next;
     }
@@ -807,7 +849,7 @@ class BoundedSearch {
       for (let i = 0; i < node.cells.length; i++) {
         for (let j = 0; j < node.cells[i].length; j++) {
           const cell = node.cells[i][j];
-          if (!cell.outcomes && cell.upper - cell.lower > 1e-9) return {node, i, j};
+          if ((!cell.outcomes || cell.cursor) && cell.upper - cell.lower > 1e-9) return {node, i, j};
         }
       }
     }
