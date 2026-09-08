@@ -104,13 +104,18 @@ function noDamageOverflow(source, target, move) {
   return ((2 * source.level / 5 + 2) * move.basePower * attack / defense / 50 + 2) * 9 < 65536;
 }
 
-function damageRange(battle, source, target, move, deadline): {min: number; max: number} | null {
+/** Internal range evaluator; callers must establish the native envelope admission. */
+export function damageRange(battle, source, target, move, deadline): {min: number; max: number} | null {
   if (!noDamageOverflow(source, target, move)) return null;
   const nativeRandom = battle.random;
   let min = Infinity;
   let max = -Infinity;
   try {
-    for (const crit of [false, true]) for (let roll = 0; roll < 16; roll++) {
+    // With the admitted hooks, post-random damage only applies positive
+    // STAB/type factors, truncation and the minimum-one clamp. The overflow
+    // guard excludes the native 16-bit wrap, so each fixed-crit branch is
+    // monotone in the random roll. Its extrema occur at the two endpoints.
+    for (const crit of [false, true]) for (const roll of [0, 15]) {
       if (performance.now() >= deadline) return null;
       // Only the audited damage randomizer can ask for random here.
       battle.random = n => {

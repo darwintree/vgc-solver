@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {createTerminalEnvelope} from '../src/terminal-envelope';
+import {createTerminalEnvelope, damageRange} from '../src/terminal-envelope';
 import {auditNativeRules} from '../src/native-rules';
 import {BoundedSolver} from '../src/bounded-solver';
 import {createBattle, legalActions, refreshMoveRequest, setHP, snapshotBattle} from '../src/showdown-adapter';
@@ -211,3 +211,50 @@ test('an added third type is outside the damage-overflow certificate domain', ()
   assert.equal(Object.keys(battle.p1.active[0].volatiles).length, 0);
   assert.equal(createTerminalEnvelope(battle), null);
 });
+
+// Independent exhaustive native oracle: every critical branch and all sixteen
+// native roll values, including rounding at resisted and boosted damage.
+function exhaustiveDamageRange(battle, source, target, move) {
+  const values = [];
+  for (const crit of [false, true]) for (let roll = 0; roll < 16; roll++) {
+    battle.random = n => {
+      assert.equal(n, 16);
+      return roll;
+    };
+    const active = battle.dex.getActiveMove(move);
+    active.willCrit = crit;
+    battle.setActiveMove(active, source, target);
+    const value = battle.actions.getDamage(source, target, active, true);
+    assert.equal(typeof value, 'number');
+    values.push(value);
+  }
+  return {min: Math.min(...values), max: Math.max(...values)};
+}
+
+for (const [species1, species2, moveName, attackBoost, defenseBoost] of [
+  ['Garchomp', 'Archaludon', 'Earthquake', 0, 0],
+  ['Garchomp', 'Archaludon', 'Earthquake', 6, 6],
+  ['Garchomp', 'Archaludon', 'Draco Meteor', -6, -6],
+  ['Archaludon', 'Garchomp', 'Flash Cannon', 6, -6],
+  ['Garchomp', 'Swampert', 'Surf', -6, 6],
+  ['Garchomp', 'Tyranitar', 'Earthquake', 0, -6],
+  ['Kommo-o', 'Garchomp', 'Clanging Scales', 0, -1],
+] as const) {
+  test(`endpoint range equals all native rolls: ${species1}/${species2} ${moveName} ${attackBoost}/${defenseBoost}`, () => {
+    const battle = createBattle({species: species1, level: 50, ability: 'Rough Skin', moves: [moveName]},
+      {species: species2, level: 50, ability: 'Stamina', moves: ['Draco Meteor']});
+    const source = battle.p1.active[0];
+    const target = battle.p2.active[0];
+    source.boosts.atk = source.boosts.spa = attackBoost;
+    target.boosts.def = target.boosts.spd = defenseBoost;
+    refreshMoveRequest(battle);
+    // Native admission is mandatory before calling the internal evaluator.
+    assert.ok(createTerminalEnvelope(battle));
+    const snapshot = snapshotBattle(battle);
+    const actual = damageRange(battle, source, target, battle.dex.moves.get(moveName), Infinity);
+    const native = restoreBattle(snapshot);
+    const expected = exhaustiveDamageRange(native, native.p1.active[0], native.p2.active[0],
+      native.dex.moves.get(moveName));
+    assert.deepEqual(actual, expected);
+  });
+}
