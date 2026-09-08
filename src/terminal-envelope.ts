@@ -2,7 +2,7 @@ import {Dex} from '@pkmn/sim';
 import type {Action, Snapshot} from './types';
 import {BranchingPRNG} from './branching-prng';
 import {auditNativeRules} from './native-rules';
-import {restoreBattle} from './showdown-adapter';
+import {restoreBattle, snapshotBattle} from './showdown-adapter';
 
 export interface TerminalEnvelope {lower: number; upper: number}
 
@@ -233,51 +233,78 @@ function hitProbability(battle, source, target, move) {
  */
 export function createTerminalEnvelope(battle, audited = auditNativeRules(battle)) {
   if (!audited || !admittedState(battle)) return null;
-  return (snapshot: Snapshot, action1: Action, action2: Action, deadline = Infinity): TerminalEnvelope | null => {
+  // A prepared evaluator is used only during one node's synchronous cell
+  // initialization. Retain detached data and numeric summaries, never a live
+  // damage-probe Battle shared between action pairs.
+  function prepare(snapshot: Snapshot, deadline = Infinity) {
     if (performance.now() >= deadline) return null;
-    const probe: any = restoreBattle(snapshot);
-    if (!admittedState(probe)) return null;
-    const moves = [probe.dex.getActiveMove(action1.id), probe.dex.getActiveMove(action2.id)];
-    // Resolve the actual native action ordering. Ties are outside this first
-    // certificate; no randomly chosen order becomes a certainty claim.
-    const actions = moves.map((move, side) => ({choice: 'move', move,
-      pokemon: probe.sides[side].active[0], targetLoc: 1, fractionalPriority: 0, priority: 0, speed: 0}));
-    for (const action of actions) probe.getActionSpeed(action);
-    const comparison = actions[0].priority - actions[1].priority || actions[0].speed - actions[1].speed;
-    if (!comparison) return null;
-    const first = comparison > 0 ? 0 : 1;
-    const second = 1 - first;
-    if (!plainDamageMove(moves[first], true) || !plainDamageMove(moves[second], false)) return null;
-    const source = actions[first].pokemon;
-    const responder = actions[second].pokemon;
-    const hits = maxHits(moves[first]);
-    if (hits === null) return null;
-    const firstHP = possibleHP(source);
-    const responseHP = possibleHP(responder);
-    const firstDamage = damageProfile(probe, source, responder, moves[first], responseHP, deadline);
-    if (!firstDamage) return null;
-    let firstKOLower = 0;
-    let firstKOUpper = 0;
-    if (hits === 1) {
-      const firstHit = hitProbability(probe, source, responder, moves[first]);
-      firstKOLower = firstHit * firstDamage.koLower;
-      firstKOUpper = firstHit * firstDamage.koUpper;
-    } else if (firstDamage.maximum * hits >= responseHP.lower) {
-      return null;
+    const context: any = restoreBattle(snapshot);
+    if (!admittedState(context)) return null;
+    const detached = snapshotBattle(context);
+    const summaries = [new Map(), new Map()];
+    function summary(side: number, action: Action) {
+      const cached = summaries[side].get(action.id);
+      if (cached) return cached;
+      const probe: any = restoreBattle(detached);
+      const source = probe.sides[side].active[0];
+      const target = probe.sides[1 - side].active[0];
+      const move = probe.dex.getActiveMove(action.id);
+      const order = {choice: 'move', move, pokemon: source, targetLoc: 1,
+        fractionalPriority: 0, priority: 0, speed: 0};
+      probe.getActionSpeed(order);
+      const value = {
+        first: plainDamageMove(move, true), response: plainDamageMove(move, false),
+        priority: order.priority, speed: order.speed, hits: maxHits(move),
+        hp: possibleHP(source), secondary: secondaryUpper(move),
+        profile: undefined as DamageProfile | null | undefined,
+        accuracy: undefined as number | undefined,
+        // These computations own one fresh native probe. They publish only
+        // scalars and cannot leak activeMove/PRNG mutations to another move.
+        compute() {
+          if (value.profile !== undefined) return;
+          value.profile = damageProfile(probe, source, target, move, possibleHP(target), deadline);
+          if (value.profile) value.accuracy = hitProbability(probe, source, target, move);
+          value.compute = () => {};
+        },
+      };
+      summaries[side].set(action.id, value);
+      return value;
     }
-    const responseDamage = damageProfile(probe, responder, source, moves[second], firstHP, deadline);
-    if (!responseDamage) return null;
-    const secondary = secondaryUpper(moves[first]);
-    if (secondary === null) return null;
-    const responseHit = hitProbability(probe, responder, source, moves[second]);
-    // These are conditional lower bounds on disjoint terminal events, not
-    // assumed independent guesses. The response uses 1-aUpper, never 1-aLower.
-    const responseKO = (1 - firstKOUpper) * (1 - secondary) * responseHit * responseDamage.koLower;
-    const firstMass = firstKOLower === 1 ? 1 : Math.max(0, firstKOLower - 1e-12);
-    const responseMass = responseKO === 1 ? 1 : Math.max(0, responseKO - 1e-12);
-    if (firstMass === 0 && responseMass === 0) return null;
-    return first === 0
-      ? {lower: 2 * firstMass - 1, upper: 1 - 2 * responseMass}
-      : {lower: 2 * responseMass - 1, upper: 1 - 2 * firstMass};
-  };
+    return (action1: Action, action2: Action): TerminalEnvelope | null => {
+      if (performance.now() >= deadline) return null;
+      const actions = [summary(0, action1), summary(1, action2)];
+      const comparison = actions[0].priority - actions[1].priority || actions[0].speed - actions[1].speed;
+      if (!comparison) return null;
+      const first = comparison > 0 ? 0 : 1;
+      const second = 1 - first;
+      const source = actions[first];
+      const responder = actions[second];
+      if (!source.first || !responder.response || source.hits === null) return null;
+      source.compute();
+      const firstDamage = source.profile;
+      if (!firstDamage) return null;
+      let firstKOLower = 0;
+      let firstKOUpper = 0;
+      if (source.hits === 1) {
+        firstKOLower = source.accuracy * firstDamage.koLower;
+        firstKOUpper = source.accuracy * firstDamage.koUpper;
+      } else if (firstDamage.maximum * source.hits >= responder.hp.lower) {
+        return null;
+      }
+      responder.compute();
+      const responseDamage = responder.profile;
+      if (!responseDamage || source.secondary === null) return null;
+      // The same immutable snapshot fixes target HP bounds and every Torrent
+      // regime. First/response roles affect only admission and this algebra;
+      // they never change either move's native damage or accuracy probe.
+      const responseKO = (1 - firstKOUpper) * (1 - source.secondary) * responder.accuracy * responseDamage.koLower;
+      const firstMass = firstKOLower === 1 ? 1 : Math.max(0, firstKOLower - 1e-12);
+      const responseMass = responseKO === 1 ? 1 : Math.max(0, responseKO - 1e-12);
+      if (firstMass === 0 && responseMass === 0) return null;
+      return first === 0
+        ? {lower: 2 * firstMass - 1, upper: 1 - 2 * responseMass}
+        : {lower: 2 * responseMass - 1, upper: 1 - 2 * firstMass};
+    };
+  }
+  return prepare;
 }

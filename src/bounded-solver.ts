@@ -374,10 +374,10 @@ class BoundedSearch {
     if (!node.actions1.length || !node.actions2.length) {
       throw new Error('BoundedSolver requires at least one legal action per player');
     }
+    const terminalEnvelope = this.terminalEnvelope?.(node.snapshot, this.deadline);
     node.cells = Array.from({length: node.actions1.length}, (_, i) =>
       Array.from({length: node.actions2.length}, (_, j) => {
-        const envelope = this.terminalEnvelope?.(node.snapshot,
-          node.actions1[i] as Action, node.actions2[j] as Action, this.deadline);
+        const envelope = terminalEnvelope?.(node.actions1[i] as Action, node.actions2[j] as Action);
         if (envelope) this.stats.terminalEnvelopes++;
         return {
           outcomes: null,

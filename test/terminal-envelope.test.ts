@@ -22,7 +22,7 @@ function position(firstMove = 'Water Gun', response = 'Power Gem') {
 
 function envelope(battle) {
   const factory = createTerminalEnvelope(battle);
-  return factory?.(snapshotBattle(battle), legalActions(battle, 0)[0], legalActions(battle, 1)[0]) ?? null;
+  return factory?.(snapshotBattle(battle))?.(legalActions(battle, 0)[0], legalActions(battle, 1)[0]) ?? null;
 }
 
 // Preserve native damage and effect execution. Only the already-audited
@@ -110,7 +110,7 @@ test('survival and response KO thresholds are necessary, and expired probes stop
   assert.ok(partial && partial.upper > -1, 'a possible critical KO is not a certain response KO');
   const valid = position();
   const factory = createTerminalEnvelope(valid);
-  assert.equal(factory(snapshotBattle(valid), legalActions(valid, 0)[0], legalActions(valid, 1)[0], -Infinity), null);
+  assert.equal(factory(snapshotBattle(valid), -Infinity), null);
 });
 
 
@@ -121,7 +121,7 @@ test('Champions native PP states admit the costly multi-hit response certificate
     const first = legalActions(battle, 0).find(action => action.id === 'scaleshot');
     const reply = legalActions(battle, 1).find(action => action.id === response);
     const factory = createTerminalEnvelope(battle);
-    const certificate = factory?.(snapshotBattle(battle), first, reply);
+    const certificate = factory?.(snapshotBattle(battle))?.(first, reply);
     assert.ok(certificate, `certificate for HP ${hp}`);
     assert.equal(certificate.lower, -1);
     assert.ok(certificate.upper <= upper + 1e-9);
@@ -310,9 +310,51 @@ test('Champions full PP special-attack cells expose partial terminal mass', () =
     const battle = createChampionsBattle(fixture);
     const first = legalActions(battle, 0).find(action => action.id === 'moonblast');
     const reply = legalActions(battle, 1).find(action => action.id === 'thunderbolt');
-    const certificate = createTerminalEnvelope(battle)?.(snapshotBattle(battle), first, reply);
+    const certificate = createTerminalEnvelope(battle)?.(snapshotBattle(battle))?.(first, reply);
     assert.ok(certificate, `partial certificate at HP ${hp}`);
     assert.ok(certificate.lower > -1 || certificate.upper < 1);
     assert.ok(certificate.lower <= certificate.upper);
   }
+});
+
+
+test('prepared snapshot shares move summaries without pair-order contamination', () => {
+  const battle = createBattle({species: 'Primarina', level: 50, ability: 'Torrent', item: 'Sitrus Berry',
+    moves: ['Moonblast', 'Sparkling Aria', 'Hydro Pump', 'Aqua Jet']},
+  {species: 'Archaludon', level: 50, ability: 'Stamina', item: 'Sitrus Berry',
+    moves: ['Flash Cannon', 'Draco Meteor', 'Dragon Pulse', 'Metal Sound']});
+  for (const hp of [1, Math.floor(battle.p1.active[0].maxhp / 3), battle.p1.active[0].maxhp]) {
+    setHP(battle, 'p1', hp);
+    refreshMoveRequest(battle);
+    const snapshot = snapshotBattle(battle);
+    const before = JSON.stringify(snapshot);
+    const factory = createTerminalEnvelope(battle);
+    assert.ok(factory);
+    const pairs = legalActions(battle, 0).flatMap(first =>
+      legalActions(battle, 1).map(second => [first, second] as const));
+    const expected = pairs.map(([first, second]) => factory(snapshot)?.(first, second) ?? null);
+    for (const order of [pairs.map((_, i) => i), pairs.map((_, i) => i).reverse()]) {
+      const prepared = factory(snapshot);
+      assert.ok(prepared);
+      for (const index of order) {
+        assert.deepEqual(prepared(...pairs[index]), expected[index]);
+        assert.deepEqual(prepared(...pairs[index]), expected[index]);
+      }
+    }
+    assert.equal(JSON.stringify(snapshot), before);
+    assert.equal(JSON.stringify(snapshotBattle(battle)), before);
+  }
+});
+
+test('prepared evaluator owns its snapshot and expired preparation yields no certificate', () => {
+  const battle = position();
+  const snapshot = snapshotBattle(battle);
+  const first = legalActions(battle, 0)[0];
+  const second = legalActions(battle, 1)[0];
+  const factory = createTerminalEnvelope(battle);
+  const expected = factory(snapshot)?.(first, second) ?? null;
+  const prepared = factory(snapshot);
+  snapshot.sides[0].pokemon[0].hp = 0;
+  assert.deepEqual(prepared(first, second), expected);
+  assert.equal(factory(snapshot, -Infinity), null);
 });
