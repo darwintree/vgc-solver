@@ -177,7 +177,7 @@ test('native callbacks relocated to another event slot do not enter the envelope
     item.onAfterMoveSecondarySelf = (battle.dex.items.get('sitrusberry') as any).onEat;
     // The broad native audit promises callback origin, not event semantics.
     assert.equal(auditNativeRules(battle), true);
-    assert.equal(createTerminalEnvelope(battle), null);
+    assert.equal(envelope(battle), null);
     battle.makeChoices('move 1', 'move 1');
     assert.equal(battle.ended, false);
     assert.ok(battle.p1.active[0].hp > 1, 'healing before the response defeats the initial-HP KO claim');
@@ -194,7 +194,7 @@ test('numeric event callbacks are not mistaken for event-order metadata', () => 
   const descriptor = Object.getOwnPropertyDescriptor(item, 'onFractionalPriority');
   try {
     item.onFractionalPriority = 1;
-    assert.equal(createTerminalEnvelope(battle), null);
+    assert.equal(envelope(battle), null);
   } finally {
     if (descriptor) Object.defineProperty(item, 'onFractionalPriority', descriptor);
     else delete item.onFractionalPriority;
@@ -207,7 +207,7 @@ test('an added third type is outside the damage-overflow certificate domain', ()
   battle.p1.active[0].addType('Ghost');
   assert.equal(battle.p1.active[0].getTypes().length, 3);
   assert.equal(Object.keys(battle.p1.active[0].volatiles).length, 0);
-  assert.equal(createTerminalEnvelope(battle), null);
+  assert.equal(envelope(battle), null);
 });
 
 
@@ -297,7 +297,7 @@ test('Torrent callbacks require their audited event slots', () => {
   try {
     ability.onBasePower = ability.onModifySpA;
     assert.equal(auditNativeRules(battle), true);
-    assert.equal(createTerminalEnvelope(battle), null);
+    assert.equal(envelope(battle), null);
   } finally {
     if (descriptor) Object.defineProperty(ability, 'onBasePower', descriptor);
     else delete ability.onBasePower;
@@ -357,4 +357,103 @@ test('prepared evaluator owns its snapshot and expired preparation yields no cer
   snapshot.sides[0].pokemon[0].hp = 0;
   assert.deepEqual(prepared(first, second), expected);
   assert.equal(factory(snapshot, -Infinity), null);
+});
+
+
+function bustedPosition(firstMove = 'Shadow Claw', response = 'Water Gun') {
+  const battle = createBattle({species: 'Mimikyu', level: 50, ability: 'Disguise', item: 'Life Orb',
+    moves: [firstMove]}, {species: 'Primarina', level: 50, ability: 'Torrent', moves: [response]});
+  battle.p1.active[0].formeChange('Mimikyu-Busted', battle.dex.abilities.get('disguise'), true);
+  refreshMoveRequest(battle);
+  return battle;
+}
+
+function assertNativeEnclosure(battle) {
+  const certificate = envelope(battle);
+  const oracle = nativeInterval(snapshotBattle(battle), legalActions(battle, 0)[0], legalActions(battle, 1)[0]);
+  assert.ok((certificate?.lower ?? -1) <= oracle.lower + 1e-9);
+  assert.ok((certificate?.upper ?? 1) >= oracle.upper - 1e-9);
+  return certificate;
+}
+
+test('a native-audited intact root can prepare a later busted Disguise node', () => {
+  const battle = createBattle({species: 'Mimikyu', level: 50, ability: 'Disguise', item: 'Life Orb',
+    moves: ['Shadow Claw']}, {species: 'Primarina', level: 50, ability: 'Torrent', moves: ['Water Gun']});
+  const factory = createTerminalEnvelope(battle);
+  assert.ok(factory);
+  assert.equal(factory(snapshotBattle(battle)), null);
+  battle.p1.active[0].formeChange('Mimikyu-Busted', battle.dex.abilities.get('disguise'), true);
+  setHP(battle, 'p2', 10);
+  refreshMoveRequest(battle);
+  assert.ok(factory(snapshotBattle(battle))?.(legalActions(battle, 0)[0], legalActions(battle, 1)[0]));
+  assert.ok(assertNativeEnclosure(battle));
+});
+
+for (const hp of [13, 14, 15]) {
+  test(`first Life Orb KO respects native recoil boundary at HP${hp}`, () => {
+    const battle = bustedPosition();
+    setHP(battle, 'p1', hp);
+    setHP(battle, 'p2', 10);
+    refreshMoveRequest(battle);
+    const certificate = assertNativeEnclosure(battle);
+    if (hp > Math.ceil(battle.p1.active[0].baseMaxhp / 10)) assert.equal(certificate?.lower, 1);
+    else assert.notEqual(certificate?.lower, 1);
+  });
+}
+
+for (const hp of [20, 80, 131]) {
+  test(`response Life Orb keeps damage and recoil survival jointly safe at HP${hp}`, () => {
+    const battle = bustedPosition('Shadow Claw');
+    battle.p1.active[0].boosts.spe = -6;
+    battle.p2.active[0].boosts.spe = 6;
+    setHP(battle, 'p1', Math.min(hp, battle.p1.active[0].maxhp));
+    setHP(battle, 'p2', 20);
+    refreshMoveRequest(battle);
+    assertNativeEnclosure(battle);
+  });
+}
+
+test('contact damage refuses Rough Skin and suppressed items remain outside admission', () => {
+  const contact = bustedPosition();
+  contact.p2.active[0].setAbility('roughskin');
+  assert.equal(envelope(contact), null);
+  const suppressed = bustedPosition();
+  suppressed.p1.active[0].addVolatile('embargo');
+  assert.equal(envelope(suppressed), null);
+  const transformed = bustedPosition();
+  transformed.p1.active[0].transformed = true;
+  assert.equal(envelope(transformed), null);
+});
+
+test('Life Orb and Disguise require exact callbacks in their native event slots', () => {
+  for (const [kind, id, event, replacement] of [
+    ['items', 'lifeorb', 'onModifyDamage', () => 100000],
+    ['items', 'lifeorb', 'onAfterMoveSecondarySelf', () => {}],
+    ['abilities', 'disguise', 'onUpdate', () => {}],
+  ] as const) {
+    const battle = bustedPosition();
+    const effect = battle.dex[kind].get(id) as any;
+    const original = effect[event];
+    try {
+      effect[event] = replacement;
+      assert.equal(envelope(battle), null);
+    } finally { effect[event] = original; }
+  }
+});
+
+
+test('Life Orb damage outside the no-overflow domain remains unknown', () => {
+  const battle = bustedPosition();
+  battle.p1.active[0].storedStats.atk = 1000000;
+  battle.p1.active[0].boosts.atk = 6;
+  refreshMoveRequest(battle);
+  assert.equal(envelope(battle), null);
+});
+
+
+test('first Life Orb accuracy and secondary branches remain inside native bounds', () => {
+  const battle = bustedPosition('Play Rough');
+  setHP(battle, 'p2', 10);
+  refreshMoveRequest(battle);
+  assert.ok(assertNativeEnclosure(battle));
 });

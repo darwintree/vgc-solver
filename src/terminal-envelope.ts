@@ -8,26 +8,34 @@ export interface TerminalEnvelope {lower: number; upper: number}
 
 // These native callbacks have a deliberately small monotonicity proof:
 // Stamina only raises Defense; Sitrus only heals its living holder; Rough
-// Skin is inert for our non-contact moves; Focus Sash is inert below full HP.
-// Torrent has only two HP regimes, both probed with native damage randomness.
+// Skin is excluded for contact pairs; Focus Sash is inert below full HP.
+// Torrent has two HP regimes, both probed with native damage randomness.
+// Broken Disguise is inert. Life Orb damage and recoil are bounded separately.
 // Admission binds both identity and event slot: a native healing callback
 // moved to AfterMoveSecondarySelf would otherwise invalidate the HP proof.
 // This is separate from the general native-source audit.
 const torrent = Dex.abilities.get('torrent') as any;
+const disguise = Dex.abilities.get('disguise') as any;
+const roughSkin = Dex.abilities.get('roughskin') as any;
+const disguiseEvents = ['onDamage', 'onCriticalHit', 'onEffectiveness', 'onUpdate'];
 const abilityHooks = new Map([['onDamagingHit', new Set([
   (Dex.abilities.get('stamina') as any).onDamagingHit,
   (Dex.abilities.get('roughskin') as any).onDamagingHit,
 ])],
   ['onModifyAtk', new Set([torrent.onModifyAtk])],
   ['onModifySpA', new Set([torrent.onModifySpA])],
+  ...disguiseEvents.map(event => [event, new Set([disguise[event]])] as [string, Set<any>]),
 ]);
 const berry = Dex.items.get('sitrusberry') as any;
 const sash = Dex.items.get('focussash') as any;
+const lifeOrb = Dex.items.get('lifeorb') as any;
 const itemHooks = new Map([
   ['onUpdate', new Set([berry.onUpdate])],
   ['onTryEatItem', new Set([berry.onTryEatItem])],
   ['onEat', new Set([berry.onEat])],
   ['onDamage', new Set([sash.onDamage])],
+  ['onModifyDamage', new Set([lifeOrb.onModifyDamage])],
+  ['onAfterMoveSecondarySelf', new Set([lifeOrb.onAfterMoveSecondarySelf])],
 ]);
 const noHooks = new Map();
 
@@ -61,7 +69,7 @@ function secondaries(move) {
 function plainDamageMove(move, first: boolean) {
   if (!move.exists || !['Physical', 'Special'].includes(move.category) || move.target !== 'normal' ||
       !(move.basePower > 0 && move.basePower <= 250) ||
-      !(move.accuracy === true || Number.isInteger(move.accuracy)) || move.flags.contact || move.flags.charge ||
+      !(move.accuracy === true || Number.isInteger(move.accuracy)) || move.flags.charge ||
       move.flags.recharge || move.flags.futuremove || move.isZ || move.isMax || move.ohko ||
       Object.values(move).some(value => typeof value === 'function')) return false;
   for (const field of ['damage', 'drain', 'heal', 'recoil', 'struggleRecoil', 'mindBlownRecoil',
@@ -96,16 +104,31 @@ function maxHits(move): number | null {
   return maximum;
 }
 
+function admittedAbility(pokemon) {
+  const ability = pokemon.getAbility();
+  if (!admittedHooks(ability, abilityHooks)) return false;
+  // All four native Disguise handlers return without effects outside this
+  // exact species predicate. Transformed Pokemon are excluded separately.
+  return !disguiseEvents.some(event => ability[event] === disguise[event]) ||
+    !['mimikyu', 'mimikyutotem'].includes(pokemon.species.id);
+}
+
+function maximumRecoil(pokemon) {
+  return pokemon.getItem().onAfterMoveSecondarySelf === lifeOrb.onAfterMoveSecondarySelf
+    ? Math.ceil(pokemon.baseMaxhp / 10) : 0;
+}
+
 function admittedState(battle) {
   if (battle.gen !== 9 || battle.gameType !== 'singles' || battle.ended || battle.requestState !== 'move' ||
       battle.sides.length !== 2 || battle.field.weather || battle.field.terrain ||
       Object.keys(battle.field.pseudoWeather).length || !admittedHooks(battle.format, noHooks)) return false;
   return battle.sides.every(side => side.pokemon.length === 1 && side.active.length === 1 &&
     !Object.keys(side.sideConditions).length && !Object.keys(side.slotConditions?.[0] || {}).length &&
-    side.active.every(pokemon => pokemon.hp > 0 && pokemon.level <= 100 && !pokemon.status &&
+    side.active.every(pokemon => pokemon.hp > 0 && pokemon.level <= 100 && pokemon.isActive &&
+      !pokemon.ignoringItem() && !pokemon.status &&
       !pokemon.terastallized && !pokemon.transformed && !pokemon.addedType && pokemon.getTypes().length <= 2 &&
       !Object.keys(pokemon.volatiles).length &&
-      admittedHooks(pokemon.getAbility(), abilityHooks) &&
+      admittedAbility(pokemon) &&
       admittedHooks(pokemon.getItem(), itemHooks) && admittedHooks(pokemon.baseSpecies, noHooks)));
 }
 
@@ -123,7 +146,8 @@ function noDamageOverflow(source, target, move) {
   const defense = target.calculateStat(defenseStat, -6);
   // Torrent is bounded above in attack. Two types, native STAB and critical
   // damage give at most 4 * 1.5 * 1.5; exclude native 16-bit wraparound.
-  return ((2 * source.level / 5 + 2) * move.basePower * attack / defense / 50 + 2) * 9 < 65536;
+  const modifier = source.getItem().onModifyDamage === lifeOrb.onModifyDamage ? 1.3 : 1;
+  return ((2 * source.level / 5 + 2) * move.basePower * attack / defense / 50 + 2) * 9 * modifier + 1 < 65536;
 }
 
 interface DamageProfile {
@@ -232,7 +256,7 @@ function hitProbability(battle, source, target, move) {
  * Admission is native and state-based; unsupported mechanics return null.
  */
 export function createTerminalEnvelope(battle, audited = auditNativeRules(battle)) {
-  if (!audited || !admittedState(battle)) return null;
+  if (!audited) return null;
   // A prepared evaluator is used only during one node's synchronous cell
   // initialization. Retain detached data and numeric summaries, never a live
   // damage-probe Battle shared between action pairs.
@@ -255,7 +279,8 @@ export function createTerminalEnvelope(battle, audited = auditNativeRules(battle
       const value = {
         first: plainDamageMove(move, true), response: plainDamageMove(move, false),
         priority: order.priority, speed: order.speed, hits: maxHits(move),
-        hp: possibleHP(source), secondary: secondaryUpper(move),
+        hp: possibleHP(source), recoil: maximumRecoil(source), secondary: secondaryUpper(move),
+        contactSafe: !move.flags.contact || target.getAbility().onDamagingHit !== roughSkin.onDamagingHit,
         profile: undefined as DamageProfile | null | undefined,
         accuracy: undefined as number | undefined,
         // These computations own one fresh native probe. They publish only
@@ -279,14 +304,17 @@ export function createTerminalEnvelope(battle, audited = auditNativeRules(battle
       const second = 1 - first;
       const source = actions[first];
       const responder = actions[second];
-      if (!source.first || !responder.response || source.hits === null) return null;
+      if (!source.first || !responder.response || source.hits === null ||
+          !source.contactSafe || !responder.contactSafe) return null;
       source.compute();
       const firstDamage = source.profile;
       if (!firstDamage) return null;
       let firstKOLower = 0;
       let firstKOUpper = 0;
       if (source.hits === 1) {
-        firstKOLower = source.accuracy * firstDamage.koLower;
+        // A target KO is terminal success only when native item recoil
+        // cannot also exhaust the attacker's HP.
+        firstKOLower = source.hp.lower > source.recoil ? source.accuracy * firstDamage.koLower : 0;
         firstKOUpper = source.accuracy * firstDamage.koUpper;
       } else if (firstDamage.maximum * source.hits >= responder.hp.lower) {
         return null;
@@ -297,7 +325,14 @@ export function createTerminalEnvelope(battle, audited = auditNativeRules(battle
       // The same immutable snapshot fixes target HP bounds and every Torrent
       // regime. First/response roles affect only admission and this algebra;
       // they never change either move's native damage or accuracy probe.
-      const responseKO = (1 - firstKOUpper) * (1 - source.secondary) * responder.accuracy * responseDamage.koLower;
+      // Keep damage and remaining-HP conditions jointly safe. When the
+      // responder holds Life Orb, certify only if even the largest first
+      // hit sequence leaves it above maximum recoil. Other branches remain
+      // unknown; no independence between damage and survival is assumed.
+      const responseSurvivesRecoil = responder.recoil === 0 ||
+        responder.hp.lower - firstDamage.maximum * source.hits > responder.recoil;
+      const responseKO = responseSurvivesRecoil
+        ? (1 - firstKOUpper) * (1 - source.secondary) * responder.accuracy * responseDamage.koLower : 0;
       const firstMass = firstKOLower === 1 ? 1 : Math.max(0, firstKOLower - 1e-12);
       const responseMass = responseKO === 1 ? 1 : Math.max(0, responseKO - 1e-12);
       if (firstMass === 0 && responseMass === 0) return null;
