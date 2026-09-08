@@ -159,7 +159,41 @@ for (const utility of [-1, 1]) {
       // solver's numerical guard, so that guard must not hide a bad endpoint.
       assert.ok(result.lowerBound <= lowerCompletion);
       assert.ok(result.upperBound >= upperCompletion);
-      assert.ok(Math.abs(result.value - utility * completed / total) < 1e-10);
+      assert.ok(result.value >= result.lowerBound && result.value <= result.upperBound);
     });
+  }
+}
+
+for (const utility of [-1, 1]) {
+  for (const initialError of [-5e-10, 5e-10]) {
+    for (const finalError of [-8e-10, 0, 8e-10]) {
+      test(`cumulative rounding preserves the final certificate (${utility}, ${initialError}, ${finalError})`, () => {
+        let batches = 0;
+        const tail = 0.25 + finalError;
+        const solver = new BoundedSolver({tolerance: 1e-7, adapter: {
+          legalActions: () => ['a'],
+          enumerateTurn: () => { throw new Error('cursor adapter expected'); },
+          createTurnCursor: () => ({advance: () => {
+            batches++;
+            return batches === 1 ? {
+              outcomes: [{utility, probability: 0.75}],
+              remainingProbability: 0.25 + initialError, complete: false, simulatorRuns: 1,
+            } : {
+              outcomes: [{utility, probability: 0.75}, {utility: -utility, probability: tail}],
+              remainingProbability: 0, complete: true, simulatorRuns: 1,
+            };
+          }}),
+        }});
+        const expected = utility * (0.75 - tail) / (0.75 + tail);
+        const result = solver.solve('root');
+        assert.equal(batches, 2);
+        assert.equal(result.converged, true);
+        assert.equal(result.exact, true);
+        // Each accepted batch may have a different sum rounding error. An
+        // earlier monotone endpoint must still contain the normalized final value.
+        assert.ok(result.lowerBound <= expected, `${result.lowerBound} > ${expected}`);
+        assert.ok(result.upperBound >= expected, `${result.upperBound} < ${expected}`);
+      });
+    }
   }
 }

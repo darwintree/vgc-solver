@@ -15,6 +15,8 @@ import {createEventPlan} from './event-plan';
 import {auditNativeRules} from './native-rules';
 import {createTerminalEnvelope} from './terminal-envelope';
 
+const PROBABILITY_SUM_TOLERANCE = 1e-9;
+
 export interface BoundedAdapter {
   // Custom adapters may use primitive state IDs and action IDs.
   snapshotBattle?: (battle: any) => any;
@@ -422,18 +424,22 @@ class BoundedSearch {
       if (child) child.parents.add(node);
       outcomes.push({probability, child, utility: null});
     }
-    const total = remaining + outcomes.reduce((sum, outcome) => sum + outcome.probability, 0);
-    if (!(total > 0) || Math.abs(total - 1) > 1e-9) {
+    const completed = outcomes.reduce((sum, outcome) => sum + outcome.probability, 0);
+    const total = remaining + completed;
+    if (!(total > 0) || Math.abs(total - 1) > PROBABILITY_SUM_TOLERANCE) {
       throw new Error(`Transition probabilities sum to ${total}, not 1`);
     }
-    // Normalize the whole probability partition, including the unexplored
-    // mass. Conditioning only on completed outcomes would invent evidence;
-    // leaving an admitted sum error uncorrected could narrow a certificate.
-    for (const outcome of outcomes) outcome.probability /= total;
+    // A later cumulative batch may have a different admitted total. For an
+    // incomplete batch use the largest possible final total and leave the
+    // residual unknown, so monotone bounds contain every final normalization.
+    // Complete transitions retain normalization by their actual total.
+    const incomplete = progressive && !transition.complete;
+    const denominator = incomplete ? 1 + PROBABILITY_SUM_TOLERANCE : total;
+    for (const outcome of outcomes) outcome.probability /= denominator;
     const cell = node.cells[i][j];
     if (!cell.outcomes) this.stats.expandedCells++;
     cell.outcomes = outcomes;
-    cell.remainingProbability = remaining / total;
+    cell.remainingProbability = incomplete ? Math.max(0, 1 - completed / denominator) : remaining / total;
     if (transition.complete) cell.cursor = null;
   }
 
