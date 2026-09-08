@@ -42,7 +42,7 @@ Q_s(a,b)=\sum_{s'}P(s'\mid s,a,b)V(s'),\qquad V(s)=\operatorname{val}(Q_s).
 
 exact 求解中，子状态在必胜行或纯鞍点证书成立时停止展开，其余状态补齐矩阵求解；根节点返回完整收益矩阵和双方策略。
 
-bounded 求解按[证明前沿](optimization-techniques/bounded-search.md)逐格展开，极值纯策略候选可优先跨回合验证，一般证明先补充当前矩阵信息。同步 native 路径用可续跑游标保留已完成后继及剩余概率质量：未完成质量按 `[-1,1]` 计入安全界，不必等整格枚举结束才回传。受审计的一回合终局包络还可在生成后继前收窄格子；它只提供区间，不提供完整分布或 exact 证书。根达到容差即可停止，完整行动维度与所有未知部分保留。随机树与状态空间仍可能随局面复杂度迅速增长。
+bounded 求解按[证明前沿](optimization-techniques/bounded-search.md)逐格展开，极值纯策略候选可优先跨回合验证，一般证明先补充当前矩阵信息。同步 native 路径用可续跑游标保留已完成后继及剩余概率质量：未完成质量按 `[-1,1]` 计入安全界，不必等整格枚举结束才回传。受审计的一回合终局包络还可在生成后继前收窄格子；节点独立准入，同一节点内共享各招式的原生概率数值摘要。每个未缓存招式用新恢复的 Battle 计算，不跨 HP 状态共享可变模拟器。包络包含受限反伤存活条件，只提供区间，不提供完整分布或 exact 证书。根达到容差即可停止，完整行动维度与所有未知部分保留。随机树与状态空间仍可能随局面复杂度迅速增长。
 
 exact、worker 和未提供游标的自定义 adapter 继续使用完整 `enumerateTurn` 路径。同步 native 游标从回合起点重放随机前缀，不保存中途 Battle，也不使用 PP 转移模板；这项绕过不影响完整枚举路径已有的 PP 复用。原生规则审计失败时，依赖该审计的包络、缓存与事件计划不启用；模拟器等价捷径另按方法身份和回调守卫逐项回退。
 
@@ -52,7 +52,7 @@ exact、worker 和未提供游标的自定义 adapter 继续使用完整 `enumer
 src/showdown-adapter.ts  Showdown 状态复制、合法行动、随机分支枚举
 src/branching-prng.ts    可回放且可分叉的 PRNG facade
 src/progressive-transition.ts  同步 bounded 的渐进转移与剩余概率质量
-src/terminal-envelope.ts  受审计的一回合终局区间与伤害端点范围
+src/terminal-envelope.ts  节点准入、共享原生概率摘要与受限反伤终局区间
 src/empty-events.ts      空事件消除与原生方法检查
 src/simulator-optimizations.ts  副作用与伤害随机结果的等价合并
 src/matrix-game.ts       零和矩阵 simplex、数值证书与小矩阵回退
