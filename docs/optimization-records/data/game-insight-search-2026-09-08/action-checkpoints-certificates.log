@@ -1,0 +1,12 @@
+✔ bounded native certificate covers full-PP case4 (6629.691394ms)
+✔ bounded native certificate covers full-PP case5 (30251.941779ms)
+✔ case4 and case5 roots retain maximum PP (1.700934ms)
+✔ bounded search certifies rectangular stochastic DAGs with shared successors (231.654101ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37626.024196
