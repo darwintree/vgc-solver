@@ -9,13 +9,18 @@ export interface TerminalEnvelope {lower: number; upper: number}
 // These native callbacks have a deliberately small monotonicity proof:
 // Stamina only raises Defense; Sitrus only heals its living holder; Rough
 // Skin is inert for our non-contact moves; Focus Sash is inert below full HP.
+// Torrent has only two HP regimes, both probed with native damage randomness.
 // Admission binds both identity and event slot: a native healing callback
 // moved to AfterMoveSecondarySelf would otherwise invalidate the HP proof.
 // This is separate from the general native-source audit.
+const torrent = Dex.abilities.get('torrent') as any;
 const abilityHooks = new Map([['onDamagingHit', new Set([
   (Dex.abilities.get('stamina') as any).onDamagingHit,
   (Dex.abilities.get('roughskin') as any).onDamagingHit,
-])]]);
+])],
+  ['onModifyAtk', new Set([torrent.onModifyAtk])],
+  ['onModifySpA', new Set([torrent.onModifySpA])],
+]);
 const berry = Dex.items.get('sitrusberry') as any;
 const sash = Dex.items.get('focussash') as any;
 const itemHooks = new Map([
@@ -44,9 +49,19 @@ function plainBoosts(effect) {
       Number.isInteger(value)));
 }
 
+function admittedSecondary(effect) {
+  return plainBoosts(effect) || (Object.keys(effect).every(key => key === 'chance' || key === 'status') &&
+    ['par', 'brn', 'psn', 'tox', 'slp', 'frz'].includes(effect.status));
+}
+
+function secondaries(move) {
+  return move.secondaries || (move.secondary ? [move.secondary] : []);
+}
+
 function plainDamageMove(move, first: boolean) {
   if (!move.exists || !['Physical', 'Special'].includes(move.category) || move.target !== 'normal' ||
-      !(move.basePower > 0 && move.basePower <= 250) || move.flags.contact || move.flags.charge ||
+      !(move.basePower > 0 && move.basePower <= 250) ||
+      !(move.accuracy === true || Number.isInteger(move.accuracy)) || move.flags.contact || move.flags.charge ||
       move.flags.recharge || move.flags.futuremove || move.isZ || move.isMax || move.ohko ||
       Object.values(move).some(value => typeof value === 'function')) return false;
   for (const field of ['damage', 'drain', 'heal', 'recoil', 'struggleRecoil', 'mindBlownRecoil',
@@ -58,7 +73,8 @@ function plainDamageMove(move, first: boolean) {
   }
   if (!plainBoosts(move.self) || !plainBoosts(move.selfBoost)) return false;
   if (first) {
-    if (move.self || move.boosts || move.secondaries?.length || move.secondary) return false;
+    if (move.self || move.boosts || secondaries(move).some(effect => !admittedSecondary(effect))) return false;
+    if (move.multihit && secondaries(move).length) return false;
     // This effect occurs after the entire move. It cannot strengthen the
     // victim against the response or lower the response's accuracy.
     for (const [stat, value] of Object.entries(move.selfBoost?.boosts || {})) {
@@ -67,7 +83,7 @@ function plainDamageMove(move, first: boolean) {
     }
   } else {
     if (move.multihit) return false;
-    if ((move.secondaries || (move.secondary ? [move.secondary] : [])).some(effect => !plainBoosts(effect))) return false;
+    if (secondaries(move).some(effect => !admittedSecondary(effect))) return false;
   }
   return true;
 }
@@ -93,47 +109,108 @@ function admittedState(battle) {
       admittedHooks(pokemon.getItem(), itemHooks) && admittedHooks(pokemon.baseSpecies, noHooks)));
 }
 
+function torrentRelevant(source, move) {
+  const event = move.category === 'Physical' ? 'onModifyAtk' : 'onModifySpA';
+  return move.type === 'Water' && source.getAbility()[event] === torrent[event];
+}
+
 function noDamageOverflow(source, target, move) {
   const attackStat = move.category === 'Physical' ? 'atk' : 'spa';
   const defenseStat = move.category === 'Physical' ? 'def' : 'spd';
-  const attack = source.calculateStat(attackStat, Math.max(0, source.boosts[attackStat]));
+  let attack = source.calculateStat(attackStat, Math.max(0, source.boosts[attackStat]));
+  if (torrentRelevant(source, move)) attack = Math.ceil(attack * 1.5);
   // Include any permitted post-move defense drop, even the worst -6 stage.
   const defense = target.calculateStat(defenseStat, -6);
-  // No admitted hook modifies damage. Two types, native STAB and critical
+  // Torrent is bounded above in attack. Two types, native STAB and critical
   // damage give at most 4 * 1.5 * 1.5; exclude native 16-bit wraparound.
   return ((2 * source.level / 5 + 2) * move.basePower * attack / defense / 50 + 2) * 9 < 65536;
 }
 
-/** Internal range evaluator; callers must establish the native envelope admission. */
-export function damageRange(battle, source, target, move, deadline): {min: number; max: number} | null {
+interface DamageProfile {
+  maximum: number;
+  koLower: number;
+  koUpper: number;
+}
+
+function possibleHP(pokemon) {
+  const item = pokemon.getItem();
+  const heal = item.onUpdate === berry.onUpdate && item.onEat === berry.onEat && pokemon.hp <= pokemon.maxhp / 2
+    ? Math.ceil(pokemon.baseMaxhp / 4) : 0;
+  return {lower: pokemon.hp, upper: Math.min(pokemon.maxhp, pokemon.hp + heal)};
+}
+
+/** Exact native damage randomness, bounded across every admitted HP regime. */
+function damageProfile(battle, source, target, move, targetHP, deadline): DamageProfile | null {
   if (!noDamageOverflow(source, target, move)) return null;
-  const nativeRandom = battle.random;
-  let min = Infinity;
-  let max = -Infinity;
+  const originalHP = source.hp;
+  const originalPRNG = battle.prng;
+  const hpRegimes = torrentRelevant(source, move) ? [1, source.maxhp] : [source.hp];
+  let maximum = 0;
+  let koLower = 1;
+  let koUpper = 0;
   try {
-    // With the admitted hooks, post-random damage only applies positive
-    // STAB/type factors, truncation and the minimum-one clamp. The overflow
-    // guard excludes the native 16-bit wrap, so each fixed-crit branch is
-    // monotone in the random roll. Its extrema occur at the two endpoints.
-    for (const crit of [false, true]) for (const roll of [0, 15]) {
-      if (performance.now() >= deadline) return null;
-      // Only the audited damage randomizer can ask for random here.
-      battle.random = n => {
-        if (n !== 16) throw new Error('Unexpected randomness in terminal envelope damage');
-        return roll;
-      };
-      const probe = battle.dex.getActiveMove(move);
-      probe.willCrit = crit;
-      battle.setActiveMove(probe, source, target);
-      const damage = battle.actions.getDamage(source, target, probe, true);
-      if (typeof damage !== 'number' || !Number.isFinite(damage)) return null;
-      min = Math.min(min, damage);
-      max = Math.max(max, damage);
+    for (const hp of hpRegimes) {
+      source.hp = hp;
+      const pending = [{decisions: [], probability: 1}];
+      let lowerMass = 0;
+      let upperMass = 0;
+      let allKO = true;
+      let anyKO = false;
+      let runs = 0;
+      while (pending.length) {
+        if (performance.now() >= deadline || ++runs > 64) return null;
+        const branch = pending.pop();
+        battle.prng = new BranchingPRNG(branch.decisions, 0, (alternatives, random) => {
+          for (const alternative of alternatives.slice(1)) {
+            pending.push({decisions: [...random.decisions, alternative.decision],
+              probability: branch.probability * alternative.probability});
+          }
+          branch.probability *= alternatives[0].probability;
+          return alternatives[0];
+        });
+        const probe = battle.dex.getActiveMove(move);
+        battle.setActiveMove(probe, source, target);
+        const nativeDamage = battle.actions.getDamage(source, target, probe, true);
+        const damage = nativeDamage === false ? 0 : nativeDamage;
+        if (typeof damage !== 'number' || !Number.isFinite(damage)) return null;
+        maximum = Math.max(maximum, damage);
+        if (damage >= targetHP.upper) lowerMass += branch.probability;
+        else allKO = false;
+        if (damage >= targetHP.lower) {
+          upperMass += branch.probability;
+          anyKO = true;
+        }
+      }
+      // Do not promote a rounded sum to certainty. allKO/anyKO inspect every
+      // native crit and damage leaf, including guaranteed/no-crit moves.
+      koLower = Math.min(koLower, allKO ? 1 : Math.max(0, lowerMass - 1e-12));
+      koUpper = Math.max(koUpper, anyKO ? Math.min(1, upperMass + 1e-12) : 0);
     }
   } finally {
-    battle.random = nativeRandom;
+    source.hp = originalHP;
+    battle.prng = originalPRNG;
   }
-  return {min, max};
+  // Raw getDamage precedes the Focus Sash Damage hook. If full HP is
+  // possible, its raw KO mass is not a certified terminal lower mass.
+  if (target.getItem().onDamage === sash.onDamage && targetHP.upper === target.maxhp) koLower = 0;
+  return {maximum, koLower, koUpper};
+}
+
+/** Union bound on secondary occurrence, valid conditional on any safe prefix. */
+function secondaryUpper(move): number | null {
+  let upper = 0;
+  for (const effect of secondaries(move)) {
+    const chance = effect.chance ?? 100;
+    if (!Number.isInteger(chance)) return null;
+    let probability = chance >= 100 ? 1 : 0;
+    const prng = new BranchingPRNG([], 0, alternatives => {
+      probability = alternatives.find(alternative => alternative.decision.value === true)?.probability ?? 0;
+      return alternatives[0];
+    });
+    prng.randomChance(chance, 100);
+    upper = Math.min(1, upper + probability);
+  }
+  return Math.min(1, upper + (upper > 0 && upper < 1 ? 1e-12 : 0));
 }
 
 function hitProbability(battle, source, target, move) {
@@ -174,21 +251,33 @@ export function createTerminalEnvelope(battle, audited = auditNativeRules(battle
     const source = actions[first].pokemon;
     const responder = actions[second].pokemon;
     const hits = maxHits(moves[first]);
-    if (hits === null || (source.getItem().onDamage === sash.onDamage && source.hp === source.maxhp)) return null;
-    // A healing attacker could regain its Sash or escape the initial HP KO
-    // threshold. Sitrus on the responder is safe; on the attacker, decline.
-    if (source.getItem().onUpdate === berry.onUpdate) return null;
-    const firstDamage = damageRange(probe, source, responder, moves[first], deadline);
-    if (!firstDamage || firstDamage.max * hits >= responder.hp) return null;
-    const responseDamage = damageRange(probe, responder, source, moves[second], deadline);
-    if (!responseDamage || responseDamage.min < source.hp) return null;
-    const hitMass = hitProbability(probe, responder, source, moves[second]);
-    if (!(hitMass > 0)) return null;
-    // On a miss, all future outcomes remain possible. Include rounding slack
-    // for interval arithmetic; the PRNG facade supplies exact uint32 mass.
-    const margin = hitMass === 1 ? 0 : 1e-12;
-    return second === 0
-      ? {lower: Math.max(-1, 2 * hitMass - 1 - margin), upper: 1}
-      : {lower: -1, upper: Math.min(1, 1 - 2 * hitMass + margin)};
+    if (hits === null) return null;
+    const firstHP = possibleHP(source);
+    const responseHP = possibleHP(responder);
+    const firstDamage = damageProfile(probe, source, responder, moves[first], responseHP, deadline);
+    if (!firstDamage) return null;
+    let firstKOLower = 0;
+    let firstKOUpper = 0;
+    if (hits === 1) {
+      const firstHit = hitProbability(probe, source, responder, moves[first]);
+      firstKOLower = firstHit * firstDamage.koLower;
+      firstKOUpper = firstHit * firstDamage.koUpper;
+    } else if (firstDamage.maximum * hits >= responseHP.lower) {
+      return null;
+    }
+    const responseDamage = damageProfile(probe, responder, source, moves[second], firstHP, deadline);
+    if (!responseDamage) return null;
+    const secondary = secondaryUpper(moves[first]);
+    if (secondary === null) return null;
+    const responseHit = hitProbability(probe, responder, source, moves[second]);
+    // These are conditional lower bounds on disjoint terminal events, not
+    // assumed independent guesses. The response uses 1-aUpper, never 1-aLower.
+    const responseKO = (1 - firstKOUpper) * (1 - secondary) * responseHit * responseDamage.koLower;
+    const firstMass = firstKOLower === 1 ? 1 : Math.max(0, firstKOLower - 1e-12);
+    const responseMass = responseKO === 1 ? 1 : Math.max(0, responseKO - 1e-12);
+    if (firstMass === 0 && responseMass === 0) return null;
+    return first === 0
+      ? {lower: 2 * firstMass - 1, upper: 1 - 2 * responseMass}
+      : {lower: 2 * responseMass - 1, upper: 1 - 2 * firstMass};
   };
 }

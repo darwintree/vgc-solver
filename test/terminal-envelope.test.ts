@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {createTerminalEnvelope, damageRange} from '../src/terminal-envelope';
+import {createTerminalEnvelope} from '../src/terminal-envelope';
 import {auditNativeRules} from '../src/native-rules';
 import {BoundedSolver} from '../src/bounded-solver';
-import {createBattle, legalActions, refreshMoveRequest, setHP, snapshotBattle} from '../src/showdown-adapter';
+import {createBattle, enumerateTurn, legalActions, refreshMoveRequest, setHP, snapshotBattle} from '../src/showdown-adapter';
 import {BranchingPRNG} from '../src/branching-prng';
 import {installEmptyEventOptimization} from '../src/empty-events';
 import {restoreBattle, terminalUtility} from '../src/showdown-adapter';
@@ -86,7 +86,7 @@ for (const firstMove of ['Drain Punch', 'Power-Up Punch', 'Super Fang', 'Flail',
   });
 }
 
-test('full HP Sash, protection, unclassified ability, and healing attacker fall back', () => {
+test('full HP Sash, protection, and unclassified ability fall back', () => {
   const full = position();
   setHP(full, 'p1', full.p1.active[0].maxhp);
   assert.equal(envelope(full), null);
@@ -96,20 +96,18 @@ test('full HP Sash, protection, unclassified ability, and healing attacker fall 
   const ability = position();
   ability.p2.active[0].setAbility('weakarmor');
   assert.equal(envelope(ability), null);
-  const healing = position();
-  healing.p1.active[0].setItem('sitrusberry');
-  assert.equal(envelope(healing), null);
 });
 
 test('survival and response KO thresholds are necessary, and expired probes stop', () => {
   const battle = position();
   setHP(battle, 'p2', 1);
-  assert.equal(envelope(battle), null);
+  assert.equal(envelope(battle), null, 'possible pre-action berry healing leaves both terminal events unknown');
   const healthy = position('Water Gun', 'Mud-Slap');
   healthy.p1.active[0].setItem('');
   healthy.p2.active[0].boosts.spa = -6;
   setHP(healthy, 'p1', healthy.p1.active[0].maxhp);
-  assert.equal(envelope(healthy), null);
+  const partial = envelope(healthy);
+  assert.ok(partial && partial.upper > -1, 'a possible critical KO is not a certain response KO');
   const valid = position();
   const factory = createTerminalEnvelope(valid);
   assert.equal(factory(snapshotBattle(valid), legalActions(valid, 0)[0], legalActions(valid, 1)[0], -Infinity), null);
@@ -212,49 +210,109 @@ test('an added third type is outside the damage-overflow certificate domain', ()
   assert.equal(createTerminalEnvelope(battle), null);
 });
 
-// Independent exhaustive native oracle: every critical branch and all sixteen
-// native roll values, including rounding at resisted and boosted damage.
-function exhaustiveDamageRange(battle, source, target, move) {
-  const values = [];
-  for (const crit of [false, true]) for (let roll = 0; roll < 16; roll++) {
-    battle.random = n => {
-      assert.equal(n, 16);
-      return roll;
-    };
-    const active = battle.dex.getActiveMove(move);
-    active.willCrit = crit;
-    battle.setActiveMove(active, source, target);
-    const value = battle.actions.getDamage(source, target, active, true);
-    assert.equal(typeof value, 'number');
-    values.push(value);
-  }
-  return {min: Math.min(...values), max: Math.max(...values)};
+
+test('a healing attacker uses its possible healed HP for the response threshold', () => {
+  const battle = position();
+  battle.p1.active[0].setItem('sitrusberry');
+  const certificate = envelope(battle);
+  assert.ok(certificate);
+  const oracle = nativeInterval(snapshotBattle(battle), legalActions(battle, 0)[0], legalActions(battle, 1)[0]);
+  assert.ok(certificate.lower <= oracle.lower + 1e-9);
+  assert.ok(certificate.upper >= oracle.upper - 1e-9);
+});
+
+function probabilityPosition(firstMove = 'Power Gem', response = 'Power Gem') {
+  const battle = createBattle({species: 'Garchomp', level: 50, ability: 'Rough Skin', moves: [firstMove]},
+    {species: 'Primarina', level: 50, ability: 'Torrent', item: 'Sitrus Berry', moves: [response]});
+  setHP(battle, 'p1', 25);
+  setHP(battle, 'p2', 65);
+  refreshMoveRequest(battle);
+  return battle;
 }
 
-for (const [species1, species2, moveName, attackBoost, defenseBoost] of [
-  ['Garchomp', 'Archaludon', 'Earthquake', 0, 0],
-  ['Garchomp', 'Archaludon', 'Earthquake', 6, 6],
-  ['Garchomp', 'Archaludon', 'Draco Meteor', -6, -6],
-  ['Archaludon', 'Garchomp', 'Flash Cannon', 6, -6],
-  ['Garchomp', 'Swampert', 'Surf', -6, 6],
-  ['Garchomp', 'Tyranitar', 'Earthquake', 0, -6],
-  ['Kommo-o', 'Garchomp', 'Clanging Scales', 0, -1],
-] as const) {
-  test(`endpoint range equals all native rolls: ${species1}/${species2} ${moveName} ${attackBoost}/${defenseBoost}`, () => {
-    const battle = createBattle({species: species1, level: 50, ability: 'Rough Skin', moves: [moveName]},
-      {species: species2, level: 50, ability: 'Stamina', moves: ['Draco Meteor']});
-    const source = battle.p1.active[0];
-    const target = battle.p2.active[0];
-    source.boosts.atk = source.boosts.spa = attackBoost;
-    target.boosts.def = target.boosts.spd = defenseBoost;
-    refreshMoveRequest(battle);
-    // Native admission is mandatory before calling the internal evaluator.
-    assert.ok(createTerminalEnvelope(battle));
+for (const [first, hp] of [['Power Gem', 30], ['Hydro Pump', 20], ['Frost Breath', 14]] as const) {
+  test(`probabilistic KO partitions enclose native damage and accuracy: ${first}`, () => {
+    const battle = probabilityPosition(first);
+    battle.p2.active[0].setItem('');
+    setHP(battle, 'p2', hp);
     const snapshot = snapshotBattle(battle);
-    const actual = damageRange(battle, source, target, battle.dex.moves.get(moveName), Infinity);
-    const native = restoreBattle(snapshot);
-    const expected = exhaustiveDamageRange(native, native.p1.active[0], native.p2.active[0],
-      native.dex.moves.get(moveName));
-    assert.deepEqual(actual, expected);
+    const before = JSON.stringify(snapshot);
+    const certificate = envelope(battle);
+    assert.ok(certificate);
+    const oracle = nativeInterval(snapshot, legalActions(battle, 0)[0], legalActions(battle, 1)[0]);
+    assert.ok(certificate.lower <= oracle.lower + 1e-9);
+    assert.ok(certificate.upper >= oracle.upper - 1e-9);
+    assert.ok(certificate.lower > -1 && certificate.upper < 1, 'both terminal events have known positive mass');
+    assert.ok(certificate.lower <= certificate.upper);
+    assert.equal(JSON.stringify(snapshotBattle(battle)), before);
   });
 }
+
+test('Torrent HP regimes and berry healing keep native response mass enclosed', () => {
+  const battle = probabilityPosition('Water Gun', 'Hydro Pump');
+  setHP(battle, 'p1', 100);
+  setHP(battle, 'p2', 40);
+  const certificate = envelope(battle);
+  assert.ok(certificate);
+  const oracle = nativeInterval(snapshotBattle(battle), legalActions(battle, 0)[0], legalActions(battle, 1)[0]);
+  assert.ok(certificate.lower <= oracle.lower + 1e-9);
+  assert.ok(certificate.upper >= oracle.upper - 1e-9);
+});
+
+test('a first secondary is left unknown instead of assuming the response can act', () => {
+  const battle = probabilityPosition('Thunderbolt', 'Power Gem');
+  const certificate = envelope(battle);
+  assert.ok(certificate);
+  // Use the already independently audited simulator distribution here:
+  // raw random(100) secondary leaves otherwise multiply the oracle by 100.
+  const native = enumerateTurn(snapshotBattle(battle), legalActions(battle, 0)[0], legalActions(battle, 1)[0]);
+  const lower = native.outcomes.reduce((sum, outcome) => sum + outcome.probability * (outcome.utility ?? -1), 0);
+  const upper = native.outcomes.reduce((sum, outcome) => sum + outcome.probability * (outcome.utility ?? 1), 0);
+  assert.ok(certificate.lower <= lower + 1e-9);
+  assert.ok(certificate.upper >= upper - 1e-9);
+});
+
+test('an explicit no-crit native damage rule is not assigned ordinary critical mass', () => {
+  const battle = probabilityPosition();
+  const definition: any = battle.dex.moves.get('powergem');
+  const descriptor = Object.getOwnPropertyDescriptor(definition, 'willCrit');
+  try {
+    definition.willCrit = false;
+    const certificate = envelope(battle);
+    assert.ok(certificate);
+    const oracle = nativeInterval(snapshotBattle(battle), legalActions(battle, 0)[0], legalActions(battle, 1)[0]);
+    assert.ok(certificate.lower <= oracle.lower + 1e-9);
+    assert.ok(certificate.upper >= oracle.upper - 1e-9);
+  } finally {
+    if (descriptor) Object.defineProperty(definition, 'willCrit', descriptor);
+    else delete definition.willCrit;
+  }
+});
+
+
+test('Torrent callbacks require their audited event slots', () => {
+  const battle = probabilityPosition('Water Gun', 'Hydro Pump');
+  const ability: any = battle.dex.abilities.get('torrent');
+  const descriptor = Object.getOwnPropertyDescriptor(ability, 'onBasePower');
+  try {
+    ability.onBasePower = ability.onModifySpA;
+    assert.equal(auditNativeRules(battle), true);
+    assert.equal(createTerminalEnvelope(battle), null);
+  } finally {
+    if (descriptor) Object.defineProperty(ability, 'onBasePower', descriptor);
+    else delete ability.onBasePower;
+  }
+});
+
+test('Champions full PP special-attack cells expose partial terminal mass', () => {
+  for (const hp of [50, 100]) {
+    const fixture = championsCases().find(entry => entry.id === `primarina-${hp}-vs-archaludon-100`);
+    const battle = createChampionsBattle(fixture);
+    const first = legalActions(battle, 0).find(action => action.id === 'moonblast');
+    const reply = legalActions(battle, 1).find(action => action.id === 'thunderbolt');
+    const certificate = createTerminalEnvelope(battle)?.(snapshotBattle(battle), first, reply);
+    assert.ok(certificate, `partial certificate at HP ${hp}`);
+    assert.ok(certificate.lower > -1 || certificate.upper < 1);
+    assert.ok(certificate.lower <= certificate.upper);
+  }
+});
