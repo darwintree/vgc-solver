@@ -113,6 +113,15 @@ function admittedAbility(pokemon) {
     !['mimikyu', 'mimikyutotem'].includes(pokemon.species.id);
 }
 
+function admittedItem(pokemon) {
+  const item = pokemon.getItem();
+  if (!admittedHooks(item, itemHooks)) return false;
+  // Recoil can cross the healing threshold even when initial HP is above
+  // half. The fixed initial-HP interval does not cover that callback mix.
+  return !(item.onAfterMoveSecondarySelf === lifeOrb.onAfterMoveSecondarySelf &&
+    item.onUpdate === berry.onUpdate);
+}
+
 function maximumRecoil(pokemon) {
   return pokemon.getItem().onAfterMoveSecondarySelf === lifeOrb.onAfterMoveSecondarySelf
     ? Math.ceil(pokemon.baseMaxhp / 10) : 0;
@@ -129,7 +138,7 @@ function admittedState(battle) {
       !pokemon.terastallized && !pokemon.transformed && !pokemon.addedType && pokemon.getTypes().length <= 2 &&
       !Object.keys(pokemon.volatiles).length &&
       admittedAbility(pokemon) &&
-      admittedHooks(pokemon.getItem(), itemHooks) && admittedHooks(pokemon.baseSpecies, noHooks)));
+      admittedItem(pokemon) && admittedHooks(pokemon.baseSpecies, noHooks)));
 }
 
 function torrentRelevant(source, move) {

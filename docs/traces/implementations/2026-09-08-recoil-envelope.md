@@ -26,3 +26,13 @@ Native oracle checks cover recoil boundaries, first and responding holders, inta
 
 Validation:
 Typecheck/build pass. Initial terminal suite passed37 tests; two combined Play Rough response fixtures exceeded the existing50,000-branch independent native oracle limit, without a certificate containment failure. Separating response survival/crit checks (Shadow Claw) from first-hit accuracy/secondary checks (Play Rough) retained native rule coverage without raising the branch limit. The focused final11 tests all pass, including both formerly oversized survival fixtures. No production fix was needed.
+
+### 2. Reject a native callback mixture that crosses the healing threshold
+
+Type: interpretation
+
+Review finding: “A custom item can combine native Life Orb recoil with Sitrus healing in their original slots. Recoil can cross half HP and heal above initial HP, outside possibleHP's initial-threshold interval.”
+
+Triage: grounded=true; accurate=true; reachable=true; material=true; owned=true. The independent callback-slot admission permits this combination and native-source audit accepts each callback. Response checks all pass: the minimal guard addresses the mechanism, preserves the supported native item domain, retains safe unknown fallback, and has a direct regression test.
+
+Decision: reject an item carrying both the native recoil callback and native healing updater. Do not approximate the newly reachable healing state or change ordinary Life Orb/Sitrus behavior.

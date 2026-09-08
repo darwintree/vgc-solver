@@ -457,3 +457,27 @@ test('first Life Orb accuracy and secondary branches remain inside native bounds
   refreshMoveRequest(battle);
   assert.ok(assertNativeEnclosure(battle));
 });
+
+
+test('combined native recoil and healing callbacks fall back before crossing the berry threshold', () => {
+  const battle = bustedPosition('Shadow Claw', 'Moonblast');
+  setHP(battle, 'p1', 70);
+  refreshMoveRequest(battle);
+  const item = battle.dex.items.get('lifeorb') as any;
+  const berry = battle.dex.items.get('sitrusberry') as any;
+  const events = ['onUpdate', 'onTryEatItem', 'onEat'];
+  const descriptors = events.map(event => Object.getOwnPropertyDescriptor(item, event));
+  try {
+    for (const event of events) item[event] = berry[event];
+    assert.equal(auditNativeRules(battle), true, 'each callback has native source and event slot');
+    assert.ok(battle.p1.active[0].hp > battle.p1.active[0].maxhp / 2);
+    assert.ok(battle.p1.active[0].hp - Math.floor(battle.p1.active[0].baseMaxhp / 10) <=
+      battle.p1.active[0].maxhp / 2, 'recoil can newly activate healing');
+    assert.equal(envelope(battle), null);
+  } finally {
+    for (const [index, event] of events.entries()) {
+      if (descriptors[index]) Object.defineProperty(item, event, descriptors[index]);
+      else delete item[event];
+    }
+  }
+});
