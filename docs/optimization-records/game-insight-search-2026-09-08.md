@@ -1,12 +1,56 @@
-# 游戏见解与可扩展搜索：部分改善与停止交付
+# 游戏见解与可扩展搜索：部分改善与本轮收尾
 
 本轮目标是固定 Champions 快照全部 54 项受支持 case，在原生满 PP、同步 workers=0、冷进程、10 秒 search、0.02 区间宽度下收敛。351 项不支持／缺失输入仍跳过。标准 fixture 与完整功能测试另作回归。用户随后要求结束已启动的一轮测量、停止继续探索并创建 PR；54/54 目标未达成。本记录保留已验证改进、负结果和停止的候选，不把部分改善写成目标完成。
 
 ## 交付状态
 
-基线为 **29/54**；首次无提示组合 `682e043` 为 **49/54**。随后 `73fe8b6`（prepared／概率／反伤安全包络候选）的全量初步筛查为 **50/54**，仍有4项未达标。这个结果属于该候选的一次冷进程筛查，不能代替最终 PR 版本验收，也不能把组合收益分摊给某个单独优化。**最终代码为 `a5a116c`，已包含累计概率数值修复并通过typecheck/build与65项focused测试；完整功能套件和最终全量筛查仍待确认，逐项时间与区间暂不落定。**
+最终代码为 `a5a116c`，含累计概率数值修复；带完整文档的测量提交为 **`bb78629375e7c9876a8b269637f3acacfb73bd4c`**。最终全量筛查 **50/54达标、4项未达标、351项跳过，0 error／watchdog**。相比 `51acee3` 基线29/54新增21项，基线29项均保持达标；相比首次组合 `682e043` 的49项也没有分类回归。**54/54目标未达成，用户要求停止继续探索并交付部分改善。**
 
-初步剩余项是西狮海壬50／铝钢桥龙100、西狮海壬100／铝钢桥龙100、西狮海壬100／谜拟丘50、西狮海壬100／谜拟丘100；最终列表以修复后完整筛查为准。所有版本保持原生最大 PP（含 PP Up）、同步 workers=0、无预热、每例新进程、10,000 ms search 预算和0.02区间宽度。prepare、search、total 分开记录；总耗时包括准备与 fixture 创建，不能把 search 限额称为端到端10秒保证。
+[最终原始数据](data/game-insight-search-2026-09-08/final-bb78629.jsonl)保留全部405项及环境信息。每项新进程、无预热、单样本，原生最大PP（含PP Up）、同步workers=0、10,000ms search预算、0.02区间宽度；Node24.20.0、模拟器0.10.11。prepare、search、total分开记录，总耗时还包含fixture创建，不能把search限额称为端到端10秒保证。表内数值按展示精度取舍，完整证书端点以JSONL为准。
+
+| 最终未达标项（双方HP%） | 安全区间 | prepare / search / total（ms） |
+| --- | --- | --- |
+| 西狮海壬50／铝钢桥龙100 | `[-0.922135417,-0.871545272]` | 163.39 / 10000.64 / 10172.10 |
+| 西狮海壬100／铝钢桥龙100 | `[-0.169824557,0.998572161]` | 163.88 / 10001.99 / 10174.23 |
+| 西狮海壬100／谜拟丘50 | `[-0.478869390,-0.043089558]` | 164.79 / 10001.45 / 10176.05 |
+| 西狮海壬100／谜拟丘100 | `[-0.990615195,0.587421056]` | 162.53 / 10000.30 / 10171.30 |
+
+铝钢桥龙100／谜拟丘100本次search4283.13ms、区间`[0.783358271,0.803125000]`；西狮海壬100／铝钢桥龙50为8072.15ms、区间`[0.970963235,0.990874175]`。二者及4个未达标项各另作两次冷进程复测，均未改变分类；标准fixture性能对照另列。单次全量扫描与少量重复均不是跨环境保证。
+
+最终代码已通过typecheck/build、[65项focused测试](data/game-insight-search-2026-09-08/pr-integrated-focused.log)及[完整258/258测试](data/game-insight-search-2026-09-08/pr-final-full-suite.log)。功能测试与性能分开执行，全部测试通过不等于限时54项目标达成。
+
+## 最终重点项重复验收
+
+在全量样本之外，[第二次](data/game-insight-search-2026-09-08/pr-final-repeat-2.jsonl)和[第三次](data/game-insight-search-2026-09-08/pr-final-repeat-3.jsonl)继续使用 `bb78629`、相同原生PP、workers=0、无预热、每例独立进程。下表是三次样本的分项中位数；各分项独立取中位数，不应强行相加。
+
+| 对局（HP%） | 达标／样本 | prepare / search / total中位数（ms） | 区间宽度范围 |
+| --- | --- | --- | --- |
+| 西狮海壬50／铝钢桥龙100 | 0/3 | 164.53 / 10000.57 / 10173.67 | 0.050590–0.051882 |
+| 西狮海壬100／铝钢桥龙100 | 0/3 | 163.62 / 10001.99 / 10173.27 | 1.168326–1.168397 |
+| 西狮海壬100／谜拟丘50 | 0/3 | 164.53 / 10000.40 / 10173.64 | 0.424453–0.435780 |
+| 西狮海壬100／谜拟丘100 | 0/3 | 163.71 / 10000.45 / 10172.61 | 1.578036–1.578145 |
+| 铝钢桥龙100／谜拟丘100 | 3/3 | 162.90 / 4284.99 / 4457.65 | 0.019667–0.019983 |
+| 西狮海壬100／铝钢桥龙50 | 3/3 | 163.60 / 8164.56 / 8336.56 | 0.019911–0.019929 |
+
+铝钢桥龙／谜拟丘的三次search为4.283–4.323秒；西狮海壬／半血铝钢桥龙为8.072–8.204秒。其余48个受支持项没有本轮三次重复覆盖，不把6项重复结果扩大为54项全部重复验收。
+
+## 标准fixture性能对照
+
+[原始对照](data/game-insight-search-2026-09-08/pr-standard-comparison.jsonl)比较基线 `51acee3` 与最终 `bb78629`，每版本、每fixture各3个独立冷进程，无预热、sync workers=0、bounded search10,000ms／容差0.02。双方均为3/3收敛。未传 `--pp`：`sucker-punch` 使用其原生最大PP；`leftovers` 保留fixture原设的Seismic Toss4PP／Protect1PP，**不是Champions原生满PP输入**，也不纳入54项计数。
+
+| fixture | 基线prepare / search / total中位数（ms） | 最终prepare / search / total中位数（ms） |
+| --- | --- | --- |
+| sucker-punch | 179.29 / 922.71 / 1112.67 | 182.51 / 937.54 / 1130.33 |
+| leftovers | 179.57 / 309.64 / 497.28 | 179.16 / 314.84 / 501.12 |
+
+两项最终search中位数分别高约1.6%和1.7%，不能称为这两项加速；三次小样本不足以判断如此小的差异是否稳定。这里确认在相同fixture输入下仍收敛，并如实保留时间变化。完整转移已有PP模板复用不变，同步native渐进路径不使用模板的边界见[有界搜索](../optimization-techniques/bounded-search.md)。
+
+复现每个冷进程使用已有CLI，三次分别启动，构建与测量分开：
+
+```bash
+node dist/src/benchmark.js --case sucker-punch --solver bounded --search-ms 10000 --runs 1
+node dist/src/benchmark.js --case leftovers --solver bounded --search-ms 10000 --runs 1
+```
 
 ## 基线与测量
 
@@ -56,9 +100,11 @@
 | P2 proof gap — Effective third types bypass the stated overflow bound | terminal-envelope damage bound | T/T/T/T/T | T/T/T/T | fix | `f803c31` 拒绝 addedType 并检查有效类型数；guard 与真实 Champions 证书测试通过。修复的是可达证明域缺口，未宣称复现 stock Champions 错值 |
 | P2 — Capture the audited immunity implementation instead of comparing against the mutable prototype | simulator query audit | T/T/T/T/T | T/T/T/T | fix | `7f35491` 捕获 import-time Dex 查询 identity；无 PRNG 内省的原生状态修改反例复现 immunity 分布 12 对 1、effectiveness 分布 42 对 44，修复后全状态分布一致 |
 
+最终交付复审另发现 **P1 — independently normalizing cumulative partial batches can preserve a false certificate**：每批独立归一化与单调区间求交会保留过紧端点。该项已确认并由 `48f5f23` 修复，详见[复审与数学反例](data/game-insight-search-2026-09-08/final-code-review.md)、[旧实现6/12反例失败](data/game-insight-search-2026-09-08/partial-rounding-red-detail.log)和[修复后54项聚焦验证](data/game-insight-search-2026-09-08/partial-rounding-green.log)。最终组合的65项及258项验证见首节；不把较早审查中的“待验证”状态视为最终状态。
+
 ## 第四轮调度消融
 
-`7be204d` 将“继续随机枚举的剩余不确定性”与所有可展开后继的概率加权宽度之和比较，替代与最大单个后继比较；端点计算不变。46 项 focused 测试通过。[五项串行单样本](data/game-insight-search-2026-09-08/probability-sum.jsonl)中，铝钢桥龙 100／谜拟丘 100 于 9162.45 ms 达标，西狮海壬 100／谜拟丘 50 宽度改善，但另三项宽度退化；当前不全量采纳。特别是“总不确定性更多”不代表单位时间能消除更多不确定性，后续诊断转向实际转移与后继证明成本。
+`7be204d` 将“继续随机枚举的剩余不确定性”与所有可展开后继的概率加权宽度之和比较，替代与最大单个后继比较；端点计算不变。46 项 focused 测试通过。[五项串行单样本](data/game-insight-search-2026-09-08/probability-sum.jsonl)中，铝钢桥龙 100／谜拟丘 100 于 9162.45 ms 达标，西狮海壬 100／谜拟丘 50 宽度改善，但另三项宽度退化；未采用。特别是“总不确定性更多”不代表单位时间能消除更多不确定性，后续诊断转向实际转移与后继证明成本。
 
 ## 计算热点与功能回归
 
@@ -73,11 +119,11 @@
 
 独立的[证明负担诊断](data/game-insight-search-2026-09-08/proof-obligation-diagnostic-summary.md)显示约 94% search 花在转移／cursor，接受后继约 3.6–4.7%，backup 与选择合计不足 2%。大后继数本身不证明浪费；诊断按根的每个对手回应约束列出质量与未知区间。该证据支持转移吞吐优化，并提示需要结合实际证明成本选择工作，暂不支持“累计复制是主因”。
 
-`682e043` 已完成 typecheck/build、相关 focused 测试及 `node --test --test-concurrency=4 dist/test/*.test.js`。[全量日志](data/game-insight-search-2026-09-08/validated-full-suite.log)记录 33 个测试文件中 32 个通过，唯一失败为 types 测试启动 TypeScript 子进程被沙箱 `spawnSync EPERM` 拦截；同一 `node --test dist/test/types.test.js` 提权运行通过。未为此修改代码或放宽类型断言。后续最终候选仍须重新完成相关验证。
+`682e043` 已完成 typecheck/build、相关 focused 测试及 `node --test --test-concurrency=4 dist/test/*.test.js`。[全量日志](data/game-insight-search-2026-09-08/validated-full-suite.log)记录 33 个测试文件中 32 个通过，唯一失败为 types 测试启动 TypeScript 子进程被沙箱 `spawnSync EPERM` 拦截；同一 `node --test dist/test/types.test.js` 提权运行通过。未为此修改代码或放宽类型断言。最终候选已另行完成65项focused及258项完整验证，见首节。
 
 ## 概率包络与强制行动诊断
 
-`792ff3e` 将原生单击暴击／伤害分布、命中率、Torrent HP 区域及回复果阈值组合为局部终局质量界。附加效果发生的质量保留未知；回复必胜质量使用先手 KO 概率上界的补集，避免重复认领概率。[33 项 focused 测试](data/game-insight-search-2026-09-08/probability-envelope-validation-final.log)通过，但[五项消融](data/game-insight-search-2026-09-08/probability-envelope.jsonl)未解决任一剩余 case：西狮海壬 50／铝钢桥龙 100 宽度退化至 0.15068，满血陆鲨／铝钢桥龙耗时增加至 3965 ms。额外证明计算未带来本轮收益，当前不采纳。
+`792ff3e` 将原生单击暴击／伤害分布、命中率、Torrent HP 区域及回复果阈值组合为局部终局质量界。附加效果发生的质量保留未知；回复必胜质量使用先手 KO 概率上界的补集，避免重复认领概率。[33 项 focused 测试](data/game-insight-search-2026-09-08/probability-envelope-validation-final.log)通过，但[五项消融](data/game-insight-search-2026-09-08/probability-envelope.jsonl)未解决任一剩余 case：西狮海壬 50／铝钢桥龙 100 宽度退化至 0.15068，满血陆鲨／铝钢桥龙耗时增加至 3965 ms。额外证明计算未带来该次独立消融的收益，当时未采纳；后续prepared／反伤组合另行验收，不能混同两个版本。
 
 满血西狮海壬／谜拟丘的原生 Encore×Swords Dance 后继只有一个，下一回合合法维度为 4×1，Encore 剩余 duration=3。初始局面的 10 秒搜索仍把该后继留在约 `[-0.9417,1]`；[把同一后继独立作为根](data/game-insight-search-2026-09-08/encore-child-auto.json)，现有 auto 调度却在 191.5 ms 内得到 `[0.9892187497,1]`，使用 Moonblast 纯策略。[固定 P1 首行动对照](data/game-insight-search-2026-09-08/encore-child-policy.json)也得到同一区间，248.2 ms；这只是诊断，固定行动的上界不能移作完整游戏上界。证据支持“已存在便宜的证明，但全局调度未及时完成”，不支持另建重复的策略评估器。
 
@@ -85,7 +131,7 @@
 
 | 候选 | 证据与取舍 |
 | --- | --- |
-| `2cc0f75` 融合原生编码与 JSON 规范化，后续元数据修正 `72a6f34` | [五项配对](data/game-insight-search-2026-09-08/snapshot-paired-corrected.jsonl)吞吐收益小且混合，没有新增收敛；[39 项 focused 验证](data/game-insight-search-2026-09-08/snapshot-validation-final.log)通过。当前保留为实验，计时对应 `2cc0f75`；修正版尚未重复计时。原记录 workers=1 是元数据笔误，实际入口直接运行同步 BoundedSolver，修正为 workers=0/backend=sync；原始文件也保留 |
+| `2cc0f75` 融合原生编码与 JSON 规范化，后续元数据修正 `72a6f34` | [五项配对](data/game-insight-search-2026-09-08/snapshot-paired-corrected.jsonl)吞吐收益小且混合，没有新增收敛；[39 项 focused 验证](data/game-insight-search-2026-09-08/snapshot-validation-final.log)通过。未采用，计时对应 `2cc0f75`；修正版尚未重复计时。原记录 workers=1 是元数据笔误，实际入口直接运行同步 BoundedSolver，修正为 workers=0/backend=sync；原始日志保留在实验工作区，PR只保留更正后的副本 |
 | `333ddcc` joint 支持分数除以可见未完成工作数，与原始选择交替 | [五项测量](data/game-insight-search-2026-09-08/proof-cost.jsonl)无新增收敛，故不采用；估计工作数并不等于实际证明成本 |
 | 终局包络损耗定位 | [满血陆鲨诊断](data/game-insight-search-2026-09-08/envelope-cost-baseline.json)的 6480 次尝试均无证书，耗时 1776 ms／总 search 3536 ms。后续测试受审计伤害范围的随机端点计算，而非无条件保留昂贵证明 |
 
@@ -101,7 +147,7 @@
 | `4ca7d80` 按剩余预算和根不确定性份额保留证明 | 39项focused测试通过；局部／全局交替，份额钳制为[0,1] | 先到的无关义务占住唯一槽位，目标即使取得55–99%份额也没有局部服务；两次中间诊断均失败，因此未再跑5项。未采用；[诊断](data/game-insight-search-2026-09-08/proof-credit-summary.md) |
 | `abfe802`→`9a276bb`→`4f75d2d` 行动边界checkpoint | 最后版本28项focused测试通过；固定1725次重放的完整分布相同，减少重复捕获后攻击转移约15%改善 | 最后版本5个困难项全部未收敛，额外prepare约0.3秒；微基准收益不代表完整搜索改善。未采用；[摘要](data/game-insight-search-2026-09-08/action-checkpoint-prefix-summary.md)、[逐项数据](data/game-insight-search-2026-09-08/action-checkpoint-prefix.jsonl) |
 | `328e31b` prepared概率包络 | 29项包络测试通过；一次准备供同节点多个行动组合复用 | 独立版本仍未解决两个西狮海壬／铝钢桥龙项，不能单独采纳；它是后续反伤候选的底座，[摘要](data/game-insight-search-2026-09-08/prepared-envelope-summary.md) |
-| `73fe8b6` 反伤安全后继包络 | focused原生证书通过；准入放宽不绕过反伤或剩余未知质量 | 配对样本铝钢桥龙／谜拟丘10秒未收敛→4.05秒收敛，其余困难项混合。随后全量初筛50/54；最终修复版验收待确认。[配对摘要](data/game-insight-search-2026-09-08/recoil-envelope-summary.md)、[数据](data/game-insight-search-2026-09-08/recoil-envelope-paired.jsonl) |
+| `73fe8b6` 反伤安全后继包络 | focused原生证书通过；准入放宽不绕过反伤或剩余未知质量 | 配对样本铝钢桥龙／谜拟丘10秒未收敛→4.05秒收敛，其余困难项混合。随后全量初筛50/54；修复后最终组合也测得50/54，见首节。[配对摘要](data/game-insight-search-2026-09-08/recoil-envelope-summary.md)、[数据](data/game-insight-search-2026-09-08/recoil-envelope-paired.jsonl) |
 
 上述生命宝珠／画皮随机等价、渐进质量保留和受限证书与候选提示／缓存／调度必须分开看。提示、SUM分配、工作量分数、burst、单槽credit及checkpoint没有因功能测试通过而自动进入生产代码。较早概率／prepared包络独立负结果也不能直接替代后续组合的正确性与性能验收。
 
@@ -113,7 +159,7 @@
 
 最终复审发现，`dc8b03b` 按每批当前总质量归一化仍不能保证不同累计批次之间的单调证书安全：后续完成批次的允许总质量可能不同。`48f5f23` 改为未完成批次用允许的最大总质量 `1+1e-9` 缩放已完成概率，将全部残余留为未知；完成批次才按实际总质量归一化。这样早期区间包含所有被合同允许的最终归一化结果。该修复及组合准入守卫进入最终代码 `a5a116c`，不能省略为仅有吞吐收益的版本。
 
-最终代码已通过typecheck/build及[65项focused测试](data/game-insight-search-2026-09-08/pr-integrated-focused.log)。完整功能套件、标准fixture回归和54项完整扫描尚待验收证据。本文不把 `73fe8b6` 的初步50/54转写为最终PR成绩；最终确认后补入实际剩余项的区间与prepare/search/total，并保留error/watchdog/skipped计数。
+最终代码已通过typecheck/build、65项focused测试和完整258/258测试。修复后的 `bb78629` 全量结果与旧 `73fe8b6` 初筛分别保留；最终区间、时间与分类见首节，不能用初筛替代修复后的验收。重点项三次重复结果见首部；标准fixture的三次冷进程性能对照见首部。
 
 ## 已停止的工作
 
