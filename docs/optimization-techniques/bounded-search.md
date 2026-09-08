@@ -25,13 +25,34 @@ root = [0.75 + 0.25×(-1), 0.75 + 0.25×1] = [0.5, 1]
 
 多行动时不能把格子平均。P2 会选择回应，所以必须分别求上下界矩阵的博弈值；未知格仍然影响矩阵的安全界。
 
+## 同步渐进式转移
+
+同步原生 bounded 搜索以可续跑游标逐批生成随机转移；每批最多尝试 32 次整回合重放，并使用不晚于全局 deadline 的 25 ms 合作式截止。游标按待处理随机前缀的概率选择下一次重放，仍从原始回合 snapshot 重放，不保存回合中间的模拟器状态。每次返回累计完成的 outcomes 与尚未完成的概率质量 `remainingProbability`，已完成的质量不会单独归一化：
+
+```text
+cell.lower = Σ completedProbability × child.lower − remainingProbability
+cell.upper = Σ completedProbability × child.upper + remainingProbability
+```
+
+这些 partial 格可以参与上下界矩阵证明。单格只有 remainingProbability 为零、游标完成且所有后继 exact 时才可参与 exact 证书；节点 exact 还要求完整行动矩阵全部满足该条件。搜索可以在证书足够时结束，保留未枚举的概率质量；这不等同于省略概率分支。调度比较 `2 × remainingProbability` 与最大的 `child.probability × child.width`，选择继续枚举该格或沿已生成后继下降；其他行动格仍由现有矩阵证明调度选择。
+
+游标在随机调用的合作式截止处中断时，会保存当前已选择的前缀及其当前质量；此前放入队列的兄弟前缀保持独立，恢复时不会重复其概率质量。每次 advance 的 simulatorRuns 计入累计 stats；expandedCells 只在第一次接受该格时增加。单次模拟器调用仍不能被任意抢占。重放次数上限按整格游标累计，不会随 advance 重置。
+
+自定义 adapter 可以提供可选 createTurnCursor，未提供时保留完整 enumerateTurn 合同；普通 complete:false 返回仍表示转移不完整、不能被当作 partial 分布。exact 和 worker 路径继续使用完整 enumerateTurn。原生游标不使用 PP 转移模板，完整枚举路径的 PP 缓存不受影响。重复 PP 局面可能退化；大量近等概率叶仍需要大量重放，收益须由独立性能测量确定。
+
+接受渐进转移时，概率验证的总质量包含已完成 outcomes 与 remainingProbability。总和在既有数值容差内但不恰为一时，两部分统一除以该总质量；不会只按已探索部分归一化。这保持完整概率划分，并避免允许的总和误差超过节点数值保护余量后产生过紧区间。
+
 ## 一回合终局包络
 
 同步 native bounded 路径在初始化行动格时尝试受限包络：原生伤害范围证明先手无论命中数、暴击与伤害随机如何均不能击倒后手，且后手命中时其最小伤害仍足以击倒先手。后手命中概率由原生 accuracy 阶段和 uint32 离散随机质量给出；未命中质量仍保持未知。例如 P2 命中概率为 `p` 时，格区间为 `[-1, 1-2p]`（另含数值保护余量）。
 
 这只是一份区间证书，不是完整转移分布。`outcomes` 仍为空，`exactCertified` 仍为 false；若继续生成实际转移，区间仅与已有包络求交集。矩阵维度与所有合法行动保留不变。
 
-首轮准入仅覆盖 Gen9 双方各最后一只、无异常或场地状态、固定威力的非接触单目标招式。原生函数 identity 审计仅允许已证明单调的防御增加及受击者回复等少量效果；动态威力、未分类事件、保护、替身、吸血、自伤、速度平局及伤害截断溢出区域均回退。完整准入见 [terminal-envelope.ts](../../src/terminal-envelope.ts)；包络不外推至双打、换人或未审计规则。
+当前准入仅覆盖 Gen9 双方各最后一只、无异常或场地状态、固定威力的非接触单目标招式。原生函数 identity 审计仅允许已证明单调的防御增加及受击者回复等少量效果；动态威力、未分类事件、保护、替身、吸血、自伤、速度平局及伤害截断溢出区域均回退。
+
+伤害范围在上述守卫内分别计算非暴击／暴击与随机 roll 的两个端点，共四次原生伤害计算。准入排除了原生 16 位溢出，余下后置倍率、取整与最小伤害钳制保持单调，所以端点覆盖该受限路径的最小和最大伤害；这不是任意招式的通用范围器。
+
+先手持有可回复自身的文柚果或满 HP 气势披带时不建立该证书；后手的受击回复与持久力防御增加只用于已证明安全的方向。完整准入见 [terminal-envelope.ts](../../src/terminal-envelope.ts)；包络不外推至双打、换人或未审计规则。
 
 ## 前沿选择与证明方向
 
@@ -64,11 +85,11 @@ upper-solution 的 P1 概率
 
 ## 已生成未知格、循环与图回退
 
-行动格一旦生成，就保存完整随机后继和概率。若选中的已生成格传播后仍为完整 `[-1, 1]`，它没有提供方向信息；在下降到这个后继前，会先扫描当前节点的未生成兄弟格。security 下界证明优先同一行，再同一列，再其余格；上界证明优先同一列，再同一行，再其余格，同级按支持度与宽度排序。joint 本身已优先处理未生成格。这避免忽略同一矩阵中仍能提供证据的行动组合；兄弟格规则只改变调度顺序，保留未知格的 `[-1,1]` 语义。
+行动格开始生成后，保存累计完成的随机后继和概率；渐进格另保留游标及未完成质量。若选中的已生成格传播后仍为完整 `[-1, 1]`，它没有提供方向信息；在下降到这个后继前，会先扫描当前节点的未生成兄弟格。security 下界证明优先同一行，再同一列，再其余格；上界证明优先同一列，再同一行，再其余格，同级按支持度与宽度排序。joint 本身已优先处理未生成格。这避免忽略同一矩阵中仍能提供证据的行动组合；兄弟格规则只改变调度顺序，保留未知格的 `[-1,1]` 语义。
 
 异步版继承相同的 `_selectFrontier` sibling 选择。它的差异在于 `_cellBatch` 可以把多个未生成格一次交给 worker：选中的 frontier 格优先，其余格按当前支持度和间隔组成批次。worker 的完成顺序不改变主线程持有的区间和证书规则。
 
-如果 security 和 joint 都因循环、不可用后继或没有可展开支持而返回空，`_findAnyFrontier` 会扫描已经 intern 的图：跳过终局和区间已足够窄的节点，选择尚未初始化的节点或尚未生成的行动格。它只恢复可达图上的工作机会，不把循环当作已解，也不删除任何行动。若图中确实没有可展开工作，结果保持当前安全区间并报告停滞或节点限制。
+如果 security 和 joint 都因循环、不可用后继或没有可展开支持而返回空，`_findAnyFrontier` 会扫描已经 intern 的图：跳过终局和区间已足够窄的节点，选择尚未初始化的节点、尚未生成的行动格或仍有游标的未完成格。它只恢复可达图上的工作机会，不把循环当作已解，也不删除任何行动。若图中确实没有可展开工作，结果保持当前安全区间并报告停滞或节点限制。
 
 循环节点的上下界只会在端点有用地收窄时传播；当前实现不是随机博弈不动点求解器。访问过自身或其他已在路径中的节点，不能推出 exact 或收敛。
 
@@ -84,26 +105,8 @@ upper-solution 的 P1 概率
 
 异步版把选中的前沿工作交给常驻 worker 批次。主线程拥有节点、矩阵、区间 backup 和前沿选择；worker 只生成直接转移。`_cellBatch` 按当前策略支持度和格宽度排序，把选中的 frontier 格放到批次前面，并最多提交 `min(workerCount, batchSize, 未生成格数)` 个格子。批次内可能同时生成多个行动格，所以计时边界和完成顺序与同步版不同；区间传播仍在主线程按返回结果完成。worker 不兼容固定原生规则、使用自定义 adapter 或规则审计失败时回退同步 backend。
 
-同步与异步都在转移和 backup 边界检查 deadline；原生模拟器调用本身不能被抢占，正在运行的调用可能使实际 elapsed 超过预算。转移返回 `complete: false` 时，该格保持未知区间，搜索不能把它当作已知效用。
+同步与异步都在转移和 backup 边界检查 deadline；原生模拟器调用本身不能被抢占，正在运行的调用可能使实际 elapsed 超过预算。完整枚举返回 `complete: false` 时，不接受该次不完整结果；带 `remainingProbability` 的游标结果则按前述部分质量公式参与证明，剩余部分始终未知。
 
 该算法针对当前一只 active 对一只 active、有限 PP 和有限离散随机分支的 1v1 状态图。它不是完整单打换人、队伍选择、双打或完整 Simultaneous Move Alpha-Beta（SMAB）求解器；真正可再生的循环需要独立的不动点随机博弈算法。规则审计、双精度矩阵、状态序列化和随机等价优化依赖固定的 `@pkmn/sim` 版本，升级后必须重新验证。
 
-本轮实测见[策略证书搜索记录](../optimization-records/strategy-certificates-2026-09-07.md)，不把单个 case 的成绩外推到其他局面。运行口径见[benchmark 指南](../benchmarking.md)；实现索引见 [bounded-solver.ts](../../src/bounded-solver.ts) 的 `_cellBounds`、`_refresh`、`_backupFrom`、`_selectFrontier`、`_findAnyFrontier`，以及 [async-bounded-solver.ts](../../src/async-bounded-solver.ts) 的批次展开。验证包括 [bounded-solver.test.ts](../../test/bounded-solver.test.ts)、[bounded-stochastic.test.ts](../../test/bounded-stochastic.test.ts)、[bounded-strategy-proof.test.ts](../../test/bounded-strategy-proof.test.ts) 和 [bounded-native-certificate.test.ts](../../test/bounded-native-certificate.test.ts)。
-
-
-## 同步渐进式转移候选
-
-同步原生 bounded 搜索以可续跑游标逐批生成随机转移；每批最多 32 次整回合重放，并使用 25 ms 合作式截止。游标按待处理随机前缀的概率选择下一次重放，仍从原始回合 snapshot 重放，不保存回合中间的模拟器状态。每次返回累计完成的 outcomes 与尚未完成的概率质量 `remainingProbability`，已完成的质量不会单独归一化：
-
-```text
-cell.lower = Σ completedProbability × child.lower − remainingProbability
-cell.upper = Σ completedProbability × child.upper + remainingProbability
-```
-
-这些 partial 格可以参与上下界矩阵证明。只有 remainingProbability 为零、游标完成且所有后继 exact 时才允许 exactCertified。搜索可以在证书足够时结束，保留未枚举的概率质量；这不等同于省略概率分支。调度比较 `2 × remainingProbability` 与最大的 `child.probability × child.width`，选择继续枚举该格或沿已生成后继下降；其他行动格仍由现有矩阵证明调度选择。
-
-游标在随机调用的合作式截止处中断时，会保存当前已选择的前缀及其当前质量；此前放入队列的兄弟前缀保持独立，恢复时不会重复其概率质量。每次 advance 的 simulatorRuns 计入累计 stats；expandedCells 只在第一次接受该格时增加。单次模拟器调用仍不能被任意抢占。
-
-自定义 adapter 可以提供可选 createTurnCursor，未提供时保留完整 enumerateTurn 合同；普通 complete:false 返回仍表示转移不完整、不能被当作 partial 分布。exact 和 worker 路径继续使用完整 enumerateTurn。本候选的原生游标暂不使用 PP 转移模板，有重复 PP 局面的性能退化风险；大量近等概率叶仍需要大量重放，需以独立性能测量评估。
-
-接受渐进转移时，概率验证的总质量包含已完成 outcomes 与 remainingProbability。总和在既有数值容差内但不恰为一时，两部分统一除以该总质量；不会只按已探索部分归一化。这保持完整概率划分，并避免允许的总和误差超过节点数值保护余量后产生过紧区间。
+历史策略调度实测见[策略证书搜索记录](../optimization-records/strategy-certificates-2026-09-07.md)，不把单个 case 的成绩外推到其他局面。运行口径见[benchmark 指南](../benchmarking.md)；实现索引见 [bounded-solver.ts](../../src/bounded-solver.ts) 的 `_cellBounds`、`_refresh`、`_backupFrom`、`_selectFrontier`、`_findAnyFrontier`，以及 [async-bounded-solver.ts](../../src/async-bounded-solver.ts) 的批次展开、[progressive-transition.ts](../../src/progressive-transition.ts) 的游标和 [terminal-envelope.ts](../../src/terminal-envelope.ts) 的受限包络。验证包括 [bounded-solver.test.ts](../../test/bounded-solver.test.ts)、[bounded-stochastic.test.ts](../../test/bounded-stochastic.test.ts)、[bounded-strategy-proof.test.ts](../../test/bounded-strategy-proof.test.ts)、[bounded-native-certificate.test.ts](../../test/bounded-native-certificate.test.ts)、[progressive-transition.test.ts](../../test/progressive-transition.test.ts) 和 [terminal-envelope.test.ts](../../test/terminal-envelope.test.ts)。
