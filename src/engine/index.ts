@@ -49,4 +49,11 @@ export {
 } from './damage';
 export {stepBattle} from './turn';
 export {compareTurnWithShowdown, type ParityReport} from './parity';
-export {createEngineBoundedAdapter, type EngineActionEntry, type EngineAdapterOptions} from './adapter';
+export {
+  createEngineBoundedAdapter,
+  createMonotoneAnalyzer,
+  createMonotoneSignature,
+  type EngineActionEntry,
+  type EngineAdapterOptions,
+  type MonotoneAnalyzer,
+} from './adapter';

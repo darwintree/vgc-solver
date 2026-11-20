@@ -262,6 +262,90 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
     compileSide(battle.p2, 'p2'),
   ];
 
+  // Compute exact fine-grained reader bits so unused historical fields never split equivalent states
+  const allTeamMoves = (s: 0 | 1) => sides[s].team.flatMap(p => p.moves);
+  const allTeamAbilities = (s: 0 | 1) =>
+    sides[s].team.flatMap(p => [p.abilitySpec, ...(p.megaForme ? [p.megaForme.abilitySpec] : [])]);
+  const hasTransformAny = [0, 1].some(s =>
+    allTeamMoves(s as 0 | 1).some(m => m.specialKind === 'transform' || m.specialKind === 'copycat') ||
+    allTeamAbilities(s as 0 | 1).some(a => a.imposter)
+  );
+  for (const s of [0, 1] as const) {
+    const opp: 0 | 1 = s === 0 ? 1 : 0;
+    const moves = allTeamMoves(s);
+    const abs = allTeamAbilities(s);
+    if (moves.some(m => m.specialKind === 'copycat')) {
+      featureMask |= FeatureBit.FIELD_LAST_MOVE | FeatureBit.LAST_MOVE_ID;
+    }
+    if (moves.some(m => m.specialKind === 'instruct' || m.specialKind === 'uproar')) {
+      featureMask |= FeatureBit.LAST_MOVE_ID;
+    }
+    if (moves.some(m => m.specialKind === 'stomping-tantrum')) {
+      featureMask |= FeatureBit.LAST_MOVE_FAILED;
+    }
+    if (moves.some(m => m.specialKind === 'recycle') || abs.some(a => a.harvest)) {
+      featureMask |= FeatureBit.LAST_ITEM;
+    }
+    if (moves.some(m => m.specialKind === 'belch')) {
+      featureMask |= FeatureBit.ATE_BERRY;
+    }
+    const readsOppLastMoveIdx =
+      moves.some(m => m.specialKind === 'encore' || m.specialKind === 'disable' || m.specialKind === 'spite' || m.specialKind === 'torment') ||
+      abs.some(a => a.cursedBody);
+    if (readsOppLastMoveIdx) {
+      featureMask |= opp === 0 ? FeatureBit.SIDE0_LAST_MOVE_IDX : FeatureBit.SIDE1_LAST_MOVE_IDX;
+      if (hasTransformAny) {
+        featureMask |= s === 0 ? FeatureBit.SIDE0_LAST_MOVE_IDX : FeatureBit.SIDE1_LAST_MOVE_IDX;
+      }
+    }
+  }
+
+  // Determine whether SpA (boosts[2]) and SpD (boosts[3]) can ever be observed.
+  const anyGlobalBoostReader = [0, 1].some(s => {
+    const moves = allTeamMoves(s as 0 | 1);
+    const abs = allTeamAbilities(s as 0 | 1);
+    const items = sides[s as 0 | 1].team.map(p => p.itemSpec);
+    return (
+      moves.some(m =>
+        m.specialKind === 'stored-power' ||
+        m.specialKind === 'psych-up' ||
+        m.specialKind === 'power-swap' ||
+        m.specialKind === 'guard-swap' ||
+        m.specialKind === 'topsy-turvy' ||
+        m.specialKind === 'baton-pass' ||
+        m.specialKind === 'stockpile' ||
+        m.specialKind === 'shell-side-arm' ||
+        m.specialKind === 'acupressure' ||
+        m.specialKind === 'lash-out' ||
+        m.specialKind === 'stomping-tantrum' ||
+        m.specialKind === 'transform' ||
+        m.specialKind === 'copycat' ||
+        m.specialKind === 'sleep-talk'
+      ) ||
+      abs.some(a =>
+        a.defiant ||
+        a.competitive ||
+        a.contrary ||
+        a.mirrorArmor ||
+        a.opportunist ||
+        a.moody ||
+        a.imposter ||
+        a.curiousMedicine
+      ) ||
+      items.some(it => it.archetype === 'white-herb')
+    );
+  });
+  const sideHasSpecialMove = (s: 0 | 1) =>
+    allTeamMoves(s).some(m => m.category === 'Special' || m.specialKind === 'shell-side-arm');
+  const trackSpaBoost: [boolean, boolean] = [
+    anyGlobalBoostReader || sideHasSpecialMove(0),
+    anyGlobalBoostReader || sideHasSpecialMove(1),
+  ];
+  const trackSpdBoost: [boolean, boolean] = [
+    anyGlobalBoostReader || sideHasSpecialMove(1),
+    anyGlobalBoostReader || sideHasSpecialMove(0),
+  ];
+
   const {move: struggleMove} = compileMoveSpec(battle.dex, 'struggle', 1);
   struggleMove.recoil = null;
   struggleMove.type = '???';
@@ -273,6 +357,8 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
     activeCount,
     truncBits,
     featureMask,
+    trackSpaBoost,
+    trackSpdBoost,
     sides,
     typeChart: buildTypeChart(battle.dex),
     itemSpecCache,

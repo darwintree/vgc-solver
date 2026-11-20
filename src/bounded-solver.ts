@@ -18,16 +18,31 @@ import {canRunInEngine, createEngineBoundedAdapter} from './engine';
 
 const PROBABILITY_SUM_TOLERANCE = 1e-9;
 
+export interface MonotoneSignature {
+  groupKey: string;
+  h1: number | null;
+  h2: number | null;
+}
+export interface MonotoneBoxOutcome {
+  probability: number;
+  lowerSnapshot: Snapshot;
+  upperSnapshot: Snapshot;
+  split: () => (import('./types').Outcome | MonotoneBoxOutcome)[];
+}
 export interface BoundedAdapter {
   // Custom adapters may use primitive state IDs and action IDs.
   snapshotBattle?: (battle: any) => any;
   restoreBattle?: (snapshot: any) => any;
   stateKey?: (snapshot: any) => string;
+  monotoneSignature?: (snapshot: any) => MonotoneSignature | null;
   terminalUtility?: (battle: any) => number | null;
   legalActions?: (battle: any, side: number) => (Action | string | number)[];
   createTurnCursor?: (snapshot: any, p1: any, p2: any, options?: any) => TransitionCursor;
   enumerateTurn: (snapshot: any, p1: any, p2: any, options?: any) => {
-    outcomes: Transition['outcomes']; simulatorRuns?: number; cacheHits?: number; complete?: boolean;
+    outcomes: (import('./types').Outcome | MonotoneBoxOutcome)[];
+    simulatorRuns?: number;
+    cacheHits?: number;
+    complete?: boolean;
   };
 }
 export interface BoundedOptions extends SolverOptions {
@@ -64,6 +79,8 @@ interface BoundedOutcome {
   probability: number;
   utility: number | null;
   child: SearchNode | null;
+  upperChild?: SearchNode | null;
+  split?: (() => (import('./types').Outcome | MonotoneBoxOutcome)[]) | null;
 }
 interface BoundedCell {
   cursor?: TransitionCursor | null;
@@ -71,6 +88,17 @@ interface BoundedCell {
   outcomes: BoundedOutcome[] | null;
   lower: number;
   upper: number;
+}
+interface MonotoneFrontier2D {
+  h1: number;
+  h2: number;
+  val: number;
+}
+interface MonotoneGroup {
+  kind: 'h1' | 'h2' | '2d';
+  nodes: SearchNode[];
+  lowerFrontier: MonotoneFrontier2D[];
+  upperFrontier: MonotoneFrontier2D[];
 }
 export interface SearchNode {
   key: string;
@@ -88,6 +116,9 @@ export interface SearchNode {
   upperSolution: MatrixSolution | null;
   parents: Set<SearchNode>;
   exactCertified: boolean;
+  monoGroup?: MonotoneGroup | null;
+  monoH1?: number | null;
+  monoH2?: number | null;
 }
 
 const DEFAULT_LOWER = -1;
@@ -133,6 +164,8 @@ function createStats() {
     searchMs: 0,
     prepareMs: 0,
     terminalEnvelopes: 0,
+    monotoneUpdates: 0,
+    boxSplits: 0,
   };
 }
 
@@ -151,6 +184,8 @@ class BoundedSearch {
   declare adapter: BoundedAdapter;
   declare nodes: Map<string, SearchNode>;
   declare snapshotKeyCache: WeakMap<object, string>;
+  declare monotoneGroups: Map<string, MonotoneGroup>;
+  declare monoCornerTurn: number;
   declare stats: ReturnType<typeof createStats>;
   declare limitReached: boolean;
   declare stopReason: string | null;
@@ -199,6 +234,8 @@ class BoundedSearch {
   _reset() {
     this.nodes = new Map();
     this.snapshotKeyCache = new WeakMap();
+    this.monotoneGroups = new Map();
+    this.monoCornerTurn = 0;
     this.stats = createStats();
     this.limitReached = false;
     this.stopReason = null;
@@ -318,7 +355,9 @@ class BoundedSearch {
         break;
       }
       if (frontier.initialize) this._expand(frontier.node);
-      else this._expandCell(frontier.node, frontier.i, frontier.j);
+      else if (frontier.splitOutcomeIndex !== undefined) {
+        this._splitOutcome(frontier.node, frontier.i, frontier.j, frontier.splitOutcomeIndex);
+      } else this._expandCell(frontier.node, frontier.i, frontier.j);
       this._backupFrom([frontier.node]);
     }
     this._backupFrom([root]);
@@ -385,7 +424,64 @@ class BoundedSearch {
     this.nodes.set(key, node);
     this.stats.discoveredStates++;
     this.stats.solvedStates = this.stats.discoveredStates;
+    if (terminal === null && this.rootNode !== null && this.adapter.monotoneSignature) {
+      this._registerMonotone(node);
+    }
     return node;
+  }
+
+  _registerMonotone(node: SearchNode) {
+    const sig = this.adapter.monotoneSignature!(node.snapshot);
+    if (!sig || (sig.h1 === null && sig.h2 === null)) return;
+    const kind: 'h1' | 'h2' | '2d' = sig.h1 !== null && sig.h2 !== null
+      ? '2d'
+      : sig.h1 !== null ? 'h1' : 'h2';
+    let group = this.monotoneGroups.get(sig.groupKey);
+    if (!group) {
+      group = {kind, nodes: [], lowerFrontier: [], upperFrontier: []};
+      this.monotoneGroups.set(sig.groupKey, group);
+    }
+    node.monoGroup = group;
+    node.monoH1 = sig.h1;
+    node.monoH2 = sig.h2;
+
+    if (kind !== '2d') {
+      const coord = kind === 'h1' ? sig.h1! : -sig.h2!;
+      const list = group.nodes;
+      let lo = 0;
+      let hi = list.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        const mc = kind === 'h1' ? list[mid].monoH1! : -list[mid].monoH2!;
+        if (mc < coord) lo = mid + 1;
+        else hi = mid;
+      }
+      if (lo > 0) node.lower = Math.max(node.lower, list[lo - 1].lower);
+      if (lo < list.length) node.upper = Math.min(node.upper, list[lo].upper);
+      if (node.lower > node.upper) node.upper = node.lower;
+      list.splice(lo, 0, node);
+      if (node.lower > DEFAULT_LOWER + EPSILON || node.upper < DEFAULT_UPPER - EPSILON) {
+        this.stats.monotoneUpdates++;
+      }
+      return;
+    }
+
+    const h1 = sig.h1!;
+    const h2 = sig.h2!;
+    let bestL = DEFAULT_LOWER;
+    for (const f of group.lowerFrontier) {
+      if (f.h1 <= h1 && f.h2 >= h2 && f.val > bestL) bestL = f.val;
+    }
+    let bestU = DEFAULT_UPPER;
+    for (const f of group.upperFrontier) {
+      if (f.h1 >= h1 && f.h2 <= h2 && f.val < bestU) bestU = f.val;
+    }
+    node.lower = bestL;
+    node.upper = Math.max(bestL, bestU);
+    group.nodes.push(node);
+    if (bestL > DEFAULT_LOWER + EPSILON || bestU < DEFAULT_UPPER - EPSILON) {
+      this.stats.monotoneUpdates++;
+    }
   }
 
   _transitionOptions() {
@@ -457,21 +553,10 @@ class BoundedSearch {
     if (!Array.isArray(transition.outcomes) || !transition.outcomes.length && remaining === 0) {
       throw new Error('A transition must have at least one outcome');
     }
-    const outcomes = [];
+    const skipTerminal = this.adapter === nativeAdapter;
+    const outcomes: BoundedOutcome[] = [];
     for (const outcome of transition.outcomes) {
-      const probability = Number(outcome.probability);
-      if (!(probability >= 0) || !Number.isFinite(probability)) {
-        throw new Error(`Invalid transition probability: ${outcome.probability}`);
-      }
-      if (outcome.snapshot === undefined) {
-        const utility = finiteUtility(outcome.utility);
-        if (utility === null) throw new Error('Terminal outcome lacks utility');
-        outcomes.push({probability, utility, child: null});
-        continue;
-      }
-      const child = this._intern(outcome.snapshot, this.adapter === nativeAdapter);
-      if (child) child.parents.add(node);
-      outcomes.push({probability, child, utility: null});
+      outcomes.push(this._internOutcome(node, outcome, skipTerminal));
     }
     const completed = outcomes.reduce((sum, outcome) => sum + outcome.probability, 0);
     const total = remaining + completed;
@@ -490,6 +575,55 @@ class BoundedSearch {
     cell.outcomes = outcomes;
     cell.remainingProbability = incomplete ? Math.max(0, 1 - completed / denominator) : remaining / total;
     if (transition.complete) cell.cursor = null;
+  }
+
+  _internOutcome(node: SearchNode, outcome: any, skipTerminal: boolean): BoundedOutcome {
+    const probability = Number(outcome.probability);
+    if (!(probability >= 0) || !Number.isFinite(probability)) {
+      throw new Error(`Invalid transition probability: ${outcome.probability}`);
+    }
+    if (outcome.lowerSnapshot !== undefined && outcome.upperSnapshot !== undefined && typeof outcome.split === 'function') {
+      const lowerChild = this._intern(outcome.lowerSnapshot, skipTerminal);
+      const upperChild = this._intern(outcome.upperSnapshot, skipTerminal);
+      if (lowerChild) lowerChild.parents.add(node);
+      if (upperChild) upperChild.parents.add(node);
+      if (lowerChild && upperChild && lowerChild === upperChild) {
+        return {probability, utility: null, child: lowerChild, upperChild: null, split: null};
+      }
+      return {probability, utility: null, child: lowerChild, upperChild, split: outcome.split};
+    }
+    if (outcome.snapshot === undefined) {
+      const utility = finiteUtility(outcome.utility);
+      if (utility === null) throw new Error('Terminal outcome lacks utility');
+      return {probability, utility, child: null, upperChild: null, split: null};
+    }
+    const child = this._intern(outcome.snapshot, skipTerminal);
+    if (child) child.parents.add(node);
+    return {probability, child, utility: null, upperChild: null, split: null};
+  }
+
+  _splitOutcome(node: SearchNode, i: number, j: number, outcomeIndex: number) {
+    if (node.terminal !== null || !node.initialized) return;
+    const cell = node.cells[i][j];
+    if (!cell.outcomes || outcomeIndex < 0 || outcomeIndex >= cell.outcomes.length) return;
+    const outcome = cell.outcomes[outcomeIndex];
+    if (!outcome.split) return;
+    if (this._timedOut()) {
+      this.stopReason = 'time';
+      return;
+    }
+    const rawSubs = outcome.split();
+    if (!Array.isArray(rawSubs) || rawSubs.length === 0) {
+      throw new Error('MonotoneBoxOutcome.split() must return at least one sub-outcome');
+    }
+    const skipTerminal = this.adapter === nativeAdapter;
+    const subs = rawSubs.map(sub => this._internOutcome(node, sub, skipTerminal));
+    const sum = subs.reduce((acc, s) => acc + s.probability, 0);
+    if (Math.abs(sum - outcome.probability) > PROBABILITY_SUM_TOLERANCE) {
+      throw new Error(`Split sub-outcome probabilities sum to ${sum}, expected ${outcome.probability}`);
+    }
+    cell.outcomes.splice(outcomeIndex, 1, ...subs);
+    this.stats.boxSplits++;
   }
 
   _expand(node: SearchNode) {
@@ -540,8 +674,13 @@ class BoundedSearch {
       let childLower = outcome.utility;
       let childUpper = outcome.utility;
       if (outcome.utility === null) {
-        childLower = outcome.child ? outcome.child.lower : DEFAULT_LOWER;
-        childUpper = outcome.child ? outcome.child.upper : DEFAULT_UPPER;
+        if (outcome.split) {
+          childLower = outcome.child ? outcome.child.lower : DEFAULT_LOWER;
+          childUpper = outcome.upperChild ? outcome.upperChild.upper : DEFAULT_UPPER;
+        } else {
+          childLower = outcome.child ? outcome.child.lower : DEFAULT_LOWER;
+          childUpper = outcome.child ? outcome.child.upper : DEFAULT_UPPER;
+        }
       }
       lower += outcome.probability * childLower;
       upper += outcome.probability * childUpper;
@@ -565,7 +704,7 @@ class BoundedSearch {
     const previousExact = node.exactCertified;
     const exactCertified = node.cells.every(row => row.every(cell => cell.outcomes && !cell.cursor && !cell.remainingProbability &&
       cell.outcomes.every(outcome => outcome.utility !== null ||
-        (outcome.child && outcome.child.exactCertified))));
+        (!outcome.split && outcome.child && outcome.child.exactCertified))));
     if (!matrixChanged) {
       node.exactCertified = exactCertified;
       return previousExact !== exactCertified;
@@ -614,6 +753,8 @@ class BoundedSearch {
       }
       const node = queue.shift();
       queued.delete(node);
+      const prevLower = node.lower;
+      const prevUpper = node.upper;
       if (this._refresh(node)) {
         updates++;
         for (const parent of node.parents) {
@@ -621,6 +762,11 @@ class BoundedSearch {
             queued.add(parent);
             queue.push(parent);
           }
+        }
+        const lowerImproved = node.lower > prevLower + EPSILON;
+        const upperImproved = node.upper < prevUpper - EPSILON;
+        if (node.monoGroup && (lowerImproved || upperImproved)) {
+          this._propagateMonotone(node, lowerImproved, upperImproved, queue, queued);
         }
       }
       // A monotone interval backup on a cycle can only have useful changes
@@ -632,6 +778,108 @@ class BoundedSearch {
       }
     }
     return updates;
+  }
+
+  _propagateMonotone(
+    source: SearchNode,
+    lowerImproved: boolean,
+    upperImproved: boolean,
+    queue: SearchNode[],
+    queued: Set<SearchNode>
+  ) {
+    const group = source.monoGroup;
+    if (!group) return;
+    const enqueueParents = (peer: SearchNode) => {
+      for (const parent of peer.parents) {
+        if (!queued.has(parent)) {
+          queued.add(parent);
+          queue.push(parent);
+        }
+      }
+    };
+
+    if (group.kind !== '2d') {
+      const list = group.nodes;
+      const coord = group.kind === 'h1' ? source.monoH1! : -source.monoH2!;
+      let lo = 0;
+      let hi = list.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        const mc = group.kind === 'h1' ? list[mid].monoH1! : -list[mid].monoH2!;
+        if (mc < coord) lo = mid + 1;
+        else hi = mid;
+      }
+      if (lowerImproved) {
+        for (let k = lo + 1; k < list.length; k++) {
+          const peer = list[k];
+          if (peer.lower >= source.lower - EPSILON) break;
+          if (peer === this.rootNode) continue;
+          peer.lower = Math.min(peer.upper, source.lower);
+          this.stats.monotoneUpdates++;
+          enqueueParents(peer);
+        }
+      }
+      if (upperImproved) {
+        for (let k = lo - 1; k >= 0; k--) {
+          const peer = list[k];
+          if (peer.upper <= source.upper + EPSILON) break;
+          if (peer === this.rootNode) continue;
+          peer.upper = Math.max(peer.lower, source.upper);
+          this.stats.monotoneUpdates++;
+          enqueueParents(peer);
+        }
+      }
+      return;
+    }
+
+    const h1 = source.monoH1!;
+    const h2 = source.monoH2!;
+    if (lowerImproved) {
+      let dominated = false;
+      for (const f of group.lowerFrontier) {
+        if (f.h1 <= h1 && f.h2 >= h2 && f.val >= source.lower - EPSILON) {
+          dominated = true;
+          break;
+        }
+      }
+      if (!dominated) {
+        group.lowerFrontier = group.lowerFrontier.filter(
+          f => !(f.h1 >= h1 && f.h2 <= h2 && f.val <= source.lower + EPSILON)
+        );
+        group.lowerFrontier.push({h1, h2, val: source.lower});
+        for (const peer of group.nodes) {
+          if (peer === source || peer === this.rootNode) continue;
+          if (peer.monoH1! >= h1 && peer.monoH2! <= h2 && peer.lower < source.lower - EPSILON) {
+            peer.lower = Math.min(peer.upper, source.lower);
+            this.stats.monotoneUpdates++;
+            enqueueParents(peer);
+          }
+        }
+      }
+    }
+    if (upperImproved) {
+      let dominated = false;
+      for (const f of group.upperFrontier) {
+        if (f.h1 >= h1 && f.h2 <= h2 && f.val <= source.upper + EPSILON) {
+          dominated = true;
+          break;
+        }
+      }
+      if (!dominated) {
+        group.upperFrontier = group.upperFrontier.filter(
+          f => !(f.h1 <= h1 && f.h2 >= h2 && f.val >= source.upper - EPSILON)
+        );
+        group.upperFrontier.push({h1, h2, val: source.upper});
+        for (const peer of group.nodes) {
+          if (peer === source || peer === this.rootNode) continue;
+          if (peer.monoH1! <= h1 && peer.monoH2! >= h2 && peer.upper > source.upper + EPSILON) {
+            peer.upper = Math.max(peer.lower, source.upper);
+            this.stats.monotoneUpdates++;
+            enqueueParents(peer);
+          }
+        }
+      }
+    }
   }
 
   _selectFrontier(root: SearchNode, selectionPolicy = this.options.selectionPolicy) {
@@ -678,8 +926,15 @@ class BoundedSearch {
       const canExpandCell = cell => {
         if (cell.upper - cell.lower <= 1e-9) return false;
         if (!cell.outcomes || cell.cursor) return true;
-        return cell.outcomes.some(outcome => outcome.utility === null && outcome.child &&
-          outcome.child.upper - outcome.child.lower > 1e-9);
+        return cell.outcomes.some(outcome => {
+          if (outcome.utility !== null) return false;
+          if (outcome.split) {
+            const lo = outcome.child ? outcome.child.lower : DEFAULT_LOWER;
+            const hi = outcome.upperChild ? outcome.upperChild.upper : DEFAULT_UPPER;
+            return hi - lo > 1e-9;
+          }
+          return !!(outcome.child && outcome.child.upper - outcome.child.lower > 1e-9);
+        });
       };
       const chooseJoint = () => {
         let selected = null;
@@ -856,9 +1111,35 @@ class BoundedSearch {
         }
         if (sibling) return {node, i: sibling.i, j: sibling.j};
       }
-      let next = null;
+      const preferLowerCorner = selectionPolicy === 'security'
+        ? lowerProof
+        : ((this.monoCornerTurn++ & 1) === 0);
+      const {child: next, splitOutcomeIndex, maxSingleScore} = this._selectCellChild(
+        chosen.cell.outcomes,
+        path,
+        preferLowerCorner
+      );
+      if (chosen.cell.cursor && 2 * chosen.cell.remainingProbability >= maxSingleScore) {
+        return {node, i: chosen.i, j: chosen.j};
+      }
+      if (splitOutcomeIndex !== undefined) {
+        return {node, i: chosen.i, j: chosen.j, splitOutcomeIndex};
+      }
+      if (!next) return null;
+      node = next;
+    }
+    return null;
+  }
+
+  _selectCellChild(
+    outcomes: BoundedOutcome[],
+    path: Set<unknown>,
+    preferLowerCorner: boolean
+  ): {child: SearchNode | null; splitOutcomeIndex?: number; maxSingleScore: number} {
+    if (!this.adapter.monotoneSignature && !outcomes.some(o => !!o.split)) {
+      let next: SearchNode | null = null;
       let nextScore = -1;
-      for (const outcome of chosen.cell.outcomes) {
+      for (const outcome of outcomes) {
         if (!outcome.child || outcome.utility !== null) continue;
         const gap = outcome.child.upper - outcome.child.lower;
         if (gap <= 1e-9) continue;
@@ -868,13 +1149,222 @@ class BoundedSearch {
           nextScore = score;
         }
       }
-      if (chosen.cell.cursor && 2 * chosen.cell.remainingProbability >= nextScore) {
-        return {node, i: chosen.i, j: chosen.j};
-      }
-      if (!next) return null;
-      node = next;
+      return {child: next, maxSingleScore: nextScore};
     }
-    return null;
+
+    let maxSingleScore = -1;
+    let bestSingle: SearchNode | null = null;
+    let bestSingleScore = -1;
+    let bestBoxIdx = -1;
+    let bestBoxScore = -1;
+    let groups: Map<MonotoneGroup, {score: number; members: {child: SearchNode; prob: number}[]}> | null = null;
+
+    for (let idx = 0; idx < outcomes.length; idx++) {
+      const outcome = outcomes[idx];
+      if (outcome.utility !== null) continue;
+      if (outcome.split) {
+        const loNode = outcome.child;
+        const hiNode = outcome.upperChild;
+        const lo = loNode ? loNode.lower : DEFAULT_LOWER;
+        const hi = hiNode ? hiNode.upper : DEFAULT_UPPER;
+        const boxGap = hi - lo;
+        if (boxGap <= 1e-9) continue;
+        const score = outcome.probability * boxGap;
+        if (score > maxSingleScore) maxSingleScore = score;
+        const loCanDescend = !!(loNode && !path.has(loNode) && loNode.upper - loNode.lower > 1e-9);
+        const hiCanDescend = !!(hiNode && !path.has(hiNode) && hiNode.upper - hiNode.lower > 1e-9);
+        if (!loCanDescend && !hiCanDescend && this.limitReached) continue;
+        if (score > bestBoxScore + EPSILON) {
+          bestBoxScore = score;
+          bestBoxIdx = idx;
+        }
+        continue;
+      }
+      const child = outcome.child;
+      if (!child) continue;
+      const gap = child.upper - child.lower;
+      if (gap <= 1e-9) continue;
+      const score = outcome.probability * gap;
+      if (score > maxSingleScore) maxSingleScore = score;
+      if (path.has(child)) continue;
+
+      const mg = child.monoGroup;
+      if (!mg) {
+        if (score > bestSingleScore) {
+          bestSingle = child;
+          bestSingleScore = score;
+        }
+        continue;
+      }
+      if (!groups) groups = new Map();
+      let entry = groups.get(mg);
+      if (!entry) {
+        entry = {score: 0, members: []};
+        groups.set(mg, entry);
+      }
+      entry.score += score;
+      entry.members.push({child, prob: outcome.probability});
+    }
+
+    let bestGroup: MonotoneGroup | null = null;
+    let bestGroupEntry: {score: number; members: {child: SearchNode; prob: number}[]} | null = null;
+    if (groups) {
+      for (const [mg, entry] of groups) {
+        if (!bestGroupEntry || entry.score > bestGroupEntry.score + EPSILON) {
+          bestGroup = mg;
+          bestGroupEntry = entry;
+        }
+      }
+    }
+
+    const bestGroupScore = bestGroupEntry ? bestGroupEntry.score : -1;
+    if (bestBoxIdx >= 0 && bestBoxScore >= bestGroupScore - EPSILON && bestBoxScore >= bestSingleScore - EPSILON) {
+      const box = outcomes[bestBoxIdx];
+      const loNode = box.child;
+      const hiNode = box.upperChild;
+      const loGap = loNode && !path.has(loNode) ? loNode.upper - loNode.lower : 0;
+      const hiGap = hiNode && !path.has(hiNode) ? hiNode.upper - hiNode.lower : 0;
+      const spreadGap = loNode && hiNode ? Math.max(0, hiNode.lower - loNode.upper) : 0;
+      if (preferLowerCorner && loGap > 1e-9 && loGap >= spreadGap) {
+        return {child: loNode, maxSingleScore};
+      }
+      if (!preferLowerCorner && hiGap > 1e-9 && hiGap >= spreadGap) {
+        return {child: hiNode, maxSingleScore};
+      }
+      if (loGap > 1e-9 && loGap >= spreadGap) {
+        return {child: loNode, maxSingleScore};
+      }
+      if (hiGap > 1e-9 && hiGap >= spreadGap) {
+        return {child: hiNode, maxSingleScore};
+      }
+      if (!this.limitReached) {
+        return {child: null, splitOutcomeIndex: bestBoxIdx, maxSingleScore};
+      }
+      if (loGap > 1e-9) return {child: loNode, maxSingleScore};
+      if (hiGap > 1e-9) return {child: hiNode, maxSingleScore};
+      return {child: null, maxSingleScore};
+    }
+
+    if (!bestGroupEntry || bestSingleScore > bestGroupEntry.score + EPSILON) {
+      return {child: bestSingle, maxSingleScore};
+    }
+
+    const members = bestGroupEntry.members;
+    if (members.length === 1) {
+      return {child: members[0].child, maxSingleScore};
+    }
+
+    if (bestGroup!.kind !== '2d') {
+      const isH1 = bestGroup!.kind === 'h1';
+      members.sort((a, b) => {
+        const ca = isH1 ? a.child.monoH1! : -a.child.monoH2!;
+        const cb = isH1 ? b.child.monoH1! : -b.child.monoH2!;
+        return ca - cb;
+      });
+      let bestChild = members[0].child;
+      let bestGain = -1;
+      for (let i = 0; i < members.length; i++) {
+        const c = members[i].child;
+        let gain = 0;
+        if (preferLowerCorner) {
+          const cu = c.upper;
+          for (let j = i; j < members.length; j++) {
+            const d = cu - members[j].child.lower;
+            if (d > 0) gain += members[j].prob * d;
+          }
+        } else {
+          const cl = c.lower;
+          for (let j = 0; j <= i; j++) {
+            const d = members[j].child.upper - cl;
+            if (d > 0) gain += members[j].prob * d;
+          }
+        }
+        if (gain > bestGain + EPSILON) {
+          bestGain = gain;
+          bestChild = c;
+        }
+      }
+      return {child: bestChild, maxSingleScore};
+    }
+
+    // 2D monotone group: prune to Pareto-undominated corner candidates first so
+    // an unexpanded 16x16 grid collapses to a single corner candidate in O(k).
+    const candidates: SearchNode[] = [];
+    if (preferLowerCorner) {
+      // Lower proof: small h1, large h2, high upper dominates (h1 >=, h2 <=, upper <=).
+      members.sort((a, b) =>
+        (a.child.monoH1! - b.child.monoH1!) || (b.child.monoH2! - a.child.monoH2!)
+      );
+      for (const m of members) {
+        const c = m.child;
+        const h1 = c.monoH1!;
+        const h2 = c.monoH2!;
+        const u = c.upper;
+        let dominated = false;
+        for (const cand of candidates) {
+          if (cand.monoH1! <= h1 && cand.monoH2! >= h2 && cand.upper >= u - EPSILON) {
+            dominated = true;
+            break;
+          }
+        }
+        if (!dominated) candidates.push(c);
+      }
+    } else {
+      // Upper proof: large h1, small h2, low lower dominates (h1 <=, h2 >=, lower >=).
+      members.sort((a, b) =>
+        (b.child.monoH1! - a.child.monoH1!) || (a.child.monoH2! - b.child.monoH2!)
+      );
+      for (const m of members) {
+        const c = m.child;
+        const h1 = c.monoH1!;
+        const h2 = c.monoH2!;
+        const l = c.lower;
+        let dominated = false;
+        for (const cand of candidates) {
+          if (cand.monoH1! >= h1 && cand.monoH2! <= h2 && cand.lower <= l + EPSILON) {
+            dominated = true;
+            break;
+          }
+        }
+        if (!dominated) candidates.push(c);
+      }
+    }
+
+    if (candidates.length === 1) {
+      return {child: candidates[0], maxSingleScore};
+    }
+
+    let bestChild = candidates[0];
+    let bestGain = -1;
+    for (const c of candidates) {
+      const ch1 = c.monoH1!;
+      const ch2 = c.monoH2!;
+      let gain = 0;
+      if (preferLowerCorner) {
+        const cu = c.upper;
+        for (const m of members) {
+          const p = m.child;
+          if (p.monoH1! >= ch1 && p.monoH2! <= ch2) {
+            const d = cu - p.lower;
+            if (d > 0) gain += m.prob * d;
+          }
+        }
+      } else {
+        const cl = c.lower;
+        for (const m of members) {
+          const p = m.child;
+          if (p.monoH1! <= ch1 && p.monoH2! >= ch2) {
+            const d = p.upper - cl;
+            if (d > 0) gain += m.prob * d;
+          }
+        }
+      }
+      if (gain > bestGain + EPSILON) {
+        bestGain = gain;
+        bestChild = c;
+      }
+    }
+    return {child: bestChild, maxSingleScore};
   }
 
   /**
@@ -899,6 +1389,16 @@ class BoundedSearch {
         for (let j = 0; j < node.cells[i].length; j++) {
           const cell = node.cells[i][j];
           if ((!cell.outcomes || cell.cursor) && cell.upper - cell.lower > 1e-9) return {node, i, j};
+          if (cell.outcomes && !this.limitReached && cell.upper - cell.lower > 1e-9) {
+            for (let k = 0; k < cell.outcomes.length; k++) {
+              const o = cell.outcomes[k];
+              if (o.split) {
+                const lo = o.child ? o.child.lower : DEFAULT_LOWER;
+                const hi = o.upperChild ? o.upperChild.upper : DEFAULT_UPPER;
+                if (hi - lo > 1e-9) return {node, i, j, splitOutcomeIndex: k};
+              }
+            }
+          }
         }
       }
     }

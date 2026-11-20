@@ -251,6 +251,13 @@ export const FeatureBit = {
   SUBSTITUTE: 1 << 20,
   TAUNT: 1 << 21,
   CHOICE_LOCK: 1 << 22,
+  FIELD_LAST_MOVE: 1 << 23,
+  LAST_MOVE_ID: 1 << 24,
+  LAST_MOVE_FAILED: 1 << 25,
+  LAST_ITEM: 1 << 26,
+  ATE_BERRY: 1 << 27,
+  SIDE0_LAST_MOVE_IDX: 1 << 28,
+  SIDE1_LAST_MOVE_IDX: 1 << 29,
 } as const;
 
 export type BoostStat = 'atk' | 'def' | 'spa' | 'spd' | 'spe' | 'acc' | 'eva';
@@ -379,6 +386,10 @@ export interface StaticBattleContext {
   /** True when battle.trunc uses bit-wrapping Dex.trunc (standard VGC/OU); false for customgame Math.trunc. */
   truncBits: boolean;
   featureMask: number;
+  /** Whether side s's SpA boost (boosts[2]) can be observed by any move, item, or ability. */
+  trackSpaBoost: readonly [boolean, boolean];
+  /** Whether side s's SpD boost (boosts[3]) can be observed by any move, item, or ability. */
+  trackSpdBoost: readonly [boolean, boolean];
   sides: readonly [StaticSideData, StaticSideData];
   /** Precomputed type effectiveness exponent: +1 = 2x, -1 = 0.5x, -99 = immune. */
   typeChart: ReadonlyMap<string, ReadonlyMap<string, number>>;

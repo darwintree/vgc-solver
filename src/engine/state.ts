@@ -760,9 +760,19 @@ export function stateFromBattle(ctx: StaticBattleContext, battle: Battle): Dynam
  * Compact deterministic state key that omits protocol/log/PRNG data and any
  * optional historical field whose reader bit is not set in ctx.featureMask.
  */
-export function canonicalStateKey(ctx: StaticBattleContext, state: DynamicState): string {
+export function canonicalStateKey(
+  ctx: StaticBattleContext,
+  state: DynamicState,
+  maskActiveHp?: readonly [boolean, boolean]
+): string {
   const fm = ctx.featureMask;
-  const trackLastMove = (fm & FeatureBit.LAST_MOVE) !== 0;
+  const trackFieldLastMove = (fm & FeatureBit.FIELD_LAST_MOVE) !== 0;
+  const trackLastMoveId = (fm & FeatureBit.LAST_MOVE_ID) !== 0;
+  const trackLastMoveFailed = (fm & FeatureBit.LAST_MOVE_FAILED) !== 0;
+  const trackLastItem = (fm & FeatureBit.LAST_ITEM) !== 0;
+  const trackAteBerry = (fm & FeatureBit.ATE_BERRY) !== 0;
+  const trackSide0LastMove = (fm & FeatureBit.SIDE0_LAST_MOVE_IDX) !== 0;
+  const trackSide1LastMove = (fm & FeatureBit.SIDE1_LAST_MOVE_IDX) !== 0;
   const trackTimesAttacked = (fm & FeatureBit.TIMES_ATTACKED) !== 0;
   const trackStall = (fm & FeatureBit.PROTECT_STALL) !== 0;
   const trackEncore = (fm & FeatureBit.ENCORE) !== 0;
@@ -788,16 +798,18 @@ export function canonicalStateKey(ctx: StaticBattleContext, state: DynamicState)
       .join(';');
     out += `[${ps}|${ra}|${state.phase.needsEndOfTurn ? 1 : 0}]`;
   }
-  if (f.weather || f.terrain || f.trickRoomTurns || f.gravityTurns || f.magicRoomTurns || f.wonderRoomTurns || f.fairyLockTurns || (trackLastMove && f.lastMoveId)) {
+  if (f.weather || f.terrain || f.trickRoomTurns || f.gravityTurns || f.magicRoomTurns || f.wonderRoomTurns || f.fairyLockTurns || (trackFieldLastMove && f.lastMoveId)) {
     out += `|F:${f.weather}${f.weatherTurns},${f.terrain}${f.terrainTurns},${f.trickRoomTurns}`;
     if (f.gravityTurns || f.magicRoomTurns || f.wonderRoomTurns || f.fairyLockTurns) {
       out += `,${f.gravityTurns},${f.magicRoomTurns},${f.wonderRoomTurns},${f.fairyLockTurns}`;
     }
-    if (trackLastMove && f.lastMoveId) out += `,LM:${f.lastMoveId}`;
+    if (trackFieldLastMove && f.lastMoveId) out += `,LM:${f.lastMoveId}`;
   }
 
   for (let s = 0; s < 2; s++) {
     const side = state.sides[s];
+    const trackSideLastMoveIdx = s === 0 ? trackSide0LastMove : trackSide1LastMove;
+    const maskSideHp = maskActiveHp ? maskActiveHp[s] : false;
     out += `|S${s}:${side.active.join(',')}`;
     if (trackMega && side.megaUsed) out += `/M1`;
     if (side.stealthRock || side.spikes || side.toxicSpikes || side.stickyWeb ||
@@ -817,20 +829,24 @@ export function canonicalStateKey(ctx: StaticBattleContext, state: DynamicState)
         out += `;X`;
         continue;
       }
-      const hpStr = p.hpDist
-        ? `D(${p.hpDist.map(e => `${e.hp}:${e.prob.toFixed(9)}`).join(',')})`
-        : `${p.hp}`;
+      const hpStr = maskSideHp && i === side.active[0]
+        ? '*'
+        : (p.hpDist
+          ? `D(${p.hpDist.map(e => `${e.hp}:${e.prob.toFixed(9)}`).join(',')})`
+          : `${p.hp}`);
       out += `;${hpStr}/${p.pp.join(',')}`;
       if (p.status) out += `/${p.status}${p.statusTurns || ''}`;
       else out += `/`;
       const b = p.boosts;
-      if (b[0] || b[1] || b[2] || b[3] || b[4] || b[5] || b[6]) {
-        out += `/${b[0]},${b[1]},${b[2]},${b[3]},${b[4]},${b[5]},${b[6]}`;
+      const b2 = ctx.trackSpaBoost[s] ? b[2] : 0;
+      const b3 = ctx.trackSpdBoost[s] ? b[3] : 0;
+      if (b[0] || b[1] || b2 || b3 || b[4] || b[5] || b[6]) {
+        out += `/${b[0]},${b[1]},${b2},${b3},${b[4]},${b[5]},${b[6]}`;
       }
       if (!p.itemActive && ctx.sides[s].team[i].itemId) out += `/I0`;
-      if (p.itemOverride !== null) out += `/IO:${p.itemOverride}`;
-      if (p.lastItemId) out += `/LI:${p.lastItemId}`;
-      if (p.ateBerry) out += `/AB`;
+      if (p.itemOverride !== null && p.itemOverride !== '') out += `/IO:${p.itemOverride}`;
+      if (trackLastItem && p.lastItemId) out += `/LI:${p.lastItemId}`;
+      if (trackAteBerry && p.ateBerry) out += `/AB`;
       if (p.cudchewBerry) out += `/CC:${p.cudchewBerry}:${p.cudchewTurns}`;
       if (p.abilityOverride !== null) out += `/AO:${p.abilityOverride}`;
       if (p.gastroAcid) out += `/GA`;
@@ -845,9 +861,9 @@ export function canonicalStateKey(ctx: StaticBattleContext, state: DynamicState)
       if (trackTaunt && p.tauntTurns > 0) out += `/TN${p.tauntTurns}`;
       if (p.throatChopTurns > 0) out += `/TC${p.throatChopTurns}`;
       if (trackChoice && p.choiceLockedMoveIdx >= 0) out += `/CL${p.choiceLockedMoveIdx}`;
-      if (trackLastMove && p.lastMoveIdx !== -1) out += `/LM${p.lastMoveIdx}`;
-      if (trackLastMove && p.lastMoveId) out += `/LMI:${p.lastMoveId}`;
-      if (trackLastMove && p.lastMoveFailed) out += `/LF`;
+      if (trackSideLastMoveIdx && p.lastMoveIdx !== -1) out += `/LM${p.lastMoveIdx}`;
+      if (trackLastMoveId && p.lastMoveId) out += `/LMI:${p.lastMoveId}`;
+      if (trackLastMoveFailed && p.lastMoveFailed) out += `/LF`;
       if (trackTimesAttacked && p.timesAttacked > 0) out += `/TA${p.timesAttacked}`;
       if (trackRecharge && p.mustRecharge) out += `/RC`;
       if (p.confusionTurns > 0) out += `/CF${p.confusionTurns}`;
