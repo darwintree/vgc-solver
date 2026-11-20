@@ -4,6 +4,8 @@ Date: 2026-09-08
 Source: 用户要求同模型子代理在不同 worktree 探索可扩展优化，使当前所有 case 收敛。
 Language: 中文
 
+状态：用户已要求收尾并停止继续探索，最终交付见[实验记录](../../optimization-records/game-insight-search-2026-09-08.md)。以下条目和 Follow-up 保留当时决策，不作为继续执行的任务指令。
+
 ## Entries
 
 ### 1. 本轮验收集合

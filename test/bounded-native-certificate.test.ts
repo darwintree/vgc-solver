@@ -66,8 +66,8 @@ function independentBackup(solver, root) {
             upperRow.push(1);
             continue;
           }
-          let lower = 0;
-          let upper = 0;
+          let lower = -(cell.remainingProbability || 0);
+          let upper = cell.remainingProbability || 0;
           for (const outcome of cell.outcomes) {
             if (outcome.utility !== null) {
               lower += outcome.probability * outcome.utility;
@@ -154,7 +154,20 @@ function certifyFixture(makeFixture) {
             `generated cell ${i},${j} contains a truncated outcome`);
           actual.set(key, (actual.get(key) || 0) + outcome.probability);
         }
-        assertSameOutcomes(actual, expected, `node ${node.key} cell ${i},${j}`);
+        if (cell.cursor) {
+          assert.equal(node.exactCertified, false);
+          // Every completed prefix contributes a subdistribution of the full
+          // native turn; the rest must equal the explicit unknown mass.
+          let missing = 0;
+          for (const [key, probability] of actual) {
+            assert.ok(probability <= (expected.get(key) || 0) + PROBABILITY_TOLERANCE,
+              `partial cell ${i},${j} exceeds native mass`);
+          }
+          for (const [key, probability] of expected) missing += probability - (actual.get(key) || 0);
+          assert.ok(Math.abs(missing - cell.remainingProbability) <= PROBABILITY_TOLERANCE);
+        } else {
+          assertSameOutcomes(actual, expected, `node ${node.key} cell ${i},${j}`);
+        }
       }
     }
   }
