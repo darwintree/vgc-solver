@@ -16,6 +16,10 @@ export {auditChampionsCoverage, type ChampionsCoverageReport, type CoverageSecti
 export {canRunInEngine, compileContextFromBattle} from './context';
 export {
   activeAbilitySpec,
+  activeItemId,
+  activeItemSpec,
+  activeMoves,
+  activeSpeciesId,
   activeStats,
   activeTypes,
   activeWeightHg,
@@ -23,6 +27,7 @@ export {
   canonicalStateKey,
   cloneState,
   expandStateHpDists,
+  getItemSpec,
   isGrounded,
   isItemEffectActive,
   legalSideActions,

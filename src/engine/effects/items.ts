@@ -67,6 +67,14 @@ export interface CompiledItemSpec {
   seedStat?: 'def' | 'spd';
   /** Extended weather for weather-rock. */
   extendedWeather?: WeatherId;
+  /** True for all Berries (data-driven from Dex). */
+  isBerry?: boolean;
+  /** Fling base power (data-driven from Dex). */
+  flingPower?: number;
+  /** Fling inflicted status (e.g. Flame Orb -> brn, Light Ball -> par). */
+  flingStatus?: StatusId;
+  /** Fling inflicted volatile (e.g. King's Rock -> flinch). */
+  flingVolatile?: 'flinch';
 }
 
 /** 18 standard Gen 9 / Champions 1.2x (4915/4096) type-boosting items. */
@@ -216,6 +224,16 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
     };
   }
 
+  const fling: any = (raw as any).fling;
+  const meta: Pick<CompiledItemSpec, 'isBerry' | 'flingPower' | 'flingStatus' | 'flingVolatile'> = {
+    isBerry: !!raw.isBerry,
+    flingPower: typeof fling?.basePower === 'number' ? fling.basePower : undefined,
+    flingStatus: (fling?.status === 'brn' || fling?.status === 'par' || fling?.status === 'psn' || fling?.status === 'tox')
+      ? fling.status
+      : undefined,
+    flingVolatile: fling?.volatileStatus === 'flinch' ? 'flinch' : undefined,
+  };
+
   // 2. Type-boosting items (1.2x)
   if (TYPE_BOOST_ITEMS[id]) {
     return {
@@ -225,6 +243,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       removable,
       featureBits: FeatureBit.NONE,
       affectedType: TYPE_BOOST_ITEMS[id],
+      ...meta,
     };
   }
 
@@ -237,6 +256,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       removable,
       featureBits: FeatureBit.NONE,
       affectedType: RESIST_BERRIES[id],
+      ...meta,
     };
   }
 
@@ -249,6 +269,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       removable,
       featureBits: FeatureBit.NONE,
       curesStatus: STATUS_BERRIES[id],
+      ...meta,
     };
   }
 
@@ -262,6 +283,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       featureBits: FeatureBit.NONE,
       seedTerrain: TERRAIN_SEEDS[id].terrain,
       seedStat: TERRAIN_SEEDS[id].stat,
+      ...meta,
     };
   }
 
@@ -274,6 +296,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       removable,
       featureBits: FeatureBit.NONE,
       extendedWeather: WEATHER_ROCKS[id],
+      ...meta,
     };
   }
 
@@ -287,8 +310,9 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       removable,
       featureBits: unique.featureBits,
       affectedType: id === 'normalgem' ? 'Normal' : undefined,
+      ...meta,
     };
   }
 
-  return {id, archetype: 'none', supported: false, removable, featureBits: FeatureBit.NONE};
+  return {id, archetype: 'none', supported: false, removable, featureBits: FeatureBit.NONE, ...meta};
 }

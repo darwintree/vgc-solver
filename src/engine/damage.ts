@@ -1,5 +1,7 @@
 import {
   activeAbilitySpec,
+  activeItemSpec,
+  activeSpeciesId,
   activeStats,
   activeTypes,
   activeWeightHg,
@@ -8,6 +10,7 @@ import {
 } from './state';
 import type {
   DynamicState,
+  MoveCategory,
   StaticBattleContext,
   StaticMoveData,
   WeatherId,
@@ -53,7 +56,7 @@ export function effectiveFieldWeather(ctx: StaticBattleContext, state: DynamicSt
     for (const idx of state.sides[s].active) {
       if (idx < 0) continue;
       const p = state.sides[s].pokemon[idx];
-      if (!p.fainted && p.abilityActive && activeAbilitySpec(ctx.sides[s].team[idx], p).cloudNine) {
+      if (!p.fainted && p.abilityActive && !p.gastroAcid && activeAbilitySpec(ctx.sides[s].team[idx], p).cloudNine) {
         return '';
       }
     }
@@ -72,11 +75,12 @@ export function rawEffectiveSpeed(
   const p = state.sides[sideIdx].pokemon[pokeIdx];
   const stats = activeStats(sp, p);
   const ab = activeAbilitySpec(sp, p);
+  const abActive = p.abilityActive && !p.gastroAcid;
   const weather = effectiveFieldWeather(ctx, state);
 
   let spe = applyBoostToStat(stats.spe, p.boosts[4]);
 
-  if (p.abilityActive) {
+  if (abActive) {
     if (ab.speedDoubleWeather && weather === ab.speedDoubleWeather) {
       spe = pokeRound(ctx, spe, 2);
     }
@@ -92,11 +96,12 @@ export function rawEffectiveSpeed(
   }
 
   if (isItemEffectActive(state, sp, p)) {
-    if (sp.itemSpec.archetype === 'choice-scarf') spe = pokeRound(ctx, spe, 1.5);
-    else if (sp.itemSpec.archetype === 'iron-ball') spe = pokeRound(ctx, spe, 0.5);
+    const it = activeItemSpec(ctx, sp, p);
+    if (it.archetype === 'choice-scarf') spe = pokeRound(ctx, spe, 1.5);
+    else if (it.archetype === 'iron-ball') spe = pokeRound(ctx, spe, 0.5);
   }
 
-  if (p.status === 'par' && !(p.abilityActive && ab.quickFeet)) {
+  if (p.status === 'par' && !(abActive && ab.quickFeet)) {
     spe = pokeRound(ctx, spe, 0.5);
   }
 
@@ -133,6 +138,7 @@ export function resolveMoveType(
   const sp = ctx.sides[atkSide].team[atkIdx];
   const p = state.sides[atkSide].pokemon[atkIdx];
   const ab = activeAbilitySpec(sp, p);
+  const abActive = p.abilityActive && !p.gastroAcid;
   let type = move.type;
   let ateBoosted = false;
 
@@ -148,12 +154,15 @@ export function resolveMoveType(
     else if (state.field.terrain === 'misty') type = 'Fairy';
     else if (state.field.terrain === 'psychic') type = 'Psychic';
   } else if (move.specialKind === 'raging-bull') {
-    if (sp.speciesId === 'taurospaldeacombat') type = 'Fighting';
-    else if (sp.speciesId === 'taurospaldeablaze') type = 'Fire';
-    else if (sp.speciesId === 'taurospaldeaaqua') type = 'Water';
+    const sid = activeSpeciesId(sp, p);
+    if (sid === 'taurospaldeacombat') type = 'Fighting';
+    else if (sid === 'taurospaldeablaze') type = 'Fire';
+    else if (sid === 'taurospaldeaaqua') type = 'Water';
+  } else if (move.specialKind === 'aura-wheel') {
+    type = activeSpeciesId(sp, p) === 'morpekohangry' ? 'Dark' : 'Electric';
   }
 
-  if (p.abilityActive) {
+  if (abActive) {
     if (ab.ateType && type === 'Normal' && move.category !== 'Status' &&
         move.id !== 'technoblast' && move.id !== 'weatherball' && move.id !== 'terrainpulse') {
       type = ab.ateType;
@@ -162,6 +171,12 @@ export function resolveMoveType(
       type = 'Water';
     }
   }
+
+  if (p.electrified && move.id !== 'struggle') {
+    type = 'Electric';
+    ateBoosted = false;
+  }
+
   return {type, ateBoosted};
 }
 
@@ -218,6 +233,8 @@ export interface DamageRollOptions {
   analyticBoost?: boolean;
   fickleDouble?: boolean;
   basePowerOverride?: number;
+  categoryOverride?: MoveCategory;
+  contactOverride?: boolean;
   parentalBondSecondHit?: boolean;
   teraShellActive?: boolean;
 }
@@ -251,7 +268,8 @@ export class DamageBatchCache {
     const defStatic = ctx.sides[defSide].team[defIdx];
     const defTypes = activeTypes(defStatic, defPoke);
     const atkTypes = activeTypes(atkStatic, atkPoke);
-    const isPhys = move.category === 'Physical';
+    const effectiveCategory = opts.categoryOverride ?? move.category;
+    const isPhys = effectiveCategory === 'Physical';
     const defScreen = isPhys
       ? (state.sides[defSide].reflectTurns > 0 || state.sides[defSide].auroraVeilTurns > 0)
       : (state.sides[defSide].lightScreenTurns > 0 || state.sides[defSide].auroraVeilTurns > 0);
@@ -262,14 +280,19 @@ export class DamageBatchCache {
       (move.specialKind === 'stored-power' ? `:${atkPoke.boosts.join(',')}` : '') +
       (move.specialKind === 'rage-fist' ? `:rf${atkPoke.timesAttacked}` : '') +
       (move.specialKind === 'last-respects' ? `:lr${state.sides[atkSide].pokemon.filter(p => p.fainted).length}` : '') +
+      (move.specialKind === 'spit-up' ? `:su${atkPoke.stockpileLayers}` : '') +
+      (move.specialKind === 'round' && state.sides[atkSide].roundUsedThisTurn ? ':rd2' : '') +
       (move.specialKind === 'gyro-ball' || move.specialKind === 'electro-ball'
         ? `:sp${atkPoke.boosts[4]},${defPoke.boosts[4]},${state.sides[atkSide].tailwindTurns > 0 ? 1 : 0}${state.sides[defSide].tailwindTurns > 0 ? 1 : 0}` : '') +
       (opts.basePowerOverride ? `:bp${opts.basePowerOverride}` : '') +
+      (opts.categoryOverride ? `:cat${opts.categoryOverride[0]}` : '') +
+      (opts.contactOverride !== undefined ? `:ct${opts.contactOverride ? 1 : 0}` : '') +
       (opts.analyticBoost ? ':an' : '') +
       (opts.fickleDouble ? ':fd' : '') +
       (opts.parentalBondSecondHit ? ':pb2' : '') +
       (opts.teraShellActive ? ':ts' : '') +
       (atkPoke.charged ? ':cg' : '') +
+      (atkPoke.electrified ? ':el' : '') +
       (atkPoke.helpingHandCount ? `:hh${atkPoke.helpingHandCount}` : '') +
       (defPoke.glaiveRush ? ':gr' : '') +
       (defPoke.switchedInThisTurn ? ':sw' : '') +
@@ -278,6 +301,20 @@ export class DamageBatchCache {
       (atkPoke.damagedThisTurn > 0 ? ':at' : '') +
       (atkPoke.statLoweredThisTurn ? ':sl' : '') +
       (atkPoke.lastMoveFailed ? ':lf' : '') +
+      (atkPoke.formeId ? `:af${atkPoke.formeId}` : '') +
+      (defPoke.formeId ? `:df${defPoke.formeId}` : '') +
+      (atkPoke.abilityOverride !== null ? `:aa${atkPoke.abilityOverride}` : '') +
+      (defPoke.abilityOverride !== null ? `:da${defPoke.abilityOverride}` : '') +
+      (atkPoke.gastroAcid ? ':ag' : '') +
+      (defPoke.gastroAcid ? ':dg' : '') +
+      (atkPoke.itemOverride !== null ? `:ai${atkPoke.itemOverride}` : '') +
+      (defPoke.itemOverride !== null ? `:di${defPoke.itemOverride}` : '') +
+      (atkPoke.powerTrick ? ':apw' : '') +
+      (defPoke.powerTrick ? ':dpw' : '') +
+      (atkPoke.statOverride ? `:aso${atkPoke.statOverride.atk ?? ''},${atkPoke.statOverride.def ?? ''},${atkPoke.statOverride.spa ?? ''},${atkPoke.statOverride.spd ?? ''}` : '') +
+      (defPoke.statOverride ? `:dso${defPoke.statOverride.atk ?? ''},${defPoke.statOverride.def ?? ''},${defPoke.statOverride.spa ?? ''},${defPoke.statOverride.spd ?? ''}` : '') +
+      (atkPoke.transformed ? `:atf${atkPoke.transformed.speciesId}` : '') +
+      (defPoke.transformed ? `:dtf${defPoke.transformed.speciesId}` : '') +
       (state.field.wonderRoomTurns > 0 ? ':wr' : '') +
       (state.field.magicRoomTurns > 0 ? ':mr' : '') +
       (state.field.gravityTurns > 0 ? ':gv' : '');
@@ -312,7 +349,7 @@ function hasActiveFieldAbility(
     for (const idx of state.sides[s].active) {
       if (idx < 0) continue;
       const p = state.sides[s].pokemon[idx];
-      if (!p.fainted && p.abilityActive && check(activeAbilitySpec(ctx.sides[s].team[idx], p))) {
+      if (!p.fainted && p.abilityActive && !p.gastroAcid && check(activeAbilitySpec(ctx.sides[s].team[idx], p))) {
         return true;
       }
     }
@@ -331,7 +368,7 @@ function countActiveSideAbility(
   for (const idx of state.sides[sideIdx].active) {
     if (idx < 0 || idx === excludeIdx) continue;
     const p = state.sides[sideIdx].pokemon[idx];
-    if (!p.fainted && p.abilityActive && check(activeAbilitySpec(ctx.sides[sideIdx].team[idx], p))) {
+    if (!p.fainted && p.abilityActive && !p.gastroAcid && check(activeAbilitySpec(ctx.sides[sideIdx].team[idx], p))) {
       count++;
     }
   }
@@ -358,10 +395,15 @@ export function computeDamageRolls(
   const defStats = activeStats(defStatic, defPoke);
   const atkAb = activeAbilitySpec(atkStatic, atkPoke);
   const defAb = activeAbilitySpec(defStatic, defPoke);
-  const moldBreaker = atkPoke.abilityActive && !!atkAb.moldBreaker;
-  const defAbActive = defPoke.abilityActive && !moldBreaker;
+  const atkAbActive = atkPoke.abilityActive && !atkPoke.gastroAcid;
+  const moldBreaker = atkAbActive && !!atkAb.moldBreaker;
+  const defAbActive = defPoke.abilityActive && !defPoke.gastroAcid && !moldBreaker;
   const weather = effectiveFieldWeather(ctx, state);
-  const makesContact = move.contact && !(atkPoke.abilityActive && atkAb.longReach);
+  const effectiveCategory = opts.categoryOverride ?? move.category;
+  const baseContact = opts.contactOverride ?? move.contact;
+  const makesContact = baseContact && !(atkAbActive && atkAb.longReach);
+  const atkItemSpec = activeItemSpec(ctx, atkStatic, atkPoke);
+  const defItemSpec = activeItemSpec(ctx, defStatic, defPoke);
 
   const {type: moveType, ateBoosted} = resolveMoveType(ctx, state, atkSide, atkIdx, move);
 
@@ -370,7 +412,7 @@ export function computeDamageRolls(
     ctx,
     moveType,
     defTypes,
-    atkPoke.abilityActive && !!atkAb.scrappy,
+    atkAbActive && !!atkAb.scrappy,
     move.specialKind
   );
   if (eff.immune) {
@@ -404,6 +446,10 @@ export function computeDamageRolls(
     let totalPos = 0;
     for (let i = 0; i < 7; i++) if (atkPoke.boosts[i] > 0) totalPos += atkPoke.boosts[i];
     basePower = 20 + 20 * totalPos;
+  } else if (move.specialKind === 'spit-up') {
+    basePower = 100 * atkPoke.stockpileLayers;
+  } else if (move.specialKind === 'round' && state.sides[atkSide].roundUsedThisTurn) {
+    basePower = move.basePower * 2;
   } else if (move.specialKind === 'hp-scaled-bp') {
     basePower = Math.max(1, Math.floor(150 * atkPoke.hp / atkStatic.maxhp));
   } else if (move.specialKind === 'weight-target') {
@@ -456,11 +502,11 @@ export function computeDamageRolls(
   basePower = clampInt(basePower, 1);
 
   // BasePower modifiers (Solar Beam non-Sun penalty, Knock Off, Charge, Helping Hand, Abilities, Items, Terrain)
-  const effectiveWeather = (atkPoke.abilityActive && atkAb.megaSol) ? 'sun' : weather;
+  const effectiveWeather = (atkAbActive && atkAb.megaSol) ? 'sun' : weather;
   if (move.specialKind === 'solar-beam' && effectiveWeather !== '' && effectiveWeather !== 'sun') {
     basePower = pokeRound(ctx, basePower, 0.5);
   }
-  if (move.knockOff && defPoke.itemActive && defStatic.itemRemovable) {
+  if (move.knockOff && defPoke.itemActive && defItemSpec.id !== '' && defItemSpec.removable) {
     basePower = pokeRound(ctx, basePower, 1.5);
   }
   if (atkPoke.charged && moveType === 'Electric') {
@@ -476,11 +522,11 @@ export function computeDamageRolls(
     basePower = pokeRound(ctx, basePower, 5448, 4096);
   }
   if (moveType === 'Steel') {
-    const ssCount = (atkPoke.abilityActive && atkAb.steelySpirit ? 1 : 0) +
+    const ssCount = (atkAbActive && atkAb.steelySpirit ? 1 : 0) +
       countActiveSideAbility(ctx, state, atkSide, atkIdx, a => !!a.steelySpirit);
     for (let i = 0; i < ssCount; i++) basePower = pokeRound(ctx, basePower, 1.5);
   }
-  if (atkPoke.abilityActive) {
+  if (atkAbActive) {
     if (atkAb.technician && basePower <= 60) basePower = pokeRound(ctx, basePower, 1.5);
     if (atkAb.toughClaws && makesContact) basePower = pokeRound(ctx, basePower, 5325, 4096);
     if (atkAb.sheerForce && move.secondaries.length > 0) basePower = pokeRound(ctx, basePower, 5325, 4096);
@@ -491,6 +537,9 @@ export function computeDamageRolls(
     if (atkAb.reckless && (move.recoil || move.specialKind === 'crash-recoil')) basePower = pokeRound(ctx, basePower, 4915, 4096);
     if (atkAb.punkRock && move.sound) basePower = pokeRound(ctx, basePower, 5325, 4096);
     if (atkAb.analytic && opts.analyticBoost) basePower = pokeRound(ctx, basePower, 5325, 4096);
+    if (atkAb.rivalry && atkStatic.gender && defStatic.gender) {
+      basePower = pokeRound(ctx, basePower, atkStatic.gender === defStatic.gender ? 1.25 : 0.75);
+    }
     if (atkAb.supremeOverlord) {
       const fallen = Math.min(5, state.sides[atkSide].pokemon.filter(p => p.fainted).length);
       if (fallen > 0) basePower = pokeRound(ctx, basePower, SUPREME_OVERLORD_MODS[fallen], 4096);
@@ -504,12 +553,12 @@ export function computeDamageRolls(
     basePower = pokeRound(ctx, basePower, 5120, 4096);
   }
   if (isItemEffectActive(state, atkStatic, atkPoke)) {
-    const it = atkStatic.itemSpec;
+    const it = atkItemSpec;
     if (it.archetype === 'type-boost' && it.affectedType === moveType) {
       basePower = pokeRound(ctx, basePower, 4915, 4096);
-    } else if (it.archetype === 'muscle-band' && move.category === 'Physical') {
+    } else if (it.archetype === 'muscle-band' && effectiveCategory === 'Physical') {
       basePower = pokeRound(ctx, basePower, 4505, 4096);
-    } else if (it.archetype === 'wise-glasses' && move.category === 'Special') {
+    } else if (it.archetype === 'wise-glasses' && effectiveCategory === 'Special') {
       basePower = pokeRound(ctx, basePower, 4505, 4096);
     } else if (it.archetype === 'normal-gem' && moveType === 'Normal') {
       basePower = pokeRound(ctx, basePower, 5325, 4096);
@@ -532,7 +581,7 @@ export function computeDamageRolls(
   basePower = clampInt(basePower, 1);
 
   // Offensive / Defensive stat selection (Body Press, Foul Play, Psyshock, Wonder Room, Unaware)
-  const isPhys = move.category === 'Physical';
+  const isPhys = effectiveCategory === 'Physical';
   const useDefForAtk = move.specialKind === 'body-press';
   const useTargetAtk = move.specialKind === 'foul-play';
   const targetPhysDef = isPhys || move.specialKind === 'psyshock';
@@ -547,7 +596,7 @@ export function computeDamageRolls(
   let defBoost = defPoke.boosts[targetPhysDef ? 1 : 3];
 
   if (defAbActive && defAb.unaware) atkBoost = 0;
-  if (atkPoke.abilityActive && atkAb.unaware) defBoost = 0;
+  if (atkAbActive && atkAb.unaware) defBoost = 0;
   if (opts.isCrit) {
     if (atkBoost < 0) atkBoost = 0;
     if (defBoost > 0) defBoost = 0;
@@ -564,7 +613,7 @@ export function computeDamageRolls(
   let defense = applyBoostToStat(rawDefBase, defBoost);
 
   // ModifyAtk / ModifySpA (Abilities & Items)
-  if (atkPoke.abilityActive) {
+  if (atkAbActive) {
     if (opts.pinchActive && hasPinchBoost(atkAb, moveType)) {
       attack = pokeRound(ctx, attack, 1.5);
     }
@@ -582,7 +631,7 @@ export function computeDamageRolls(
     }
     if (atkPoke.flashFireActive && moveType === 'Fire') attack = pokeRound(ctx, attack, 1.5);
   }
-  if (isItemEffectActive(state, atkStatic, atkPoke) && atkStatic.itemSpec.archetype === 'light-ball' && atkStatic.speciesId === 'pikachu') {
+  if (isItemEffectActive(state, atkStatic, atkPoke) && atkItemSpec.archetype === 'light-ball' && activeSpeciesId(atkStatic, atkPoke) === 'pikachu') {
     attack = pokeRound(ctx, attack, 2);
   }
   if (defAbActive) {
@@ -625,12 +674,12 @@ export function computeDamageRolls(
   }
 
   const isSTAB = moveType !== '???' && atkTypes.includes(moveType);
-  const stabMult = isSTAB ? (atkPoke.abilityActive && atkAb.adaptability ? 2 : 1.5) : 1;
+  const stabMult = isSTAB ? (atkAbActive && atkAb.adaptability ? 2 : 1.5) : 1;
   const isBurnedPhys = atkPoke.status === 'brn' && isPhys &&
-    !(atkPoke.abilityActive && atkAb.guts) && move.specialKind !== 'facade';
-  const hasLifeOrb = isItemEffectActive(state, atkStatic, atkPoke) && atkStatic.itemSpec.archetype === 'life-orb' && move.id !== 'struggle';
-  const hasExpertBelt = isItemEffectActive(state, atkStatic, atkPoke) && atkStatic.itemSpec.archetype === 'expert-belt' && typeMod > 0;
-  const hasScreen = !opts.isCrit && !(atkPoke.abilityActive && atkAb.infiltrator) && (
+    !(atkAbActive && atkAb.guts) && move.specialKind !== 'facade';
+  const hasLifeOrb = isItemEffectActive(state, atkStatic, atkPoke) && atkItemSpec.archetype === 'life-orb' && move.id !== 'struggle';
+  const hasExpertBelt = isItemEffectActive(state, atkStatic, atkPoke) && atkItemSpec.archetype === 'expert-belt' && typeMod > 0;
+  const hasScreen = !opts.isCrit && !(atkAbActive && atkAb.infiltrator) && (
     isPhys
       ? (state.sides[defSide].reflectTurns > 0 || state.sides[defSide].auroraVeilTurns > 0)
       : (state.sides[defSide].lightScreenTurns > 0 || state.sides[defSide].auroraVeilTurns > 0)
@@ -675,13 +724,13 @@ export function computeDamageRolls(
         if (makesContact) d = pokeRound(ctx, d, 0.5);
         if (moveType === 'Fire') d = pokeRound(ctx, d, 2);
       }
-      if (defAb.iceScales && move.category === 'Special') d = pokeRound(ctx, d, 0.5);
+      if (defAb.iceScales && effectiveCategory === 'Special') d = pokeRound(ctx, d, 0.5);
       if (defAb.punkRock && move.sound) d = pokeRound(ctx, d, 0.5);
     }
     for (let fg = 0; fg < friendGuardCount; fg++) {
       d = pokeRound(ctx, d, 0.75);
     }
-    if (atkPoke.abilityActive) {
+    if (atkAbActive) {
       if (atkAb.sniper && opts.isCrit) d = pokeRound(ctx, d, 1.5);
       if (atkAb.tintedLens && typeMod < 0) d = pokeRound(ctx, d, 2);
     }
@@ -693,7 +742,7 @@ export function computeDamageRolls(
     }
     if (opts.resistBerryActive) {
       d = pokeRound(ctx, d, 0.5);
-      if (defPoke.abilityActive && defAb.ripen) {
+      if (defPoke.abilityActive && !defPoke.gastroAcid && defAb.ripen) {
         d = pokeRound(ctx, d, 0.5);
       }
     }

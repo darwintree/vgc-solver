@@ -175,6 +175,31 @@ export interface CompiledAbilitySpec {
   stalwart?: boolean;           // Moves ignore redirection
   stall?: boolean;              // Moves last in priority bracket
   quickDraw?: boolean;          // 30% chance to move first in priority bracket with attacks
+  tangledFeet?: boolean;        // 0.5x incoming accuracy when confused
+  rivalry?: boolean;            // 1.25x BP same gender, 0.75x opposite gender
+  cursedBody?: boolean;         // 30% chance on hit to disable attacker's move
+  cuteCharm?: boolean;          // 30% chance on contact hit to infatuate opposite gender
+  moody?: boolean;              // Residual +2 random stat, -1 different random stat
+  cudChew?: boolean;            // Re-eat consumed Berry at end of next turn
+  emergencyExit?: boolean;      // Switch out when HP drops to <= 50% from > 50%
+  mimicry?: boolean;            // Type changes to match active Terrain
+  battleBond?: boolean;         // Once-per-battle +1 Atk/SpA/Spe on KO for Greninja-Bond
+  mummy?: boolean;              // Contact hit overwrites attacker ability with Mummy
+  wanderingSpirit?: boolean;    // Contact hit swaps abilities
+  trace?: boolean;              // Switch-in copies random foe ability
+  receiver?: boolean;           // Doubles ally faint copies ally ability
+  magician?: boolean;           // Damaging move steals target item if user has none
+  pickpocket?: boolean;         // Contact hit steals attacker item if defender has none
+  symbiosis?: boolean;          // Doubles ally consuming item receives holder's item
+  illusion?: boolean;           // Cosmetic disguise (cleared on hit, blocks Transform)
+  zeroToHero?: boolean;         // Palafin transforms to Hero on switch-out
+  iceFace?: boolean;            // Eiscue blocks 1 physical hit, restores in Snow
+  shieldsDown?: boolean;        // Minior Meteor (>50% HP, status immune) <-> Core (<=50% HP)
+  stanceChange?: boolean;       // Aegislash Blade on attack, Shield on King's Shield
+  forecast?: boolean;           // Castform changes forme & type with Weather
+  hungerSwitch?: boolean;       // Morpeko toggles Full Belly <-> Hangry at residual
+  gulpMissile?: boolean;        // Cramorant Surf/Dive catches prey & counters on hit
+  imposter?: boolean;           // Switch-in transforms into opposing active Pokemon
   noOpInBattle?: boolean;       // Abilities with no competitive battle effect (Illuminate, Pickup, etc.)
 }
 
@@ -392,6 +417,31 @@ const ABILITY_SPECS: Record<string, Omit<CompiledAbilitySpec, 'id' | 'supported'
   stalwart: {stalwart: true},
   stall: {stall: true},
   quickdraw: {quickDraw: true},
+  tangledfeet: {tangledFeet: true},
+  rivalry: {rivalry: true},
+  cursedbody: {cursedBody: true, featureBits: FeatureBit.LAST_MOVE},
+  cutecharm: {cuteCharm: true},
+  moody: {moody: true},
+  cudchew: {cudChew: true},
+  emergencyexit: {emergencyExit: true, featureBits: FeatureBit.PIVOT},
+  mimicry: {mimicry: true},
+  battlebond: {battleBond: true},
+  mummy: {mummy: true},
+  wanderingspirit: {wanderingSpirit: true},
+  trace: {trace: true},
+  receiver: {receiver: true},
+  magician: {magician: true},
+  pickpocket: {pickpocket: true},
+  symbiosis: {symbiosis: true},
+  illusion: {illusion: true},
+  zerotohero: {zeroToHero: true},
+  iceface: {iceFace: true, featureBits: FeatureBit.DISGUISE},
+  shieldsdown: {shieldsDown: true},
+  stancechange: {stanceChange: true},
+  forecast: {forecast: true},
+  hungerswitch: {hungerSwitch: true},
+  gulpmissile: {gulpMissile: true},
+  imposter: {imposter: true},
   keeneye: {noOpInBattle: true},
   runaway: {noOpInBattle: true},
   illuminate: {noOpInBattle: true},

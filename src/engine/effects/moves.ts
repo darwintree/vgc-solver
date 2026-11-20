@@ -246,6 +246,56 @@ const SPECIAL_MOVE_KINDS: Record<string, {kind: MoveSpecialKind; featureBits?: n
   afteryou: {kind: 'after-you'},
   quash: {kind: 'quash'},
 
+  // Wave 3: Item manipulation, ability mutation, stat/volatile, doubles & transform moves (48/48 -> 100% Champions)
+  trick: {kind: 'trick'},
+  switcheroo: {kind: 'trick'},
+  thief: {kind: 'steal-item'},
+  covet: {kind: 'steal-item'},
+  bugbite: {kind: 'steal-berry'},
+  pluck: {kind: 'steal-berry'},
+  recycle: {kind: 'recycle'},
+  stuffcheeks: {kind: 'stuff-cheeks'},
+  belch: {kind: 'belch'},
+  fling: {kind: 'fling'},
+  teatime: {kind: 'teatime'},
+  gastroacid: {kind: 'gastro-acid'},
+  worryseed: {kind: 'worry-seed'},
+  simplebeam: {kind: 'simple-beam'},
+  entrainment: {kind: 'entrainment'},
+  roleplay: {kind: 'role-play'},
+  skillswap: {kind: 'skill-swap'},
+  magnetrise: {kind: 'magnet-rise'},
+  lockon: {kind: 'lock-on'},
+  magneticflux: {kind: 'magnetic-flux'},
+  stockpile: {kind: 'stockpile'},
+  spitup: {kind: 'spit-up'},
+  swallow: {kind: 'swallow'},
+  powertrick: {kind: 'power-trick'},
+  powershift: {kind: 'power-shift'},
+  powersplit: {kind: 'power-split'},
+  guardsplit: {kind: 'guard-split'},
+  reflecttype: {kind: 'reflect-type'},
+  lastresort: {kind: 'last-resort'},
+  imprison: {kind: 'imprison'},
+  octolock: {kind: 'octolock'},
+  focuspunch: {kind: 'focus-punch'},
+  beakblast: {kind: 'beak-blast'},
+  electrify: {kind: 'electrify'},
+  attract: {kind: 'attract'},
+  uproar: {kind: 'uproar'},
+  beatup: {kind: 'beat-up'},
+  round: {kind: 'round'},
+  shellsidearm: {kind: 'shell-side-arm'},
+  healingwish: {kind: 'healing-wish'},
+  batonpass: {kind: 'baton-pass', featureBits: FeatureBit.PIVOT},
+  shedtail: {kind: 'shed-tail', featureBits: FeatureBit.PIVOT | FeatureBit.SUBSTITUTE},
+  sleeptalk: {kind: 'sleep-talk'},
+  copycat: {kind: 'copycat', featureBits: FeatureBit.LAST_MOVE},
+  instruct: {kind: 'instruct', featureBits: FeatureBit.LAST_MOVE},
+  aurawheel: {kind: 'aura-wheel'},
+  transform: {kind: 'transform'},
+  revivalblessing: {kind: 'revival-blessing'},
+
   // Pure-data / explicitly listed standard moves
   scaleshot: {kind: 'standard'},
   hyperbeam: {kind: 'standard', featureBits: FeatureBit.RECHARGE},
@@ -435,6 +485,7 @@ export function compileMoveSpec(
     const selfBoosts = extractBoosts(sec.self?.boosts);
     if (selfBoosts) spec.selfBoosts = selfBoosts;
     if (sec.volatileStatus === 'flinch') spec.volatileStatus = 'flinch';
+    else if (sec.volatileStatus === 'confusion') spec.volatileStatus = 'confusion';
     if (spec.status || spec.boosts || spec.selfBoosts || spec.volatileStatus) {
       secondaries.push(spec);
     }
@@ -463,6 +514,11 @@ export function compileMoveSpec(
     raw.category === 'Status' && typeof raw.status === 'string' && SUPPORTED_STATUSES.has(raw.status)
       ? (raw.status as StatusId)
       : null;
+
+  const volatileStatus: 'confusion' | 'flinch' | undefined =
+    raw.volatileStatus === 'confusion' || raw.volatileStatus === 'flinch'
+      ? raw.volatileStatus
+      : undefined;
 
   const recoil: [number, number] | null =
     Array.isArray(raw.recoil) && raw.recoil.length === 2
@@ -502,6 +558,10 @@ export function compileMoveSpec(
     reflectable: !!flags.reflectable,
     bypassSub: !!flags.bypasssub || !!flags.sound,
     failEncore: !!flags.failencore || id === 'struggle',
+    failCopycat: !!flags.failcopycat,
+    noSleepTalk: !!flags.nosleeptalk,
+    failInstruct: !!flags.failinstruct,
+    volatileStatus,
     fixedDamage,
     multihit,
     selfSwitch: !!raw.selfSwitch,

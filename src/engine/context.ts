@@ -20,7 +20,20 @@ const SUPPORTED_VOLATILES = new Set([
   'disable', 'torment', 'leechseed', 'yawn', 'curse', 'perishsong', 'trapped', 'partiallytrapped',
   'aquaring', 'ingrain', 'smackdown', 'focusenergy', 'dragoncheer', 'charge', 'glaiverush',
   'syrupbomb', 'destinybond', 'noretreat', 'flashfire', 'unburden', 'twoTurnMove',
+  'confusion', 'attract', 'magnetrise', 'lockon', 'stockpile', 'powertrick', 'powershift',
+  'imprison', 'octolock', 'uproar', 'gastroacid', 'focuspunch', 'beakblast', 'electrify', 'fling',
 ]);
+
+const ALT_FORMES_BY_BASE: Record<string, readonly string[]> = {
+  palafin: ['palafinhero'],
+  eiscue: ['eiscuenoice'],
+  minior: ['miniormeteor'],
+  aegislash: ['aegislashblade'],
+  castform: ['castformsunny', 'castformrainy', 'castformsnowy'],
+  morpeko: ['morpekohangry'],
+  cramorant: ['cramorantgulping', 'cramorantgorging'],
+};
+
 const SUPPORTED_WEATHERS = new Set(['', 'sunnyday', 'raindance', 'sandstorm', 'snowscape', 'snow', 'hail']);
 const SUPPORTED_TERRAINS = new Set(['', 'electricterrain', 'grassyterrain', 'mistyterrain', 'psychicterrain']);
 const SUPPORTED_SIDE_CONDS = new Set([
@@ -97,7 +110,7 @@ export function canRunInEngine(battle: Battle): EngineSupportReport {
         }
       }
       const status = toID(pokemon.status);
-      if (!SUPPORTED_STATUSES.has(status)) {
+      if (status !== 'fnt' && !SUPPORTED_STATUSES.has(status)) {
         reasons.push(`Unsupported status on ${pokemon.name}: ${pokemon.status}`);
       }
       for (const vol of Object.keys(pokemon.volatiles || {})) {
@@ -134,6 +147,35 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
   let featureMask = FeatureBit.NONE;
   if (ruleset.megaEvolutionEnabled) featureMask |= FeatureBit.MEGA;
 
+  const itemSpecCache = new Map<string, import('./effects/items').CompiledItemSpec>();
+  const cacheItem = (id: string, spec: import('./effects/items').CompiledItemSpec) => {
+    itemSpecCache.set(id, spec);
+  };
+  cacheItem('', compileItemSpec(battle.dex, ''));
+
+  const compileForme = (speciesId: string, set: any): StaticMegaFormeData | null => {
+    const ms = battle.dex.species.get(speciesId);
+    if (!ms || !ms.exists) return null;
+    const fStats = battle.spreadModify(ms.baseStats, set);
+    const fAbName = ms.abilities[0] || '';
+    const fAbSpec = compileAbilitySpec(fAbName);
+    return {
+      speciesId: toID(ms.id),
+      name: ms.name,
+      types: [...ms.types],
+      weightkg: ms.weightkg || 1,
+      stats: {
+        atk: fStats.atk,
+        def: fStats.def,
+        spa: fStats.spa,
+        spd: fStats.spd,
+        spe: fStats.spe,
+      },
+      abilityId: fAbSpec.id,
+      abilitySpec: fAbSpec,
+    };
+  };
+
   const compileSide = (side: Battle['p1'], id: 'p1' | 'p2'): StaticSideData => {
     const team: StaticPokemonData[] = side.pokemon.map(p => {
       const baseSpecies = p.species.id === 'mimikyubusted'
@@ -141,6 +183,7 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
         : p.baseSpecies;
       const abilitySpec = compileAbilitySpec(p.baseAbility || p.ability);
       const itemSpec = compileItemSpec(battle.dex, p.item);
+      cacheItem(itemSpec.id, itemSpec);
 
       featureMask |= abilitySpec.featureBits | itemSpec.featureBits;
 
@@ -153,27 +196,23 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
           ? itemSpec.megaSpeciesId
           : null);
       if (canMegaSpeciesName) {
-        const ms = battle.dex.species.get(canMegaSpeciesName);
-        if (ms && ms.exists) {
-          const megaStats = battle.spreadModify(ms.baseStats, p.set);
-          const megaAbilityName = ms.abilities[0] || '';
-          const megaAbSpec = compileAbilitySpec(megaAbilityName);
-          featureMask |= FeatureBit.MEGA | megaAbSpec.featureBits;
-          megaForme = {
-            speciesId: toID(ms.id),
-            name: ms.name,
-            types: [...ms.types],
-            weightkg: ms.weightkg || 1,
-            stats: {
-              atk: megaStats.atk,
-              def: megaStats.def,
-              spa: megaStats.spa,
-              spd: megaStats.spd,
-              spe: megaStats.spe,
-            },
-            abilityId: megaAbSpec.id,
-            abilitySpec: megaAbSpec,
-          };
+        const compiled = compileForme(canMegaSpeciesName, p.set);
+        if (compiled) {
+          featureMask |= FeatureBit.MEGA | compiled.abilitySpec.featureBits;
+          megaForme = compiled;
+        }
+      }
+
+      // Precompile alt formes for form-changing species (Palafin, Eiscue, Minior, Aegislash, Castform, Morpeko, Cramorant)
+      const altFormes: Record<string, StaticMegaFormeData> = {};
+      const baseFamily = toID(baseSpecies.baseSpecies || baseSpecies.id);
+      const altIds = ALT_FORMES_BY_BASE[baseFamily];
+      if (altIds) {
+        const baseCompiled = compileForme(baseSpecies.id, p.set);
+        if (baseCompiled) altFormes[baseCompiled.speciesId] = baseCompiled;
+        for (const aid of altIds) {
+          const compiled = compileForme(aid, p.set);
+          if (compiled) altFormes[compiled.speciesId] = compiled;
         }
       }
 
@@ -183,14 +222,18 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
         return compiled.move;
       });
 
-      const baseStats = p.species.isMega
+      const baseStats = (p.species.isMega || toID(p.species.id) !== toID(baseSpecies.id))
         ? battle.spreadModify(baseSpecies.baseStats, p.set)
         : p.storedStats;
+
+      const gender: 'M' | 'F' | '' = p.gender === 'M' || p.gender === 'F' ? p.gender : '';
 
       return {
         speciesId: toID(baseSpecies.id),
         name: p.name,
         level: p.level,
+        gender,
+        baseAtk: baseSpecies.baseStats.atk || 0,
         baseTypes: [...baseSpecies.types],
         weightkg: baseSpecies.weightkg || 1,
         maxhp: p.maxhp,
@@ -207,6 +250,7 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
         itemSpec,
         itemRemovable: itemSpec.removable,
         megaForme,
+        altFormes,
         moves,
       };
     });
@@ -223,6 +267,7 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
   struggleMove.type = '???';
 
   return {
+    dex: battle.dex,
     ruleset,
     gameType,
     activeCount,
@@ -230,6 +275,7 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
     featureMask,
     sides,
     typeChart: buildTypeChart(battle.dex),
+    itemSpecCache,
     struggleMove,
   };
 }

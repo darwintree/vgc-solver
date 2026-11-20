@@ -177,7 +177,49 @@ export type MoveSpecialKind =
   | 'last-resort'
   | 'uproar'
   | 'flinch-only-turn1'
-  | 'raging-bull';
+  | 'raging-bull'
+  | 'beak-blast'
+  | 'electrify'
+  | 'octolock'
+  | 'power-shift'
+  | 'stuff-cheeks'
+  | 'steal-item'
+  | 'trick'
+  | 'attract'
+  | 'aura-wheel'
+  | 'baton-pass'
+  | 'beat-up'
+  | 'steal-berry'
+  | 'copycat'
+  | 'entrainment'
+  | 'fling'
+  | 'focus-punch'
+  | 'gastro-acid'
+  | 'guard-split'
+  | 'healing-wish'
+  | 'imprison'
+  | 'instruct'
+  | 'lock-on'
+  | 'magnetic-flux'
+  | 'magnet-rise'
+  | 'power-split'
+  | 'power-trick'
+  | 'recycle'
+  | 'reflect-type'
+  | 'revival-blessing'
+  | 'role-play'
+  | 'round'
+  | 'shed-tail'
+  | 'shell-side-arm'
+  | 'simple-beam'
+  | 'skill-swap'
+  | 'sleep-talk'
+  | 'spit-up'
+  | 'stockpile'
+  | 'swallow'
+  | 'teatime'
+  | 'transform'
+  | 'worry-seed';
 
 /**
  * Bitmask tracking which optional/historical fields are actually read by moves,
@@ -219,7 +261,7 @@ export interface MoveSecondarySpec {
   status?: StatusId;
   boosts?: Partial<Record<BoostStat, number>>;
   selfBoosts?: Partial<Record<BoostStat, number>>;
-  volatileStatus?: 'flinch';
+  volatileStatus?: 'flinch' | 'confusion';
 }
 
 export interface StaticMoveData {
@@ -246,6 +288,10 @@ export interface StaticMoveData {
   reflectable: boolean;
   bypassSub: boolean;
   failEncore: boolean;
+  failCopycat?: boolean;
+  noSleepTalk?: boolean;
+  failInstruct?: boolean;
+  volatileStatus?: 'confusion' | 'flinch';
   fixedDamage: 'level' | number | null;
   multihit: [number, number] | number | null;
   selfSwitch: boolean;
@@ -286,10 +332,25 @@ export interface StaticMegaFormeData {
   abilitySpec: CompiledAbilitySpec;
 }
 
+export type StaticFormeData = StaticMegaFormeData;
+
+export interface TransformedOverlay {
+  speciesId: string;
+  types: readonly string[];
+  weightkg: number;
+  stats: StaticStats;
+  abilityId: string;
+  moves: readonly StaticMoveData[];
+  sourceSide: 0 | 1;
+  sourceIdx: number;
+}
+
 export interface StaticPokemonData {
   speciesId: string;
   name: string;
   level: number;
+  gender: 'M' | 'F' | '';
+  baseAtk: number;
   baseTypes: readonly string[];
   weightkg: number;
   maxhp: number;
@@ -300,6 +361,7 @@ export interface StaticPokemonData {
   itemSpec: CompiledItemSpec;
   itemRemovable: boolean;
   megaForme: StaticMegaFormeData | null;
+  altFormes: Readonly<Record<string, StaticFormeData>>;
   moves: readonly StaticMoveData[];
 }
 
@@ -310,6 +372,7 @@ export interface StaticSideData {
 }
 
 export interface StaticBattleContext {
+  dex: import('@pkmn/sim').Battle['dex'];
   ruleset: RulesetConfig;
   gameType: GameType;
   activeCount: 1 | 2;
@@ -319,6 +382,8 @@ export interface StaticBattleContext {
   sides: readonly [StaticSideData, StaticSideData];
   /** Precomputed type effectiveness exponent: +1 = 2x, -1 = 0.5x, -99 = immune. */
   typeChart: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /** Cached CompiledItemSpec by item ID (for dynamic Trick/Thief/Recycle/Fling). */
+  itemSpecCache: Map<string, CompiledItemSpec>;
   /** Struggle move spec used when no normal move has PP/is enabled. */
   struggleMove: StaticMoveData;
 }
@@ -350,9 +415,21 @@ export interface PokemonState {
   statusTurns: number;
   boosts: BoostArray;
   itemActive: boolean;
+  itemOverride: string | null;     // null => original sp.itemId, '' => none, else item ID
+  lastItemId: string;              // last consumed/flung item ID (for Recycle)
+  ateBerry: boolean;               // true once a Berry was eaten (for Belch)
+  cudchewBerry: string;            // berry ID queued by Cud Chew
+  cudchewTurns: number;            // countdown for Cud Chew (2 -> 1 -> trigger at 0)
   abilityActive: boolean;
+  abilityOverride: string | null;  // null => base/mega/forme ability, else overridden ability ID
+  gastroAcid: boolean;             // ability suppressed by Gastro Acid
   abilityUsed: boolean;
   megaEvolved: boolean;
+  formeId: string | null;          // non-null when in alt forme (Palafin-Hero, Eiscue-Noice, Minior-Meteor, Aegislash-Blade, Castform-*, Morpeko-Hangry, Cramorant-*)
+  bondTriggered: boolean;          // Battle Bond once-per-battle flag
+  illusionActive: boolean;         // Illusion cosmetic disguise active (blocks Transform until damaged)
+  transformed: TransformedOverlay | null;
+  savedPp: number[] | null;        // original PP saved while transformed
   disguiseBusted: boolean;
   proteanUsed: boolean;
   flashFireActive: boolean;
@@ -366,6 +443,23 @@ export interface PokemonState {
   roosted: boolean;                // transient within a turn (loses Flying type)
   flinched: boolean;               // transient within a turn
   mustRecharge: boolean;
+  confusionTurns: number;          // 0 if not confused; else remaining turns (2..5)
+  attractSide: -1 | 0 | 1;         // -1 if not infatuated
+  attractSlot: number;             // slot of infatuation source
+  magnetRiseTurns: number;         // 0 if none; else 1..5
+  lockOnTurns: number;             // 0 if none; else 1..2
+  lockOnSide: -1 | 0 | 1;
+  lockOnSlot: number;
+  stockpileLayers: number;         // 0..3
+  stockpileDef: number;            // actual Def boost delta applied by Stockpile
+  stockpileSpd: number;            // actual SpD boost delta applied by Stockpile
+  powerTrick: boolean;             // Power Trick / Power Shift Atk<->Def swap
+  statOverride: Partial<StaticStats> | null; // Power Split / Guard Split stored stat override
+  usedMovesMask: number;           // bitmask of move indices used since switch-in (Last Resort)
+  imprison: boolean;               // Imprison volatile
+  octolockSide: -1 | 0 | 1;        // -1 if not octolocked
+  octolockSlot: number;
+  uproarTurns: number;             // 0 if not in Uproar; else 1..3
   encoreMoveIdx: number;           // -1 if not encored
   encoreTurns: number;             // remaining turns
   tauntTurns: number;              // 0 if not taunted
@@ -395,11 +489,17 @@ export interface PokemonState {
   chargingMoveIdx: number;         // -1 if not charging a two-turn move
   invulnerable: '' | 'fly' | 'dig' | 'dive' | 'shadow';
   lastMoveIdx: number;             // -1 if none, -2 if struggle
+  lastMoveId: string;              // ID of last executed move (for Instruct / Copycat)
   activeTurns: number;             // tracks turn-1 Fake Out / First Impression eligibility
   movedThisTurn: boolean;          // transient within a turn
   switchedInThisTurn: boolean;     // transient within a turn
   helpingHandCount: number;        // transient within a turn
   redirectKind: '' | 'followme' | 'ragepowder'; // transient within a turn
+  focusPunchReady: boolean;        // transient within a turn (Focus Punch pre-turn focus)
+  focusPunchLost: boolean;         // transient within a turn
+  beakBlastHeating: boolean;       // transient within a turn (Beak Blast pre-turn burn shield)
+  electrified: boolean;            // transient within a turn (Electrify -> Electric type)
+  emergencyExitTriggered: boolean; // transient within a turn
   damagedThisTurn: number;         // transient within a turn (Counter / Mirror Coat / Metal Burst / Assurance)
   damagedCategory: '' | 'Physical' | 'Special'; // transient within a turn
   damagedBySide: -1 | 0 | 1;       // transient within a turn
@@ -422,9 +522,11 @@ export interface SideState {
   safeguardTurns: number;
   wishTurns: number[];
   wishHp: number[];
+  healingWish: boolean[];
   futureMoves: (FutureMoveSlot | null)[];
   wideGuard: boolean;   // transient within a turn
   quickGuard: boolean;  // transient within a turn
+  roundUsedThisTurn: boolean; // transient within a turn (doubles Round 2x BP)
   pokemon: PokemonState[];
 }
 
@@ -438,6 +540,7 @@ export interface FieldState {
   magicRoomTurns: number;
   wonderRoomTurns: number;
   fairyLockTurns: number;
+  lastMoveId: string; // last move used on field (for Copycat)
 }
 
 export interface MoveAction {
@@ -474,12 +577,23 @@ export interface PendingQueuedAction {
   subOrder: number;
 }
 
+export interface PendingSwitchSlot {
+  side: 0 | 1;
+  slot: number;
+  /** True when Revival Blessing is selecting a fainted bench Pokemon to revive. */
+  revive?: boolean;
+  /** True when Baton Pass is transferring boosts and passable volatiles. */
+  batonPass?: boolean;
+  /** Positive Substitute HP passed by Shed Tail. */
+  shedTailHp?: number;
+}
+
 export type BattlePhase =
   | {kind: 'turn'}
   | {
       kind: 'switch';
-      /** Which sides/slots must pick a replacement before continuing. */
-      pendingSlots: {side: 0 | 1; slot: number}[];
+      /** Which sides/slots must pick a replacement (or revival target) before continuing. */
+      pendingSlots: PendingSwitchSlot[];
       /** Non-empty when paused mid-turn (e.g., U-turn / Volt Switch); empty for end-of-turn faint switches. */
       remainingActions: PendingQueuedAction[];
       /** True if residual end-of-turn effects still need to run after this switch. */
