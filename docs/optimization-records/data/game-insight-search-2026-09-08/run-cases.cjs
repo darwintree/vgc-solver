@@ -1,0 +1,6 @@
+const {fork,execFileSync}=require('node:child_process');
+const {writeFileSync,appendFileSync,readFileSync}=require('node:fs');
+const {cpus}=require('node:os');
+const [wt,out,...ids]=process.argv.slice(2);
+writeFileSync(out,JSON.stringify({type:'metadata',gitCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:wt,encoding:'utf8'}).trim(),startedAt:new Date().toISOString(),node:process.version,cpu:cpus()[0].model,simulator:JSON.parse(readFileSync(wt+'/node_modules/@pkmn/sim/package.json')).version,workers:0,backend:'sync',warmupRuns:0,runs:1,freshProcessPerCase:true,searchBudgetMs:10000,tolerance:.02,pp:'native maximum (including PP Ups)',command:process.argv})+'\n');
+(async()=>{for(const id of ids){const r=await new Promise(resolve=>{let msg,err='';const p=fork(wt+'/dist/src/champions-benchmark.js',['--child',id],{cwd:wt,stdio:['ignore','ignore','pipe','ipc']});p.stderr.on('data',x=>err+=x);p.on('message',x=>msg=x);const timer=setTimeout(()=>p.kill('SIGKILL'),30000);p.on('exit',(code,signal)=>{clearTimeout(timer);resolve(msg||{status:signal==='SIGKILL'?'watchdog':'error',error:err,code,signal})});});appendFileSync(out,JSON.stringify({id,...r})+'\n');console.log(id,r.status,r.searchMs?.toFixed(1),r.lowerBound,r.upperBound)}})().catch(e=>{console.error(e);process.exitCode=1});

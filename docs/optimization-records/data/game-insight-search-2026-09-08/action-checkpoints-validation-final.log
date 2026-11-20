@@ -1,0 +1,35 @@
+✔ two-action checkpoints preserve native setup and attack probability (224.457608ms)
+✔ damage checkpoints preserve concrete correlated HP, recoil and Disguise state (231.433295ms)
+✔ a completed multi-hit action retains Stamina and post-move boosts (929.557879ms)
+✔ secondary status and berry updates precede the checkpoint (1053.827051ms)
+✔ Encore can replace a queued move before the native suffix continues (145.843375ms)
+✔ canceling after checkpoint creation retains the residual prefix mass (188.340239ms)
+✔ evicting a checkpoint falls back to the original full prefix (226.064055ms)
+✔ factory admission rejects custom rules and fabricated cache objects (2453.686332ms)
+✔ State method replacement declines cached resume, and wrappers restore on exceptions (186.845631ms)
+✔ a forced-switch request remains a full concrete decision boundary (206.91498ms)
+✔ default API reaches a 32-level stochastic policy with non-first actions (11.686337ms)
+✔ lazy=false proves the mirrored 32-level negative chain (10.750309ms)
+✔ symmetric negative utility reaches the upper-proof endpoint (0.319796ms)
+✔ every adversarial response is covered, including a rare refutation (0.731673ms)
+✔ shared descendants retain the exact DAG certificate (0.5714ms)
+✔ a pure cycle stays unknown, while a useful alternate row can certify around it (0.347112ms)
+✔ partial probability remains adversarial uncertainty and can certify before completion (0.303199ms)
+✔ resuming a partial transition replaces cumulative mass and certifies completion (0.158592ms)
+✔ generated child evidence can precede resuming a partial transition (0.624349ms)
+✔ native one-replay batches preserve all repeated-Protect probability (2490.075597ms)
+✔ cancellation after splitting a prefix restores only the active residual mass (2423.444137ms)
+✔ a cursor enforces the total simulator limit across batches (2.080628ms)
+✔ node-limited cumulative transition acceptance keeps missing children unknown (0.265647ms)
+✔ partial mass normalization encloses both remainder completions (-1, -5e-10) (0.181703ms)
+✔ partial mass normalization encloses both remainder completions (-1, 5e-10) (0.055874ms)
+✔ partial mass normalization encloses both remainder completions (1, -5e-10) (0.041157ms)
+✔ partial mass normalization encloses both remainder completions (1, 5e-10) (0.037875ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11323.918086

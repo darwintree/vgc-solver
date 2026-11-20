@@ -1,0 +1,74 @@
+Total sample milliseconds 9727.695
+Categories [('restore/deserialize', 2396.0, 24.6), ('event work', 2250.4, 23.1), ('other native simulation', 1801.3, 18.5), ('snapshot/serialize', 1629.7, 16.8), ('state/key', 1102.7, 11.3), ('other solver/transition', 391.4, 4.0), ('audit/prepare', 156.2, 1.6)]
+SELF
+862.6 deepClone utils.js 349
+743.0 serialize state.js 380
+589.5 getCallback battle.js 853
+462.5 jsonStringifyMemo native-memo-key.js 45
+432.2 normalize native-memo-key.js 48
+349.9 normalizeJSON showdown-adapter.js 37
+341.2 findEventHandlers battle.js 866
+313.3 hasPossibleEvent event-plan.js 197
+285.1 runEvent battle.js 594
+273.5 deserialize state.js 393
+271.5 findPokemonEventHandlers battle.js 931
+200.5 cloneJSON showdown-adapter.js 32
+181.6 deserializeWithRefs state.js 307
+181.2 collect native-memo-key.js 16
+166.3 serializeWithRefs state.js 266
+160.2 serializeActiveMove state.js 246
+129.7 resolvePriority battle.js 782
+114.1  showdown-adapter.js 127
+112.3 advance progressive-transition.js 58
+103.5 fromRef state.js 353
+102.3 inspect native-rules.js 197
+98.4 Battle battle.js 56
+95.3 sameFingerprint event-plan.js 88
+84.8 _intern bounded-solver.js 209
+84.6 toID dex-data.js 26
+75.1 optimizedFindEventHandlers empty-events.js 83
+67.8 get dex-formats.js 471
+65.6 singleEvent battle.js 419
+63.6 Pokemon pokemon.js 18
+62.3 getByID dex-items.js 77
+61.9 endTurn battle.js 1422
+59.0 add battle.js 2887
+58.3 runAction battle.js 2469
+58.0 getByID dex-abilities.js 54
+53.8 deserializeBattle state.js 67
+INCLUSIVE
+9727.7 solveSync bounded-solver.js 108
+9727.7 solve bounded-solver.js 822
+9727.7  profile-solver.cjs 1
+9727.7  loader 1880
+9727.7  loader 2025
+9727.7  loader 1636
+9727.7  loader 1314
+9727.7 wrapModuleLoad loader 244
+9727.7 executeUserEntryPoint run_main 140
+9727.7  run_main_module 1
+9727.7 (root)  0
+9443.3 _expandCell bounded-solver.js 357
+8932.6 advance progressive-transition.js 58
+4051.7 makeChoices battle.js 2784
+3882.6 commitChoices battle.js 2798
+3562.8 turnLoop battle.js 2741
+2947.0 runAction battle.js 2469
+2464.1 runMove battle-actions.js 203
+2396.0 restoreBattle showdown-adapter.js 119
+2293.5 useMove battle-actions.js 347
+2282.5 useMoveInner battle-actions.js 355
+2156.4 fromJSON battle.js 173
+2147.7 deserializeBattle state.js 67
+1982.3 trySpreadMoveHit battle-actions.js 513
+1968.2 normalize native-memo-key.js 48
+1962.1 runEvent battle.js 594
+1809.4 hitStepMoveHitLoop battle-actions.js 827
+1790.8 optimizedFindEventHandlers empty-events.js 83
+1630.0 normalizeJSON showdown-adapter.js 37
+1629.7 snapshotBattle showdown-adapter.js 98
+1567.9 serialize state.js 380
+1535.6 findEventHandlers battle.js 866
+1390.7 spreadMoveHit battle-actions.js 1023
+1156.0 serializeBattle state.js 45
+1156.0 toJSON battle.js 170

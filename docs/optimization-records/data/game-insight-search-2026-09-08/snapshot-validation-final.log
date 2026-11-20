@@ -1,0 +1,47 @@
+✔ native and current distributions match from fixed single and double snapshots (4966.297786ms)
+✔ randomMapped groups equal integer damage values with exact 32-bit mass (0.464796ms)
+✔ randomGrouped returns raw representatives for observable classes (0.656044ms)
+✔ fractional secondary chance matches native random(100) semantics (2492.805541ms)
+✔ secondary aggregation bypasses forceRandomChance like native random(100) (1.075959ms)
+✔ self drops and multi-hit secondaries preserve native distributions (3328.434257ms)
+✔ two-hit Double Kick preserves the complete native distribution (992.159296ms)
+✔ custom truncation keeps native randomizer behavior (0.62629ms)
+✔ unsupported action overrides fall back to native methods (0.499842ms)
+✔ type callbacks and action overrides preserve exact fallback behavior (52.84824ms)
+✔ HP saturation preserves native damage, recoil, and drain outcomes (44.920486ms)
+✔ damage handlers disable HP saturation for Sturdy and Focus Sash (51.710877ms)
+✔ Substitute and multi-hit transitions remain exact at low HP (75.339298ms)
+✔ low HP secondary outcomes match native enumeration (962.656214ms)
+✔ post-tail saturation preserves resisted and threshold-crossing damage (58.075791ms)
+✔ saturated contact damage preserves retaliation and complete surviving team state (109.784145ms)
+✔ custom raw damage observers retain their complete native distribution (56.317263ms)
+✔ custom spread-hit wrappers retain native damage randomization (0.684906ms)
+✔ weather damage adjustment preserves the complete nonterminal roll distribution (36.708445ms)
+✔ Life Orb final rounding and suppression preserve complete native distributions (567.501281ms)
+✔ custom final damage callbacks preserve their raw damage observations (54.649192ms)
+✔ Disguise state predicates preserve native distributions across intact and busted forms (363.683656ms)
+✔ custom Disguise effectiveness observers execute only through the native path (54.144124ms)
+✔ intact Disguise absorbs rolls while preserving later actions and reserve state (1255.770393ms)
+✔ Disguise absorption respects Mold Breaker and transformed-ability suppression (208.606031ms)
+✔ multi-hit damage resumes native roll classes after breaking Disguise (1147.488297ms)
+✔ a raw observer preceding Disguise retains its native damage distribution (64.024049ms)
+✔ custom immunity prototypes retain damage after a mid-hit ability change (70.058975ms)
+✔ custom effectiveness prototypes retain native active-move mutations (49.355039ms)
+✔ snapshot detaches only native serializer aliases and preserves state shape (3.377908ms)
+✔ doubles, team ordering, illusion and active move serialize without graph alias (1.127955ms)
+✔ shared team set aliases preserve old JSON roundtrip splitting (0.911018ms)
+✔ custom toJSON falls back to the complete JSON path (1.105234ms)
+✔ State.serializeBattle override also disables the native fast path (1.139145ms)
+✔ overridden State.serializeWithRefs falls back without retaining live aliases (1.209512ms)
+✔ normalized snapshots detach repeated nested values without changing native methods (1.367931ms)
+✔ choice switch-in collections preserve JSON normalization and detachment (0.955957ms)
+✔ custom Pokemon serializer remains on the complete detached JSON path (1.160554ms)
+✔ direct format metadata retains JSON normalization and detachment (2.401511ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17601.710789

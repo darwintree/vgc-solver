@@ -1,0 +1,41 @@
+✔ default API reaches a 32-level stochastic policy with non-first actions (12.900826ms)
+✔ lazy=false proves the mirrored 32-level negative chain (10.19639ms)
+✔ symmetric negative utility reaches the upper-proof endpoint (0.333104ms)
+✔ every adversarial response is covered, including a rare refutation (0.716649ms)
+✔ shared descendants retain the exact DAG certificate (0.578625ms)
+✔ a pure cycle stays unknown, while a useful alternate row can certify around it (0.402704ms)
+✔ native one-turn interval is enclosed for Water Gun and Power Gem (750.864374ms)
+✔ native one-turn interval is enclosed for Water Gun and Hydro Pump (660.242678ms)
+✔ native one-turn interval is enclosed for Bonemerang and Power Gem (15324.293922ms)
+✔ bounded certainty retains no fabricated transition or exact flag (215.86581ms)
+✔ unsupported first-move dependency falls back: Drain Punch (182.183394ms)
+✔ unsupported first-move dependency falls back: Power-Up Punch (197.583632ms)
+✔ unsupported first-move dependency falls back: Super Fang (161.440083ms)
+✔ unsupported first-move dependency falls back: Flail (156.815445ms)
+✔ unsupported first-move dependency falls back: Swords Dance (164.807861ms)
+✔ full HP Sash, protection, and unclassified ability fall back (471.239438ms)
+✔ survival and response KO thresholds are necessary, and expired probes stop (480.566389ms)
+✔ Champions native PP states admit the costly multi-hit response certificate (350.27505ms)
+✔ status, dynamic response power and modified native methods are not certified (318.034896ms)
+✔ a berry threshold remains inside the native one-turn certificate (678.00199ms)
+✔ a first-move defense increase invalidates the response damage lower bound (319.017127ms)
+✔ native callbacks relocated to another event slot do not enter the envelope (496.990158ms)
+✔ numeric event callbacks are not mistaken for event-order metadata (160.641433ms)
+✔ an added third type is outside the damage-overflow certificate domain (163.548009ms)
+✔ a healing attacker uses its possible healed HP for the response threshold (857.178075ms)
+✔ probabilistic KO partitions enclose native damage and accuracy: Power Gem (435.075048ms)
+✔ probabilistic KO partitions enclose native damage and accuracy: Hydro Pump (413.796465ms)
+✔ probabilistic KO partitions enclose native damage and accuracy: Frost Breath (266.575323ms)
+✔ Torrent HP regimes and berry healing keep native response mass enclosed (718.082338ms)
+✔ a first secondary is left unknown instead of assuming the response can act (417.854111ms)
+✔ an explicit no-crit native damage rule is not assigned ordinary critical mass (355.78992ms)
+✔ Torrent callbacks require their audited event slots (327.694098ms)
+✔ Champions full PP special-attack cells expose partial terminal mass (330.510142ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25917.064078
