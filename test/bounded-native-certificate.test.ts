@@ -118,6 +118,7 @@ function certifyFixture(makeFixture) {
   const solver = new BoundedSolver({
     lazyCells: false,
     selectionPolicy: 'security',
+    engine: 'showdown',
     tolerance: 0.02,
     maxSearchMs: 30000,
     maxNodes: 5000,

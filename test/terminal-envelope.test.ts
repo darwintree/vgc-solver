@@ -72,7 +72,7 @@ for (const [first, response] of [['Water Gun', 'Power Gem'], ['Water Gun', 'Hydr
 }
 
 test('bounded certainty retains no fabricated transition or exact flag', () => {
-  const result = new BoundedSolver().solve(position());
+  const result = new BoundedSolver({engine: 'showdown'}).solve(position());
   assert.equal(result.converged, true);
   assert.equal(result.exact, false);
   assert.equal(result.stats.terminalEnvelopes, 1);

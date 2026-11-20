@@ -36,11 +36,12 @@ async function run() {
       const input = battle.sides.map(side => ({species: side.active[0].species.name,
         hp: side.active[0].hp, maxhp: side.active[0].maxhp,
         pp: side.active[0].moveSlots.map(m => ({id: m.id, pp: m.pp, maxpp: m.maxpp}))}));
+      const engineOpt = (args[2] === 'showdown' || args[2] === 'compact' ? args[2] : 'auto') as 'auto' | 'compact' | 'showdown';
       const result = new BoundedSolver({tolerance: 0.02, maxSearchMs: 10000,
-        lazyCells: false, selectionPolicy: 'auto'}).solve(battle);
+        lazyCells: false, selectionPolicy: 'auto', engine: engineOpt}).solve(battle);
       process.send!({status: result.converged && result.stats.searchMs <= 10000
         ? 'within-budget' : 'not-within-budget', converged: result.converged,
-        backend: 'sync', fixtureMs, prepareMs: result.stats.prepareMs,
+        backend: 'sync', engine: result.engine ?? 'showdown', fixtureMs, prepareMs: result.stats.prepareMs,
         searchMs: result.stats.searchMs, totalMs: performance.now() - start,
         lowerBound: result.lowerBound, upperBound: result.upperBound,
         input, result});
@@ -58,7 +59,7 @@ async function run() {
     command: process.argv.join(' '), gitCommit: execFileSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
     node: process.version, simulator: JSON.parse(readFileSync('node_modules/@pkmn/sim/package.json', 'utf8')).version,
     platform: platform(), release: release(), cpu: cpus()[0]?.model,
-    workers: 0, backend: 'sync', warmupRuns: 0, runs: 1, freshProcessPerCase: true,
+    workers: 0, backend: 'sync', engine: 'auto', warmupRuns: 0, runs: 1, freshProcessPerCase: true,
     searchBudgetMs: 10000, watchdogMs: 30000, tolerance: 0.02, lazyCells: false,
     pp: 'native maximum (including PP Ups)', dataVersion: snapshot.dataVersion,
     sourceGeneratedAt: snapshot.generatedAt}) + '\n');

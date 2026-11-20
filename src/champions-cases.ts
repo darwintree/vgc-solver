@@ -2,11 +2,13 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {Dex} from '@pkmn/sim';
 import {createBattle, refreshMoveRequest, setHP} from './showdown-adapter';
+import {createChampionsModBattle, getChampionsDex} from './engine/ruleset';
 
 const snapshot = JSON.parse(readFileSync(resolve('fixtures/champions/singles-top10.json'), 'utf8'));
 const statFields = {hp: 'hp_points', atk: 'attack_points', def: 'defense_points',
   spa: 'sp_atk_points', spd: 'sp_def_points', spe: 'speed_points'};
 const hpPercentages = [25, 50, 100];
+const championsDex = getChampionsDex();
 
 function configuration(entry) {
   const reasons: string[] = [];
@@ -24,25 +26,55 @@ function configuration(entry) {
   const nature = ranked('stat_alignment', 1)[0]?.name;
   const points = ranked('stat_points', 1)[0];
   const evs = {};
+  const sp = {};
   for (const [stat, field] of Object.entries(statFields)) {
     const value = Number(points?.[field]);
     if (!Number.isInteger(value) || value < 0 || value > 32) reasons.push(`Invalid ${field}`);
     // At level 50, perfect IVs: 4 EVs give the first point, then 8 per point.
     evs[stat] = value === 0 ? 0 : value * 8 - 4;
+    sp[stat] = value;
   }
   for (const [kind, names] of [
     ['species', [entry.species]], ['moves', moves], ['items', [item]],
     ['abilities', [ability]], ['natures', [nature]],
   ] as const) {
     for (const name of names) {
-      if (!name || !Dex[kind].get(name).exists) reasons.push(`Unsupported ${kind}: ${name}`);
+      if (!name || !championsDex[kind].get(name).exists) reasons.push(`Unsupported ${kind}: ${name}`);
     }
   }
-  if (item && Dex.items.get(item).megaStone) {
-    reasons.push(`Mega evolution actions are not implemented: ${item}`);
-  }
-  return {...entry, reasons, set: {species: entry.species, level: 50, item, ability, nature,
-    moves, evs, ivs: {hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31}}};
+  const usesChampionsMod = !!(
+    (item && (championsDex.items.get(item).megaStone || !Dex.items.get(item).exists)) ||
+    !Dex.species.get(entry.species).exists ||
+    (ability && !Dex.abilities.get(ability).exists) ||
+    moves.some(m => !Dex.moves.get(m).exists)
+  );
+  return {
+    ...entry,
+    reasons,
+    usesChampionsMod,
+    set: {
+      species: entry.species,
+      level: 50,
+      item,
+      ability,
+      nature,
+      moves,
+      evs,
+      ivs: {hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31},
+    },
+    championsSet: {
+      name: entry.species,
+      species: entry.species,
+      level: 50,
+      item,
+      ability,
+      nature,
+      gender: '',
+      moves,
+      evs: sp,
+      ivs: {hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31},
+    },
+  };
 }
 
 const championsConfigurations = snapshot.pokemon.map(configuration);
@@ -62,9 +94,13 @@ function championsCases() {
   return cases;
 }
 
-function createChampionsBattle(fixture) {
+function createChampionsBattle(fixture, options: {mod?: 'champions' | 'base'} = {}) {
   if (fixture.skipReasons.length) throw new Error(fixture.skipReasons.join('; '));
-  const battle = createBattle(structuredClone(fixture.p1.set), structuredClone(fixture.p2.set));
+  const useMod = options.mod === 'champions' ||
+    (options.mod !== 'base' && (fixture.p1.usesChampionsMod || fixture.p2.usesChampionsMod));
+  const battle = useMod
+    ? createChampionsModBattle([structuredClone(fixture.p1.championsSet)], [structuredClone(fixture.p2.championsSet)])
+    : createBattle(structuredClone(fixture.p1.set), structuredClone(fixture.p2.set));
   for (const [side, percent] of [['p1', fixture.hp1], ['p2', fixture.hp2]] as const) {
     setHP(battle, side, Math.max(1, Math.floor(battle[side].active[0].maxhp * percent / 100)));
   }

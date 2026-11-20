@@ -36,7 +36,7 @@ function usage() {
   return [
     `Usage: npm run benchmark -- [--case ${fixtureNames()}] [--pp N]`,
     '       [--solver exact|bounded] [--tolerance W] [--search-ms N]',
-    '       [--selection-policy auto|joint|security]',
+    '       [--selection-policy auto|joint|security] [--engine auto|compact|showdown]',
     '       [--workers N] [--warmup N] [--runs N] [--batch-size N]',
     '',
     'Without --workers, run synchronous solves. With --workers, keep a resident',
@@ -66,6 +66,7 @@ function parseArgs(argv) {
     solver: 'exact', tolerance: 0.02, toleranceSpecified: false,
     searchMs: 5000, searchMsSpecified: false,
     selectionPolicy: 'auto', selectionPolicySpecified: false,
+    engine: 'auto', engineSpecified: false,
     warmup: 0, runs: 1, batchSize: 8, help: false};
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -96,6 +97,12 @@ function parseArgs(argv) {
         throw new Error(`Invalid selection policy '${options.selectionPolicy}'. Choose auto, joint, or security`);
       }
       options.selectionPolicySpecified = true;
+    } else if (arg === '--engine') {
+      options.engine = next();
+      if (!['auto', 'compact', 'showdown'].includes(options.engine)) {
+        throw new Error(`Invalid engine '${options.engine}'. Choose auto, compact, or showdown`);
+      }
+      options.engineSpecified = true;
     }
     else if (arg === '--workers') options.workers = positiveInteger(next(), 'workers');
     else if (arg === '--warmup') options.warmup = positiveInteger(next(), 'warmup', true);
@@ -109,6 +116,7 @@ function parseArgs(argv) {
     if (options.toleranceSpecified) boundedFlags.push('--tolerance');
     if (options.searchMsSpecified) boundedFlags.push('--search-ms');
     if (options.selectionPolicySpecified) boundedFlags.push('--selection-policy');
+    if (options.engineSpecified) boundedFlags.push('--engine');
     if (boundedFlags.length) {
       throw new Error(`${boundedFlags.join(', ')} require --solver bounded`);
     }
@@ -152,7 +160,7 @@ function solverOptions(options, pool, workers) {
 
 function boundedSolverOptions(options) {
   return {tolerance: options.tolerance, maxSearchMs: options.searchMs,
-    lazyCells: false, selectionPolicy: options.selectionPolicy};
+    lazyCells: false, selectionPolicy: options.selectionPolicy, engine: options.engine};
 }
 
 function backendForResult(result, requested, solverKind) {
@@ -176,6 +184,7 @@ function boundedSample(result, totalMs, backend) {
   return {
     totalMs,
     backend,
+    engine: result.engine ?? 'showdown',
     value: result.value,
     lowerBound: result.lowerBound,
     upperBound: result.upperBound,

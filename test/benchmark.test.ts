@@ -28,6 +28,13 @@ test('bounded benchmark defaults to the generic adaptive policy', () => {
   );
 });
 
-test('benchmark registers the parallel sucker-punch-6 fixture', () => {
+test('benchmark registers the parallel sucker-punch-6 fixture and engine selection flag', () => {
   assert.equal(parseArgs(['--case', 'sucker-punch-6']).fixture, 'sucker-punch-6');
+  assert.equal(parseArgs(['--solver', 'bounded']).engine, 'auto');
+  assert.equal(parseArgs(['--solver', 'bounded', '--engine', 'compact']).engine, 'compact');
+  assert.equal(parseArgs(['--solver', 'bounded', '--engine', 'showdown']).engine, 'showdown');
+  assert.throws(
+    () => parseArgs(['--solver', 'exact', '--engine', 'compact']),
+    /--engine require --solver bounded/
+  );
 });

@@ -64,9 +64,9 @@ test('standard 1v1 fixtures match @pkmn/sim exact distributions', () => {
   assertParity(suckerPunchGame().battle, 'move 2', 'move 2', 'suckerPunch: Knock Off x Tackle');
 });
 
-test('all 54 supported Champions fixtures pass engine admission', () => {
+test('all 252 supported Champions fixtures (including Mega Evolution) pass engine admission', () => {
   const supported = championsCases().filter(c => c.skipReasons.length === 0);
-  assert.equal(supported.length, 54);
+  assert.equal(supported.length, 252);
   for (const c of supported) {
     const battle = createChampionsBattle(c);
     const report = canRunInEngine(battle);

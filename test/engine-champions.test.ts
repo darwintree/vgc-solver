@@ -292,8 +292,9 @@ test('Champions Mega Gengar Shadow Tag trapping & BoundedSolver end-to-end Mega 
   assert.ok(adapter, 'Champions Mega Evolution battle must be admitted by compact engine adapter');
   const rootActions = adapter.legalActions(adapter.snapshotBattle(bMegaSolve), 0);
   assert.ok(rootActions.some((a: any) => a.command.includes('mega')), 'Mega Evolution actions must be exposed to BoundedSolver');
-  const solver = new BoundedSolver({tolerance: 1e-4, maxSearchMs: 5000, adapter});
+  const solver = new BoundedSolver({tolerance: 1e-4, maxSearchMs: 5000});
   const res = solver.solve(bMegaSolve);
+  assert.equal(res.engine, 'compact');
   assert.equal(res.converged, true);
   assert.ok(res.lowerBound >= -1 && res.upperBound <= 1 && res.upperBound - res.lowerBound <= 1e-4);
 });

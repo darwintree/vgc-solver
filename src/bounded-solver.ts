@@ -14,6 +14,7 @@ import {createTurnCursor, type TransitionCursor} from './progressive-transition'
 import {createEventPlan} from './event-plan';
 import {auditNativeRules} from './native-rules';
 import {createTerminalEnvelope} from './terminal-envelope';
+import {canRunInEngine, createEngineBoundedAdapter} from './engine';
 
 const PROBABILITY_SUM_TOLERANCE = 1e-9;
 
@@ -36,6 +37,7 @@ export interface BoundedOptions extends SolverOptions {
   warmStartRoot?: boolean;
   lazyCells?: boolean;
   selectionPolicy?: 'auto' | 'security' | 'joint';
+  engine?: 'auto' | 'compact' | 'showdown';
   adapter?: BoundedAdapter;
 }
 export interface BoundedResult {
@@ -56,6 +58,7 @@ export interface BoundedResult {
   payoffMatrixIntervals: {lowerBound: number; upperBound: number}[][];
   stats: ReturnType<typeof createStats> & {nodes: number};
   backend?: 'sync' | 'fallback' | 'worker';
+  engine?: 'compact' | 'showdown' | 'custom';
 }
 interface BoundedOutcome {
   probability: number;
@@ -144,6 +147,7 @@ function createStats() {
  */
 class BoundedSearch {
   declare options: Required<Omit<BoundedOptions, 'adapter' | 'maxStates'>>;
+  declare explicitAdapter: BoundedAdapter | null;
   declare adapter: BoundedAdapter;
   declare nodes: Map<string, SearchNode>;
   declare snapshotKeyCache: WeakMap<object, string>;
@@ -170,9 +174,13 @@ class BoundedSearch {
       warmStartRoot: options.warmStartRoot ?? true,
       lazyCells: options.lazyCells ?? true,
       selectionPolicy: options.selectionPolicy ?? 'auto',
+      engine: options.engine ?? 'auto',
     };
     if (!['auto', 'security', 'joint'].includes(this.options.selectionPolicy)) {
       throw new RangeError('selectionPolicy must be auto, security, or joint');
+    }
+    if (!['auto', 'compact', 'showdown'].includes(this.options.engine)) {
+      throw new RangeError('engine must be auto, compact, or showdown');
     }
     if (!(this.options.tolerance >= 0) || !Number.isFinite(this.options.tolerance)) {
       throw new RangeError('tolerance must be a finite non-negative number');
@@ -183,7 +191,8 @@ class BoundedSearch {
     if (!Number.isInteger(this.options.maxNodes) || this.options.maxNodes < 1) {
       throw new RangeError('maxNodes must be a positive integer');
     }
-    this.adapter = options.adapter || nativeAdapter;
+    this.explicitAdapter = options.adapter || null;
+    this.adapter = this.explicitAdapter || nativeAdapter;
     this._reset();
   }
 
@@ -195,6 +204,7 @@ class BoundedSearch {
     this.stopReason = null;
     this.deadline = Infinity;
     this._prepareStart = 0;
+    this.adapter = this.explicitAdapter || nativeAdapter;
     this.memoStateKey = this.adapter.stateKey || stateKey;
     this.ppCache = null;
     this.ppAudit = null;
@@ -209,13 +219,51 @@ class BoundedSearch {
   protected solveSync(battle): BoundedResult {
     this._reset();
     this._prepareStart = performance.now();
+
+    let engineLabel: 'compact' | 'showdown' | 'custom' = 'custom';
+    let nativeAudit: boolean | undefined;
+
+    if (this.explicitAdapter) {
+      this.adapter = this.explicitAdapter;
+      engineLabel = 'custom';
+    } else if (this.options.engine === 'showdown') {
+      this.adapter = nativeAdapter;
+      engineLabel = 'showdown';
+    } else {
+      const isChampionsMod = battle?.dex?.currentMod === 'champions' || battle?.dex?.currentMod === 'championsregmb';
+      const support = canRunInEngine(battle);
+      let compactAdmitted = false;
+      if (support.supported) {
+        if (isChampionsMod) {
+          compactAdmitted = true;
+        } else {
+          nativeAudit = auditNativeRules(battle);
+          compactAdmitted = nativeAudit;
+        }
+      }
+      if (compactAdmitted) {
+        const compactAdapter = createEngineBoundedAdapter(battle);
+        if (compactAdapter) {
+          this.adapter = compactAdapter;
+          engineLabel = 'compact';
+        }
+      }
+      if (engineLabel !== 'compact') {
+        if (this.options.engine === 'compact') {
+          const reason = support.supported ? 'Battle failed native stock rules audit' : support.reasons.join('; ');
+          throw new Error(`Compact engine cannot run this battle: ${reason}`);
+        }
+        this.adapter = nativeAdapter;
+        engineLabel = 'showdown';
+      }
+    }
+
     const isNative = this.adapter === nativeAdapter;
 
     // Auditing and the initial snapshot are fixed preparation. The search
     // clock starts after them so maxSearchMs measures only anytime search.
-    let nativeAudit;
     if (isNative) {
-      nativeAudit = auditNativeRules(battle);
+      if (nativeAudit === undefined) nativeAudit = auditNativeRules(battle);
       this.terminalEnvelope = createTerminalEnvelope(battle, nativeAudit);
       this.memoStateKey = createMemoStateKey(battle, stateKey, nativeAudit);
       this.ppCache = createPPTransitionCache({admitOnSecondUse: true});
@@ -277,6 +325,7 @@ class BoundedSearch {
     const result = this._result(root, converged);
     this.stats.searchMs = performance.now() - searchStart;
     result.stats = {...this.stats, nodes: this.nodes.size};
+    result.engine = engineLabel;
     return result;
   }
 
