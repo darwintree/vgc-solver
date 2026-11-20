@@ -217,7 +217,7 @@ function nativeCallbackFunctions() {
 const NATIVE_CALLBACKS = nativeCallbackFunctions();
 
 function coreMethodsAreNative(battle) {
-  if (SIM_VERSION !== '0.10.11' || battle?.gen !== 9) return false;
+  if (SIM_VERSION !== '0.11.0' || battle?.gen !== 9) return false;
   if (!nativeDescriptorsAreIntact(NATIVE_PROTOTYPES) || !nativeDescriptorsAreIntact(NATIVE_STATICS)) {
     return false;
   }

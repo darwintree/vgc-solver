@@ -467,7 +467,7 @@ class BoundedSearch {
     }
     if (this.adapter.createTurnCursor) {
       cell.cursor ||= this.adapter.createTurnCursor(node.snapshot, node.actions1[i], node.actions2[j], this._transitionOptions());
-      const progress = cell.cursor.advance({maxRuns: 32, deadline: Math.min(this.deadline, performance.now() + 25)});
+      const progress = cell.cursor.advance({maxRuns: 32, deadline: this.deadline});
       this._acceptTransition(node, i, j, progress);
       return;
     }

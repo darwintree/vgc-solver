@@ -24,7 +24,7 @@
 
 ## 当前求解模型
 
-使用 `@pkmn/sim@0.10.11` 作为战斗规则引擎，并在每个回合求解零和矩阵博弈：
+使用 `@pkmn/sim@0.11.0`（及 `@pkmn/mods@0.11.0` 中的官方 `champions` 规则模组）作为战斗规则真值引擎，并在每个回合求解零和矩阵博弈：
 
 \[
 Q_s(a,b)=\sum_{s'}P(s'\mid s,a,b)V(s'),\qquad V(s)=\operatorname{val}(Q_s).
@@ -49,6 +49,7 @@ exact、worker 和未提供游标的自定义 adapter 继续使用完整 `enumer
 ## 文件结构
 
 ```text
+src/engine/              紧凑单遍分叉对战计算引擎（Pokémon Champions 基线、单双打/换人/Mega 进化、compute/certified/pruned 模式与覆盖率审计，见 docs/adr/0001-compact-branching-battle-engine.md）
 src/showdown-adapter.ts  Showdown 状态复制、合法行动、随机分支枚举
 src/branching-prng.ts    可回放且可分叉的 PRNG facade
 src/progressive-transition.ts  同步 bounded 的渐进转移与剩余概率质量

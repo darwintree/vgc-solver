@@ -107,7 +107,7 @@ function snapshotBattle(battle: Battle): Snapshot {
 }
 
 function restoreBattle(snapshot: Snapshot): Battle {
-  // @pkmn/sim 0.10.11 reconstructs all mutable state except log and Pokemon.set.
+  // @pkmn/sim 0.11.0 reconstructs all mutable state except log and Pokemon.set.
   // Detach those retained references; copying the entire snapshot duplicates its work.
   return Battle.fromJSON({
     ...snapshot,

@@ -14,7 +14,7 @@ const native = Object.freeze({
   speedSort: Battle.prototype.speedSort,
   comparePriority: Battle.prototype.comparePriority,
   singleEvent: Battle.prototype.singleEvent,
-  faintMessages: Battle.prototype.faintMessages,
+  resolveFaints: Battle.prototype.resolveFaints,
   getCallback: Battle.prototype.getCallback,
   findFieldEventHandlers: Battle.prototype.findFieldEventHandlers,
   findSideEventHandlers: Battle.prototype.findSideEventHandlers,
@@ -48,7 +48,7 @@ function hasNativeResidualMethods(battle, fieldEvent = battle.fieldEvent) {
     battle.speedSort === native.speedSort &&
     battle.comparePriority === native.comparePriority &&
     battle.singleEvent === native.singleEvent &&
-    battle.faintMessages === native.faintMessages &&
+    battle.resolveFaints === native.resolveFaints &&
     battle.getCallback === native.getCallback &&
     battle.findFieldEventHandlers === native.findFieldEventHandlers &&
     battle.findSideEventHandlers === native.findSideEventHandlers &&

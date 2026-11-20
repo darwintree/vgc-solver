@@ -12,13 +12,15 @@
     "predemo": "npm run build",
     "demo": "node dist/src/demo.js",
     "pretest": "npm run build",
-    "test": "node --test --test-concurrency=4 dist/test/*.test.js"
+    "test": "node --test --test-concurrency=4 dist/test/*.test.js",
+    "engine:coverage": "npm run build && node dist/src/engine/coverage.js"
   },
   "engines": {
     "node": ">=24"
   },
   "dependencies": {
-    "@pkmn/sim": "0.10.11"
+    "@pkmn/mods": "0.11.0",
+    "@pkmn/sim": "0.11.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
