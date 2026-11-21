@@ -71,8 +71,10 @@ export function auditChampionsCoverage(): ChampionsCoverageReport {
 }
 
 if (require.main === module) {
+  const strict = process.argv.includes('--strict');
   const r = auditChampionsCoverage();
   console.log(`Champions Coverage Audit (mod=${r.mod})`);
+  let totalMissing = 0;
   for (const [label, sec] of [
     ['Species', r.species],
     ['Megas', r.megas],
@@ -80,9 +82,14 @@ if (require.main === module) {
     ['Abilities', r.abilities],
     ['Moves', r.moves],
   ] as const) {
+    totalMissing += sec.missing.length;
     console.log(`  ${label.padEnd(10)}: ${sec.supported}/${sec.total} (${sec.percent}%)`);
     if (sec.missing.length > 0) {
       console.log(`    missing (${sec.missing.length}): ${sec.missing.slice(0, 25).join(', ')}${sec.missing.length > 25 ? ', ...' : ''}`);
     }
+  }
+  if (strict && totalMissing > 0) {
+    console.error(`Coverage audit failed in --strict mode: ${totalMissing} unsupported entries.`);
+    process.exitCode = 1;
   }
 }

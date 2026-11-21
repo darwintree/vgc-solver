@@ -1,0 +1,49 @@
+name: Champions Benchmark Sweep
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Fixture subset to sweep'
+        type: choice
+        default: historical-54
+        options:
+          - historical-54
+          - all-playable
+      strict:
+        description: 'Fail if any case misses the 10s search budget'
+        type: boolean
+        default: false
+  schedule:
+    # Weekly Monday 03:00 UTC regression sweep on historical 54 Champions matchups
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    name: Champions Singles Fresh-Process Sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Run fresh-process Champions sweep
+        run: >-
+          node scripts/champions-ci-sweep.mjs
+          --scope=${{ github.event.inputs.scope || 'historical-54' }}
+          --strict=${{ github.event.inputs.strict || 'false' }}
+          --output=champions-ci-results.jsonl
+      - name: Upload raw JSONL results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: champions-sweep-${{ github.event.inputs.scope || 'historical-54' }}
+          path: champions-ci-results.jsonl
+          retention-days: 14

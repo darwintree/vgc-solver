@@ -13,7 +13,11 @@
     "demo": "node dist/src/demo.js",
     "pretest": "npm run build",
     "test": "node --test --test-concurrency=4 dist/test/*.test.js",
-    "engine:coverage": "npm run build && node dist/src/engine/coverage.js"
+    "test:engine": "node scripts/run-tests.mjs engine",
+    "test:native": "node scripts/run-tests.mjs native",
+    "test:async": "node scripts/run-tests.mjs async",
+    "engine:coverage": "npm run build && node dist/src/engine/coverage.js",
+    "engine:coverage:strict": "npm run build && node dist/src/engine/coverage.js --strict"
   },
   "engines": {
     "node": ">=24"
