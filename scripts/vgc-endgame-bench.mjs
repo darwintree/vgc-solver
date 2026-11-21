@@ -570,7 +570,7 @@ function main() {
         }
         if (exp > 0) colBest.push({j, name: root.actions2[j].name, exp, minU, maxU});
       }
-      console.log(`   DIAG: rootExp=${expRoot}/${m * n} tight=${tightRoot} win=${winRoot} loss=${lossRoot} monoUpd=${res.stats.monotoneUpdates} ppUpd=${res.stats.ppBoundUpdates} boxSplits=${res.stats.boxSplits} matSolves=${res.stats.matrixSolves}`);
+      console.log(`   DIAG: rootExp=${expRoot}/${m * n} tight=${tightRoot} win=${winRoot} loss=${lossRoot} equivFill=${res.stats.equivCellsFilled || 0} protCont=${res.stats.protectContractions || 0} ppHits=${res.stats.ppCacheHits} monoUpd=${res.stats.monotoneUpdates} ppUpd=${res.stats.ppBoundUpdates} boxSplits=${res.stats.boxSplits} matSolves=${res.stats.matrixSolves}`);
       console.log('   Rows:', rowBest.sort((a, b) => b.exp - a.exp).slice(0, 4).map(r => `[${r.i}]${r.name}(e=${r.exp},L=${r.minL.toFixed(2)}..${r.maxL.toFixed(2)},U=${r.minU.toFixed(2)}..${r.maxU.toFixed(2)})`).join(' | '));
       console.log('   Cols:', colBest.sort((a, b) => b.exp - a.exp).slice(0, 4).map(r => `[${r.j}]${r.name}(e=${r.exp},U=${r.minU.toFixed(2)}..${r.maxU.toFixed(2)})`).join(' | '));
     }

@@ -10,6 +10,10 @@ export interface Action {
   name: string;
   id: string;
   command: string;
+  /** True when the action executes a draining move (or random move caller) for witness-conditioned monotonicity. */
+  hasDrain?: boolean;
+  /** True when the action executes Tailwind (or random move caller) for equal-Tailwind contraction witnesses. */
+  hasTailwind?: boolean;
 }
 export interface StrategyEntry {
   action: string;
@@ -49,7 +53,7 @@ export interface WorkerTransitionOptions extends TransitionOptions {
   outcomeKeyMode?: 'private';
   workerRoute?: number;
 }
-export type Outcome = {probability: number} & (
+export type Outcome = {probability: number; faintMask?: number} & (
   {snapshot: Snapshot; utility?: never} | {utility: number; snapshot?: never}
 );
 export interface Transition {

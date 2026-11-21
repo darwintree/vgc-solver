@@ -153,10 +153,27 @@ export function cloneHpDist(dist: HpDist | null): HpDist | null {
   return out;
 }
 
+const hpDistKeyCache = new WeakMap<HpDist, string>();
+
+export function hpDistKey(dist: HpDist): string {
+  let cached = hpDistKeyCache.get(dist);
+  if (cached !== undefined) return cached;
+  let s = 'D(';
+  for (let i = 0; i < dist.length; i++) {
+    if (i > 0) s += ',';
+    const e = dist[i];
+    s += e.hp + ':' + Math.round(e.prob * 1e9);
+  }
+  s += ')';
+  hpDistKeyCache.set(dist, s);
+  return s;
+}
+
 export function clonePokemon(p: PokemonState): PokemonState {
   return {
     hp: p.hp,
-    hpDist: cloneHpDist(p.hpDist),
+    // HpDist arrays are immutable once created by setNormalizedHpDist.
+    hpDist: p.hpDist,
     fainted: p.fainted,
     pp: p.pp.slice(),
     status: p.status,
@@ -773,7 +790,11 @@ export function canonicalStateKey(
   state: DynamicState,
   maskActiveHp?: readonly [boolean | number, boolean | number],
   maskPp = false,
-  maskPoke?: {side: 0 | 1; idx: number}
+  maskPoke?: {side: 0 | 1; idx: number},
+  maskHpBits = 0,
+  maskProtectBits = 0,
+  maskEqualTailwind = false,
+  maskInertTerrain = false
 ): string {
   const fm = ctx.featureMask;
   const trackFieldLastMove = (fm & FeatureBit.FIELD_LAST_MOVE) !== 0;
@@ -809,28 +830,36 @@ export function canonicalStateKey(
       .join(';');
     out += `[${ps}|${ra}|${state.phase.needsEndOfTurn ? 1 : 0}]`;
   }
-  if (f.weather || f.terrain || f.trickRoomTurns || f.gravityTurns || f.magicRoomTurns || f.wonderRoomTurns || f.fairyLockTurns || (trackFieldLastMove && f.lastMoveId)) {
-    out += `|F:${f.weather}${f.weatherTurns},${f.terrain}${f.terrainTurns},${f.trickRoomTurns}`;
+  const fTerr = maskInertTerrain ? '' : f.terrain;
+  const fTerrT = maskInertTerrain ? 0 : f.terrainTurns;
+  if (f.weather || fTerr || f.trickRoomTurns || f.gravityTurns || f.magicRoomTurns || f.wonderRoomTurns || f.fairyLockTurns || (trackFieldLastMove && f.lastMoveId)) {
+    out += `|F:${f.weather}${f.weatherTurns},${fTerr}${fTerrT},${f.trickRoomTurns}`;
     if (f.gravityTurns || f.magicRoomTurns || f.wonderRoomTurns || f.fairyLockTurns) {
       out += `,${f.gravityTurns},${f.magicRoomTurns},${f.wonderRoomTurns},${f.fairyLockTurns}`;
     }
     if (trackFieldLastMove && f.lastMoveId) out += `,LM:${f.lastMoveId}`;
   }
 
+  const eqTw = maskEqualTailwind && state.sides[0].tailwindTurns === state.sides[1].tailwindTurns;
   for (let s = 0; s < 2; s++) {
     const side = state.sides[s];
     const trackSideLastMoveIdx = s === 0 ? trackSide0LastMove : trackSide1LastMove;
     const maskSideSpec = maskActiveHp ? maskActiveHp[s] : false;
     const maskSideIdx = typeof maskSideSpec === 'number' ? maskSideSpec : (maskSideSpec ? side.active[0] : -1);
-    out += `|S${s}:${side.active.join(',')}`;
+    out += `|S${s}:`;
+    for (let sl = 0; sl < side.active.length; sl++) {
+      if (sl > 0) out += ',';
+      out += side.active[sl];
+    }
     if (trackMega && side.megaUsed) out += `/M1`;
     const sr = trackHazards && side.stealthRock ? 1 : 0;
     const spk = trackHazards ? side.spikes : 0;
     const tspk = trackHazards ? side.toxicSpikes : 0;
     const sw = trackHazards && side.stickyWeb ? 1 : 0;
+    const tw = eqTw ? 0 : side.tailwindTurns;
     if (sr || spk || tspk || sw ||
-        side.tailwindTurns || side.reflectTurns || side.lightScreenTurns || side.auroraVeilTurns || side.safeguardTurns) {
-      out += `/${sr},${spk},${tspk},${sw},${side.tailwindTurns},${side.reflectTurns},${side.lightScreenTurns},${side.auroraVeilTurns}`;
+        tw || side.reflectTurns || side.lightScreenTurns || side.auroraVeilTurns || side.safeguardTurns) {
+      out += `/${sr},${spk},${tspk},${sw},${tw},${side.reflectTurns},${side.lightScreenTurns},${side.auroraVeilTurns}`;
       if (side.safeguardTurns) out += `,${side.safeguardTurns}`;
     }
     for (let sl = 0; sl < side.wishTurns.length; sl++) {
@@ -845,15 +874,31 @@ export function canonicalStateKey(
         out += `;X`;
         continue;
       }
-      const hpStr = (maskSideIdx >= 0 && i === maskSideIdx) || (maskPoke && s === maskPoke.side && i === maskPoke.idx)
-        ? '*'
-        : (p.hpDist
-          ? `D(${p.hpDist.map(e => `${e.hp}:${e.prob.toFixed(9)}`).join(',')})`
-          : `${p.hp}`);
-      const ppStr = maskPp
-        ? p.pp.map(v => (v >= 3 ? '+' : v)).join(',')
-        : p.pp.join(',');
-      out += `;${hpStr}/${ppStr}`;
+      const hpMasked =
+        (maskSideIdx >= 0 && i === maskSideIdx) ||
+        (maskPoke && s === maskPoke.side && i === maskPoke.idx) ||
+        (maskHpBits !== 0 && (maskHpBits & (1 << (s * 6 + i))) !== 0);
+      out += ';';
+      if (hpMasked) {
+        out += '*';
+      } else if (p.hpDist) {
+        out += hpDistKey(p.hpDist);
+      } else {
+        out += p.hp;
+      }
+      out += '/';
+      const ppArr = p.pp;
+      if (maskPp) {
+        for (let m = 0; m < ppArr.length; m++) {
+          if (m > 0) out += ',';
+          out += ppArr[m] >= 3 ? '+' : ppArr[m];
+        }
+      } else {
+        for (let m = 0; m < ppArr.length; m++) {
+          if (m > 0) out += ',';
+          out += ppArr[m];
+        }
+      }
       if (p.status) out += `/${p.status}${p.statusTurns || ''}`;
       else out += `/`;
       const b = p.boosts;
@@ -875,7 +920,9 @@ export function canonicalStateKey(
       if (p.transformed) out += `/TF:${p.transformed.speciesId}:${p.transformed.abilityId}:${p.transformed.types.join(',')}`;
       if (trackDisguise && p.disguiseBusted) out += `/DB`;
       if (trackSub && p.substituteHp > 0) out += `/SB${p.substituteHp}`;
-      if (trackStall && p.protectStreak) out += `/PS${p.protectStreak}`;
+      if (trackStall && p.protectStreak && (maskProtectBits === 0 || (maskProtectBits & (1 << (s * 6 + i))) === 0)) {
+        out += `/PS${p.protectStreak}`;
+      }
       if (trackEncore && p.encoreMoveIdx >= 0) out += `/EN${p.encoreMoveIdx}:${p.encoreTurns}`;
       if (trackTaunt && p.tauntTurns > 0) out += `/TN${p.tauntTurns}`;
       if (p.throatChopTurns > 0) out += `/TC${p.throatChopTurns}`;

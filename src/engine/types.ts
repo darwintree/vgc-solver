@@ -702,12 +702,29 @@ export interface StepStats {
   peakBranches: number;
 }
 
+export const ACTION_OBS_EXECUTED = 1;
+export const ACTION_OBS_CATEGORY = 2;
+export const ACTION_OBS_EXACT = 4;
+export const ACTION_OBS_SLEEP_ONLY = 8;
+export const ACTION_OBS_OPP_TARGET_MATTERED = 16;
+
+export interface ActionObservation {
+  /** Per-slot observation bitmask indexed by slotId = side * 2 + slot (0..3). */
+  flags: Uint8Array;
+  /** Initial action priority for each slotId when action was a MoveAction. */
+  priority: Int8Array;
+  /** Initial action subOrder for each slotId when action was a MoveAction. */
+  subOrder: Int8Array;
+}
+
 export interface StepResult {
   outcomes: WeightedState[];
   /** Probability mass not expanded (certified budget hit) or dropped (pruned without renormalize). Always 0 on complete exact step. */
   remainingMass: number;
   complete: boolean;
   stats: StepStats;
+  /** Execution-trace observation mask for complete normal turns, enabling exact action-equivalence folding. */
+  actionObs?: ActionObservation;
 }
 
 export interface EngineSupportReport {

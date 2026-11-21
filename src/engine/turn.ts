@@ -25,6 +25,7 @@ import {
   expandStateHpDists,
   getHpEntries,
   getItemSpec,
+  hpDistKey,
   hpMax,
   hpMin,
   isGrounded,
@@ -35,6 +36,12 @@ import {
   splitBranchByHpPredicate,
 } from './state';
 import {
+  ACTION_OBS_CATEGORY,
+  ACTION_OBS_EXACT,
+  ACTION_OBS_EXECUTED,
+  ACTION_OBS_OPP_TARGET_MATTERED,
+  ACTION_OBS_SLEEP_ONLY,
+  type ActionObservation,
   type BoostStat,
   type BranchPolicy,
   type DynamicState,
@@ -125,13 +132,14 @@ function pokeReadsExactDamage(sp: StaticPokemonData): boolean {
 function midTurnBranchKey(
   ctx: StaticBattleContext,
   ab: ActiveBranch,
-  maskPoke?: {side: 0 | 1; idx: number}
+  maskHpBits = 0
 ): string {
-  let k = canonicalStateKey(ctx, ab.state, undefined, false, maskPoke);
+  let k = canonicalStateKey(ctx, ab.state, undefined, false, undefined, maskHpBits);
   for (let s = 0; s < 2; s++) {
     const side = ab.state.sides[s];
     if (side.wideGuard || side.quickGuard) k += `|WG${s}:${side.wideGuard ? 1 : 0}${side.quickGuard ? 1 : 0}`;
-    for (const idx of side.active) {
+    for (let sl = 0; sl < side.active.length; sl++) {
+      const idx = side.active[sl];
       if (idx < 0) continue;
       const p = side.pokemon[idx];
       if (p.protecting || p.enduring || p.roosted || p.flinched || p.movedThisTurn || p.switchedInThisTurn ||
@@ -143,81 +151,22 @@ function midTurnBranchKey(
       }
     }
   }
-  if (ab.remainingActions.length > 0) {
-    k += '|Q:' + ab.remainingActions
-      .map(a => `${a.side}.${a.action.slot}.${a.action.moveIndex}.${a.action.targetSide ?? ''}.${a.action.targetSlot ?? ''}.${a.subOrder}`)
-      .join(',');
+  const rem = ab.remainingActions;
+  if (rem.length > 0) {
+    k += '|Q:';
+    for (let i = 0; i < rem.length; i++) {
+      if (i > 0) k += ',';
+      const a = rem[i];
+      k += `${a.side}.${a.action.slot}.${a.action.moveIndex}.${a.action.targetSide ?? ''}.${a.action.targetSlot ?? ''}.${a.subOrder}`;
+    }
   }
   return k;
 }
 
-/**
- * Exact single-Pokemon marginal HP folding: merges branches whose non-HP state
- * and EVERY other Pokemon's HP distribution are bit-for-bit identical, combining
- * only `(side, idx)`'s HP distribution weighted by branch probability.
- * Preserves all cross-Pokemon joint couplings identically.
- */
-function foldBranchesByPokeHp(
-  ctx: StaticBattleContext,
-  batch: ActiveBranch[],
-  side: 0 | 1,
-  idx: number,
-  stats: StepStats
-): ActiveBranch[] {
-  if (batch.length <= 1) return batch;
-  const maskPoke = {side, idx};
-  const groups = new Map<string, ActiveBranch[]>();
-  const passthrough: ActiveBranch[] = [];
-  for (let i = 0; i < batch.length; i++) {
-    const ab = batch[i];
-    if (ab.probability <= EPS) continue;
-    if (ab.state.phase.kind === 'ended') {
-      passthrough.push(ab);
-      continue;
-    }
-    const p = ab.state.sides[side].pokemon[idx];
-    if (!p || p.fainted || p.hp <= 0) {
-      passthrough.push(ab);
-      continue;
-    }
-    const key = midTurnBranchKey(ctx, ab, maskPoke);
-    let g = groups.get(key);
-    if (!g) {
-      g = [ab];
-      groups.set(key, g);
-    } else {
-      g.push(ab);
-    }
-  }
-  if (groups.size + passthrough.length === batch.length) return batch;
-  const out: ActiveBranch[] = [...passthrough];
-  for (const g of groups.values()) {
-    if (g.length === 1) {
-      out.push(g[0]);
-      continue;
-    }
-    let totalProb = 0;
-    const hpMap = new Map<number, number>();
-    for (let i = 0; i < g.length; i++) {
-      const ab = g[i];
-      totalProb += ab.probability;
-      const entries = getHpEntries(ab.state.sides[side].pokemon[idx]);
-      for (let j = 0; j < entries.length; j++) {
-        const e = entries[j];
-        hpMap.set(e.hp, (hpMap.get(e.hp) ?? 0) + ab.probability * e.prob);
-      }
-    }
-    const target = g[0];
-    target.probability = totalProb;
-    const combined: HpEntry[] = [];
-    for (const [hp, w] of hpMap) {
-      combined.push({hp, prob: w / totalProb});
-    }
-    setNormalizedHpDist(target.state.sides[side].pokemon[idx], combined);
-    stats.merges += g.length - 1;
-    out.push(target);
-  }
-  return out;
+function pokeHpKeyStr(state: DynamicState, side: 0 | 1, idx: number): string {
+  const p = state.sides[side].pokemon[idx];
+  if (!p || p.fainted) return 'X';
+  return p.hpDist ? hpDistKey(p.hpDist) : String(p.hp);
 }
 
 function mergeActiveBranches(
@@ -226,36 +175,128 @@ function mergeActiveBranches(
   stats: StepStats
 ): ActiveBranch[] {
   if (batch.length <= 1) return batch;
-  const map = new Map<string, ActiveBranch>();
-  for (const ab of batch) {
-    if (ab.probability <= EPS) continue;
-    const key = midTurnBranchKey(ctx, ab);
-    const existing = map.get(key);
-    if (existing) {
-      existing.probability += ab.probability;
-      stats.merges++;
-    } else {
-      map.set(key, ab);
-    }
-  }
-  let out = [...map.values()];
-  if (out.length > 1) {
-    // Fold HP-only differences one active Pokemon at a time (exact in singles & doubles).
-    for (let s = 0; s < 2 && out.length > 1; s++) {
+
+  // Collect distinct active Pokemon slots across the batch once so we only
+  // serialize canonicalStateKey ONCE per branch instead of (1 + activeCount) times.
+  let activeMaskBits = 0;
+  const activeList: {side: 0 | 1; idx: number}[] = [];
+  for (let i = 0; i < batch.length; i++) {
+    const ab = batch[i];
+    if (ab.probability <= EPS || ab.state.phase.kind === 'ended') continue;
+    for (let s = 0; s < 2; s++) {
       const sideIdx: 0 | 1 = s === 0 ? 0 : 1;
-      const seenIdx = new Set<number>();
-      for (let i = 0; i < out.length; i++) {
-        const act = out[i].state.sides[sideIdx].active;
-        for (let sl = 0; sl < act.length; sl++) {
-          if (act[sl] >= 0) seenIdx.add(act[sl]);
+      const act = ab.state.sides[sideIdx].active;
+      for (let sl = 0; sl < act.length; sl++) {
+        const idx = act[sl];
+        if (idx < 0) continue;
+        const bit = 1 << (sideIdx * 6 + idx);
+        if ((activeMaskBits & bit) === 0) {
+          activeMaskBits |= bit;
+          activeList.push({side: sideIdx, idx});
         }
       }
-      for (const idx of seenIdx) {
-        if (out.length <= 1) break;
-        out = foldBranchesByPokeHp(ctx, out, sideIdx, idx, stats);
-      }
     }
   }
+  const kLen = activeList.length;
+
+  interface MergeItem {
+    ab: ActiveBranch;
+    baseKey: string;
+    hpKeys: string[];
+  }
+
+  const exactMap = new Map<string, MergeItem>();
+  for (let i = 0; i < batch.length; i++) {
+    const ab = batch[i];
+    if (ab.probability <= EPS) continue;
+    const baseKey = midTurnBranchKey(ctx, ab, activeMaskBits);
+    const hpKeys = new Array<string>(kLen);
+    let fullKey = baseKey;
+    if (ab.state.phase.kind !== 'ended') {
+      for (let k = 0; k < kLen; k++) {
+        const hk = pokeHpKeyStr(ab.state, activeList[k].side, activeList[k].idx);
+        hpKeys[k] = hk;
+        fullKey += '|' + hk;
+      }
+    } else {
+      for (let k = 0; k < kLen; k++) hpKeys[k] = '';
+    }
+    const existing = exactMap.get(fullKey);
+    if (existing) {
+      existing.ab.probability += ab.probability;
+      stats.merges++;
+    } else {
+      exactMap.set(fullKey, {ab, baseKey, hpKeys});
+    }
+  }
+
+  let items = [...exactMap.values()];
+  if (items.length > 1 && kLen > 0) {
+    // Exact single-Pokemon marginal HP folding using precomputed baseKey + hpKeys.
+    for (let k = 0; k < kLen && items.length > 1; k++) {
+      const {side, idx} = activeList[k];
+      const groups = new Map<string, MergeItem[]>();
+      const passthrough: MergeItem[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (it.ab.state.phase.kind === 'ended') {
+          passthrough.push(it);
+          continue;
+        }
+        const p = it.ab.state.sides[side].pokemon[idx];
+        if (!p || p.fainted || p.hp <= 0) {
+          passthrough.push(it);
+          continue;
+        }
+        let gk = it.baseKey;
+        for (let j = 0; j < kLen; j++) {
+          gk += '|';
+          gk += j === k ? '*' : it.hpKeys[j];
+        }
+        let g = groups.get(gk);
+        if (!g) {
+          g = [it];
+          groups.set(gk, g);
+        } else {
+          g.push(it);
+        }
+      }
+      if (groups.size + passthrough.length === items.length) continue;
+      const next: MergeItem[] = passthrough;
+      for (const g of groups.values()) {
+        if (g.length === 1) {
+          next.push(g[0]);
+          continue;
+        }
+        let totalProb = 0;
+        const hpMap = new Map<number, number>();
+        for (let i = 0; i < g.length; i++) {
+          const ab = g[i].ab;
+          totalProb += ab.probability;
+          const entries = getHpEntries(ab.state.sides[side].pokemon[idx]);
+          for (let j = 0; j < entries.length; j++) {
+            const e = entries[j];
+            hpMap.set(e.hp, (hpMap.get(e.hp) ?? 0) + ab.probability * e.prob);
+          }
+        }
+        const target = g[0];
+        target.ab.probability = totalProb;
+        const combined: HpEntry[] = [];
+        for (const [hp, w] of hpMap) {
+          combined.push({hp, prob: w / totalProb});
+        }
+        const tp = target.ab.state.sides[side].pokemon[idx];
+        setNormalizedHpDist(tp, combined);
+        target.hpKeys[k] = tp.hpDist ? hpDistKey(tp.hpDist) : String(tp.hp);
+        stats.merges += g.length - 1;
+        next.push(target);
+      }
+      items = next;
+    }
+  }
+
+  const out = new Array<ActiveBranch>(items.length);
+  for (let i = 0; i < items.length; i++) out[i] = items[i].ab;
   if (out.length > stats.peakBranches) stats.peakBranches = out.length;
   return out;
 }
@@ -1353,7 +1394,8 @@ function resolveTargets(
   atkSide: 0 | 1,
   atkSlot: number,
   action: MoveAction,
-  move: StaticMoveData
+  move: StaticMoveData,
+  obsFlags?: Uint8Array
 ): {side: 0 | 1; slot: number; pokeIdx: number}[] {
   const oppSide: 0 | 1 = atkSide === 0 ? 1 : 0;
   const targets: {side: 0 | 1; slot: number; pokeIdx: number}[] = [];
@@ -1417,6 +1459,36 @@ function resolveTargets(
       if (op.redirectKind === 'followme' || (op.redirectKind === 'ragepowder' && !atkImmunePowder)) {
         targets.push({side: oppSide, slot: sl, pokeIdx: oIdx});
         return targets;
+      }
+    }
+  }
+
+  // Record whether opponent targetSlot (0 vs 1) could actually distinguish outcomes
+  if (obsFlags && ctx.activeCount === 2 && preferredSide === oppSide) {
+    if (isAlive(oppSide, 0) && isAlive(oppSide, 1)) {
+      const i0 = state.sides[oppSide].active[0];
+      const i1 = state.sides[oppSide].active[1];
+      const p0 = state.sides[oppSide].pokemon[i0];
+      const p1 = state.sides[oppSide].pokemon[i1];
+      const ab0 = activeAbilitySpec(ctx.sides[oppSide].team[i0], p0);
+      const ab1 = activeAbilitySpec(ctx.sides[oppSide].team[i1], p1);
+      const bothPlainProtectNoPressure =
+        move.category !== 'Status' &&
+        move.protectable &&
+        !move.suckerPunch &&
+        move.specialKind !== 'upper-hand' &&
+        move.specialKind !== 'feint' &&
+        move.id !== 'phantomforce' &&
+        move.specialKind !== 'shell-side-arm' &&
+        move.specialKind !== 'poltergeist' &&
+        move.specialKind !== 'future-sight' &&
+        !(atkPoke?.abilityActive && !atkPoke.gastroAcid && atkAb?.protectBypassContact) &&
+        p0.protecting && p0.protectKind === 'protect' && !p0.invulnerable &&
+        p1.protecting && p1.protectKind === 'protect' && !p1.invulnerable &&
+        !(p0.abilityActive && !p0.gastroAcid && ab0.pressure) &&
+        !(p1.abilityActive && !p1.gastroAcid && ab1.pressure);
+      if (!bothPlainProtectNoPressure) {
+        obsFlags[atkSide * 2 + atkSlot] |= ACTION_OBS_OPP_TARGET_MATTERED;
       }
     }
   }
@@ -3203,7 +3275,8 @@ function executeMoveAction(
   stats: StepStats,
   overrideMove?: StaticMoveData,
   skipPreChecks = false,
-  defer?: DeferTracker
+  defer?: DeferTracker,
+  obsFlags?: Uint8Array
 ): {active: ActiveBranch[]; paused: WeightedState[]; ended: WeightedState[]} {
   const paused: WeightedState[] = [];
   const ended: WeightedState[] = [];
@@ -3261,6 +3334,7 @@ function executeMoveAction(
     } else if (move.specialKind === 'snore' || move.specialKind === 'sleep-talk') {
       preMoveBranches.push({ab, immobilized: false});
     } else {
+      if (obsFlags && !overrideMove) obsFlags[actorSide * 2 + action.slot] |= ACTION_OBS_SLEEP_ONLY;
       preMoveBranches.push({ab, immobilized: true});
     }
   } else if (poke.status === 'frz') {
@@ -3405,6 +3479,9 @@ function executeMoveAction(
       outActive.push(cur);
       continue;
     }
+    if (obsFlags && !overrideMove) {
+      obsFlags[actorSide * 2 + action.slot] |= ACTION_OBS_EXECUTED;
+    }
 
     // Focus Punch lost focus check
     if (move.specialKind === 'focus-punch' && p.focusPunchLost) {
@@ -3451,7 +3528,7 @@ function executeMoveAction(
 
     const wasCharging = p.chargingMoveIdx >= 0;
     const wasLocked = p.lockedMoveIdx >= 0 && moveIndex === p.lockedMoveIdx;
-    const targetsPre = resolveTargets(ctx, cur.state, actorSide, action.slot, action, move);
+    const targetsPre = resolveTargets(ctx, cur.state, actorSide, action.slot, action, move, overrideMove ? undefined : obsFlags);
 
     // Deduct PP (not deducted again on second turn of a two-turn charge move, lockedmove, or meta-called move)
     if (!overrideMove && moveIndex >= 0 && !wasCharging && !wasLocked && p.uproarTurns === 0) {
@@ -3754,6 +3831,7 @@ function executeMoveAction(
       if (t) {
         const ra = cur.remainingActions.find(x => x.side === t.side && x.action.slot === t.slot);
         if (ra) {
+          if (obsFlags) obsFlags[t.side * 2 + t.slot] |= ACTION_OBS_EXACT;
           if (move.specialKind === 'after-you') {
             ra.priority = 100;
             ra.subOrder = 10;
@@ -3950,6 +4028,7 @@ function executeMoveAction(
       continue;
     }
     if (move.specialKind === 'future-sight') {
+      if (obsFlags && !overrideMove) obsFlags[actorSide * 2 + action.slot] |= ACTION_OBS_OPP_TARGET_MATTERED;
       const targetSlot = action.targetSlot ?? 0;
       if (!cur.state.sides[oppSide].futureMoves[targetSlot]) {
         cur.state.sides[oppSide].futureMoves[targetSlot] = {
@@ -4962,6 +5041,9 @@ function executeMoveAction(
         outActive.push(cur);
         continue;
       }
+      if (obsFlags) {
+        obsFlags[t.side * 2 + t.slot] |= move.specialKind === 'upper-hand' ? ACTION_OBS_EXACT : ACTION_OBS_CATEGORY;
+      }
       const targetMoveIdx = def.encoreMoveIdx >= 0 ? def.encoreMoveIdx : pendingTargetAction.action.moveIndex;
       const targetMove = getMoveForAction(ctx, t.side, t.pokeIdx, targetMoveIdx, cur.state);
       if (targetMove.category === 'Status' || (move.specialKind === 'upper-hand' && pendingTargetAction.priority <= 0)) {
@@ -5006,6 +5088,7 @@ function executeMoveAction(
     if (move.specialKind === 'round') {
       for (const ra of cur.remainingActions) {
         if (ra.side === actorSide && ra.action.slot !== action.slot) {
+          if (obsFlags) obsFlags[ra.side * 2 + ra.action.slot] |= ACTION_OBS_EXACT;
           const allyIdx = cur.state.sides[actorSide].active[ra.action.slot];
           if (allyIdx >= 0 && !cur.state.sides[actorSide].pokemon[allyIdx].fainted) {
             const allyP = cur.state.sides[actorSide].pokemon[allyIdx];
@@ -5675,7 +5758,8 @@ function runActionLoop(
   ctx: StaticBattleContext,
   initialBatch: ActiveBranch[],
   policy: BranchPolicy,
-  stats: StepStats
+  stats: StepStats,
+  obsFlags?: Uint8Array
 ): {completed: WeightedState[]; paused: WeightedState[]; ended: WeightedState[]; remainingMass: number; complete: boolean} {
   let active = initialBatch;
   const completed: WeightedState[] = [];
@@ -5794,7 +5878,8 @@ function runActionLoop(
           stats,
           undefined,
           false,
-          defer
+          defer,
+          obsFlags
         );
         nextActive.push(...res.active);
         paused.push(...res.paused);
@@ -6411,69 +6496,6 @@ function runEndOfTurn(
   return out;
 }
 
-function foldWeightedStatesByPokeHp(
-  ctx: StaticBattleContext,
-  list: WeightedState[],
-  side: 0 | 1,
-  idx: number,
-  stats: StepStats
-): WeightedState[] {
-  if (list.length <= 1) return list;
-  const maskPoke = {side, idx};
-  const groups = new Map<string, WeightedState[]>();
-  const passthrough: WeightedState[] = [];
-  for (let i = 0; i < list.length; i++) {
-    const ws = list[i];
-    if (ws.probability <= EPS) continue;
-    if (ws.state.phase.kind === 'ended') {
-      passthrough.push(ws);
-      continue;
-    }
-    const p = ws.state.sides[side].pokemon[idx];
-    if (!p || p.fainted || p.hp <= 0) {
-      passthrough.push(ws);
-      continue;
-    }
-    const key = canonicalStateKey(ctx, ws.state, undefined, false, maskPoke);
-    let g = groups.get(key);
-    if (!g) {
-      g = [ws];
-      groups.set(key, g);
-    } else {
-      g.push(ws);
-    }
-  }
-  if (groups.size + passthrough.length === list.length) return list;
-  const out: WeightedState[] = [...passthrough];
-  for (const g of groups.values()) {
-    if (g.length === 1) {
-      out.push(g[0]);
-      continue;
-    }
-    let totalProb = 0;
-    const hpMap = new Map<number, number>();
-    for (let i = 0; i < g.length; i++) {
-      const ws = g[i];
-      totalProb += ws.probability;
-      const entries = getHpEntries(ws.state.sides[side].pokemon[idx]);
-      for (let j = 0; j < entries.length; j++) {
-        const e = entries[j];
-        hpMap.set(e.hp, (hpMap.get(e.hp) ?? 0) + ws.probability * e.prob);
-      }
-    }
-    const target = g[0];
-    target.probability = totalProb;
-    const combined: HpEntry[] = [];
-    for (const [hp, w] of hpMap) {
-      combined.push({hp, prob: w / totalProb});
-    }
-    setNormalizedHpDist(target.state.sides[side].pokemon[idx], combined);
-    stats.merges += g.length - 1;
-    out.push(target);
-  }
-  return out;
-}
-
 function finalizeOutcomes(
   ctx: StaticBattleContext,
   raw: WeightedState[],
@@ -6493,35 +6515,139 @@ function finalizeOutcomes(
     expanded = raw;
   }
 
-  const merged = new Map<string, WeightedState>();
-  for (const ws of expanded) {
-    if (ws.probability <= EPS) continue;
-    const key = canonicalStateKey(ctx, ws.state);
-    const prev = merged.get(key);
-    if (prev) {
-      prev.probability += ws.probability;
-      stats.merges++;
-    } else {
-      merged.set(key, {state: ws.state, probability: ws.probability});
-    }
-  }
-
-  let outcomes = [...merged.values()];
-  if (hpOutputMode === 'distributional' && outcomes.length > 1) {
-    for (let s = 0; s < 2 && outcomes.length > 1; s++) {
-      const sideIdx: 0 | 1 = s === 0 ? 0 : 1;
-      const seenIdx = new Set<number>();
-      for (let i = 0; i < outcomes.length; i++) {
-        const act = outcomes[i].state.sides[sideIdx].active;
+  let outcomes: WeightedState[];
+  if (hpOutputMode === 'distributional' && expanded.length > 1) {
+    let activeMaskBits = 0;
+    const activeList: {side: 0 | 1; idx: number}[] = [];
+    for (let i = 0; i < expanded.length; i++) {
+      const ws = expanded[i];
+      if (ws.probability <= EPS || ws.state.phase.kind === 'ended') continue;
+      for (let s = 0; s < 2; s++) {
+        const sideIdx: 0 | 1 = s === 0 ? 0 : 1;
+        const act = ws.state.sides[sideIdx].active;
         for (let sl = 0; sl < act.length; sl++) {
-          if (act[sl] >= 0) seenIdx.add(act[sl]);
+          const idx = act[sl];
+          if (idx < 0) continue;
+          const bit = 1 << (sideIdx * 6 + idx);
+          if ((activeMaskBits & bit) === 0) {
+            activeMaskBits |= bit;
+            activeList.push({side: sideIdx, idx});
+          }
         }
       }
-      for (const idx of seenIdx) {
-        if (outcomes.length <= 1) break;
-        outcomes = foldWeightedStatesByPokeHp(ctx, outcomes, sideIdx, idx, stats);
+    }
+    const kLen = activeList.length;
+
+    interface FinalItem {
+      ws: WeightedState;
+      baseKey: string;
+      hpKeys: string[];
+    }
+
+    const exactMap = new Map<string, FinalItem>();
+    for (let i = 0; i < expanded.length; i++) {
+      const ws = expanded[i];
+      if (ws.probability <= EPS) continue;
+      const baseKey = canonicalStateKey(ctx, ws.state, undefined, false, undefined, activeMaskBits);
+      const hpKeys = new Array<string>(kLen);
+      let fullKey = baseKey;
+      if (ws.state.phase.kind !== 'ended') {
+        for (let k = 0; k < kLen; k++) {
+          const hk = pokeHpKeyStr(ws.state, activeList[k].side, activeList[k].idx);
+          hpKeys[k] = hk;
+          fullKey += '|' + hk;
+        }
+      } else {
+        for (let k = 0; k < kLen; k++) hpKeys[k] = '';
+      }
+      const prev = exactMap.get(fullKey);
+      if (prev) {
+        prev.ws.probability += ws.probability;
+        stats.merges++;
+      } else {
+        exactMap.set(fullKey, {ws: {state: ws.state, probability: ws.probability}, baseKey, hpKeys});
       }
     }
+
+    let items = [...exactMap.values()];
+    if (items.length > 1 && kLen > 0) {
+      for (let k = 0; k < kLen && items.length > 1; k++) {
+        const {side, idx} = activeList[k];
+        const groups = new Map<string, FinalItem[]>();
+        const passthrough: FinalItem[] = [];
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          if (it.ws.state.phase.kind === 'ended') {
+            passthrough.push(it);
+            continue;
+          }
+          const p = it.ws.state.sides[side].pokemon[idx];
+          if (!p || p.fainted || p.hp <= 0) {
+            passthrough.push(it);
+            continue;
+          }
+          let gk = it.baseKey;
+          for (let j = 0; j < kLen; j++) {
+            gk += '|';
+            gk += j === k ? '*' : it.hpKeys[j];
+          }
+          let g = groups.get(gk);
+          if (!g) {
+            g = [it];
+            groups.set(gk, g);
+          } else {
+            g.push(it);
+          }
+        }
+        if (groups.size + passthrough.length === items.length) continue;
+        const next: FinalItem[] = passthrough;
+        for (const g of groups.values()) {
+          if (g.length === 1) {
+            next.push(g[0]);
+            continue;
+          }
+          let totalProb = 0;
+          const hpMap = new Map<number, number>();
+          for (let i = 0; i < g.length; i++) {
+            const ws = g[i].ws;
+            totalProb += ws.probability;
+            const entries = getHpEntries(ws.state.sides[side].pokemon[idx]);
+            for (let j = 0; j < entries.length; j++) {
+              const e = entries[j];
+              hpMap.set(e.hp, (hpMap.get(e.hp) ?? 0) + ws.probability * e.prob);
+            }
+          }
+          const target = g[0];
+          target.ws.probability = totalProb;
+          const combined: HpEntry[] = [];
+          for (const [hp, w] of hpMap) {
+            combined.push({hp, prob: w / totalProb});
+          }
+          const tp = target.ws.state.sides[side].pokemon[idx];
+          setNormalizedHpDist(tp, combined);
+          target.hpKeys[k] = tp.hpDist ? hpDistKey(tp.hpDist) : String(tp.hp);
+          stats.merges += g.length - 1;
+          next.push(target);
+        }
+        items = next;
+      }
+    }
+    outcomes = new Array<WeightedState>(items.length);
+    for (let i = 0; i < items.length; i++) outcomes[i] = items[i].ws;
+  } else {
+    const merged = new Map<string, WeightedState>();
+    for (const ws of expanded) {
+      if (ws.probability <= EPS) continue;
+      const key = canonicalStateKey(ctx, ws.state);
+      const prev = merged.get(key);
+      if (prev) {
+        prev.probability += ws.probability;
+        stats.merges++;
+      } else {
+        merged.set(key, {state: ws.state, probability: ws.probability});
+      }
+    }
+    outcomes = [...merged.values()];
   }
   let finalRemaining = remainingMass;
 
@@ -6670,9 +6796,14 @@ export function stepBattle(
   const switches: {side: 0 | 1; action: SwitchAction; speed: number}[] = [];
   const megas: {side: 0 | 1; slot: number; speed: number}[] = [];
   const moveQueue: PendingQueuedAction[] = [];
+  const obsFlags = new Uint8Array(4);
+  const obsPriority = new Int8Array(4);
+  const obsSubOrder = new Int8Array(4);
+  obsFlags.fill(ACTION_OBS_EXACT | ACTION_OBS_OPP_TARGET_MATTERED);
 
   for (const s of [0, 1] as const) {
     for (const act of sideActions[s]) {
+      const slotId = s * 2 + act.slot;
       const pokeIdx = root.sides[s].active[act.slot];
       if (pokeIdx < 0 || root.sides[s].pokemon[pokeIdx].fainted) continue;
       if (act.kind === 'switch') {
@@ -6695,6 +6826,20 @@ export function stepBattle(
         if (p.abilityActive && !p.gastroAcid && ab.galeWings && move.type === 'Flying' && hpMin(p) === sp.maxhp) prio += 1;
         if (move.specialKind === 'grassy-glide' && root.field.terrain === 'grassy' && isGrounded(sp, p, root)) prio += 1;
         const subOrder = p.abilityActive && !p.gastroAcid && ab.stall ? -1 : 0;
+        obsPriority[slotId] = prio;
+        obsSubOrder[slotId] = subOrder;
+        const exactInit =
+          !!act.mega ||
+          p.chargingMoveIdx >= 0 ||
+          p.lockedMoveIdx >= 0 ||
+          p.encoreMoveIdx >= 0 ||
+          p.mustRecharge ||
+          p.uproarTurns > 0 ||
+          move.specialKind === 'focus-punch' ||
+          move.specialKind === 'beak-blast' ||
+          move.specialKind === 'grassy-glide' ||
+          (p.status === 'slp' && activeMoves(sp, p).some(m => m.specialKind === 'snore' || m.specialKind === 'sleep-talk'));
+        obsFlags[slotId] = exactInit ? ACTION_OBS_EXACT : 0;
         moveQueue.push({
           side: s,
           action: act,
@@ -6750,6 +6895,9 @@ export function stepBattle(
       const sp = pIdx >= 0 ? ctx.sides[ra.side].team[pIdx] : null;
       const qdIdx = p ? (p.chargingMoveIdx >= 0 ? p.chargingMoveIdx : (p.lockedMoveIdx >= 0 ? p.lockedMoveIdx : (p.encoreMoveIdx >= 0 ? p.encoreMoveIdx : ra.action.moveIndex))) : ra.action.moveIndex;
       const mv = p && sp ? getMoveForAction(ctx, ra.side, pIdx, qdIdx, b.state) : null;
+      if (p && sp && !p.fainted && p.abilityActive && !p.gastroAcid && activeAbilitySpec(sp, p).quickDraw) {
+        obsFlags[ra.side * 2 + ra.action.slot] |= ACTION_OBS_EXACT;
+      }
       if (p && sp && mv && !p.fainted && p.abilityActive && !p.gastroAcid && activeAbilitySpec(sp, p).quickDraw && mv.category !== 'Status') {
         const choices = pickChoices([{item: true, prob: 0.3}, {item: false, prob: 0.7}], policy, stats);
         for (const c of choices) {
@@ -6799,12 +6947,21 @@ export function stepBattle(
   }
 
   // 5. Execute moves dynamically in priority + subOrder + post-Mega speed order
-  const loopRes = runActionLoop(ctx, batch, policy, stats);
+  const loopRes = runActionLoop(ctx, batch, policy, stats, obsFlags);
+
+  // Any slot whose action remains stored inside a paused mid-turn switch state is fully observed.
+  for (const pw of loopRes.paused) {
+    if (pw.state.phase.kind === 'switch') {
+      for (const ra of pw.state.phase.remainingActions) {
+        obsFlags[ra.side * 2 + ra.action.slot] |= ACTION_OBS_EXACT | ACTION_OBS_OPP_TARGET_MATTERED;
+      }
+    }
+  }
 
   // 6. End-of-turn residual effects
   const afterEot = runEndOfTurn(ctx, loopRes.completed, policy, stats);
 
-  return finalizeOutcomes(
+  const finalized = finalizeOutcomes(
     ctx,
     [...afterEot, ...loopRes.paused, ...loopRes.ended],
     loopRes.remainingMass,
@@ -6812,4 +6969,8 @@ export function stepBattle(
     policy,
     stats
   );
+  if (finalized.complete) {
+    finalized.actionObs = {flags: obsFlags, priority: obsPriority, subOrder: obsSubOrder};
+  }
+  return finalized;
 }
