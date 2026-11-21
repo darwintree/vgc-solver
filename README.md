@@ -30,6 +30,7 @@ npm run benchmark -- --solver bounded --case sucker-punch-6 --workers 9 --search
 ## 文档
 
 - [架构与边界](docs/architecture.md)：求解原理、代码导航和支持范围。
+- [阶段目标](docs/roadmap.md)：从 1v1 向多精灵单打、双打逐步推进的分阶段目标与过关标准。
 - [测试局面](docs/cases.md)：HP、招式、PP 和参考结果。
 - [Benchmark 指南](docs/benchmarking.md)：运行参数、计时口径、已知问题及历史性能记录。
 - [优化技术](docs/optimization-techniques/README.md)：已采用的方法、详细例子、正确性边界与实现索引。
