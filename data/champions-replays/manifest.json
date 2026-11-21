@@ -1,0 +1,3809 @@
+{
+  "schemaVersion": 1,
+  "source": "https://replay.pokemonshowdown.com",
+  "retrievedAt": "2026-11-21T01:01:28.814Z",
+  "rawPreservation": "unmodified-utf8-api-response",
+  "mechanismTagSchema": [
+    "mega",
+    "trick_room",
+    "tailwind",
+    "weather",
+    "terrain",
+    "hazards",
+    "boost",
+    "status"
+  ],
+  "totalCount": 60,
+  "totalTagCounts": {
+    "mega": 59,
+    "trick_room": 2,
+    "tailwind": 14,
+    "weather": 33,
+    "terrain": 24,
+    "hazards": 7,
+    "boost": 57,
+    "status": 19
+  },
+  "categories": {
+    "doubles": {
+      "category": "doubles",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "targetCount": 30,
+      "collectedCount": 30,
+      "filters": {
+        "minRating": 1550,
+        "minTurns": 5,
+        "requireWin": true,
+        "excludeInactivity": true,
+        "requireShowteam": true,
+        "maxPerPlayerPair": 1
+      },
+      "searchStats": {
+        "pagesFetched": 3,
+        "candidatesScanned": 151,
+        "replaysFetched": 33,
+        "rejections": {
+          "private_or_password": 0,
+          "below_min_rating": 0,
+          "duplicate_pair": 33,
+          "missing_log": 0,
+          "no_win": 0,
+          "inactivity": 0,
+          "too_few_turns": 3,
+          "missing_showteam": 0,
+          "fetch_error": 0
+        }
+      },
+      "ratingRange": {
+        "min": 1581,
+        "max": 1792
+      },
+      "turnRange": {
+        "min": 5,
+        "max": 16
+      },
+      "forfeitedCount": 4,
+      "showteamCount": 30,
+      "tagCounts": {
+        "mega": 30,
+        "trick_room": 1,
+        "tailwind": 14,
+        "weather": 19,
+        "terrain": 16,
+        "hazards": 1,
+        "boost": 30,
+        "status": 12
+      }
+    },
+    "singles": {
+      "category": "singles",
+      "formatid": "gen9championsbssregmc",
+      "targetCount": 30,
+      "collectedCount": 30,
+      "filters": {
+        "minRating": 1400,
+        "minTurns": 6,
+        "requireWin": true,
+        "excludeInactivity": true,
+        "requireShowteam": false,
+        "maxPerPlayerPair": 1
+      },
+      "searchStats": {
+        "pagesFetched": 2,
+        "candidatesScanned": 101,
+        "replaysFetched": 33,
+        "rejections": {
+          "private_or_password": 0,
+          "below_min_rating": 0,
+          "duplicate_pair": 18,
+          "missing_log": 0,
+          "no_win": 0,
+          "inactivity": 1,
+          "too_few_turns": 2,
+          "missing_showteam": 0,
+          "fetch_error": 0
+        }
+      },
+      "ratingRange": {
+        "min": 1423,
+        "max": 1547
+      },
+      "turnRange": {
+        "min": 6,
+        "max": 26
+      },
+      "forfeitedCount": 9,
+      "showteamCount": 0,
+      "tagCounts": {
+        "mega": 29,
+        "trick_room": 1,
+        "tailwind": 0,
+        "weather": 14,
+        "terrain": 8,
+        "hazards": 6,
+        "boost": 27,
+        "status": 7
+      }
+    }
+  },
+  "replays": [
+    {
+      "id": "gen9championsvgc2026regmcbo3-2704565612",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2704565612.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2704565612",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2704565612.json",
+      "players": [
+        "vicenteguedes",
+        "MysteriousWind"
+      ],
+      "playerPairKey": "mysteriouswind::vicenteguedes",
+      "winner": "vicenteguedes",
+      "rating": 1792,
+      "uploadtime": 1792971498,
+      "uploadedAt": "2026-10-25T23:38:18.000Z",
+      "views": "196",
+      "turns": 8,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Sneasler",
+          "Archaludon",
+          "Basculegion",
+          "Salamence",
+          "Froslass",
+          "Kingambit"
+        ],
+        "p2": [
+          "Sneasler",
+          "Basculegion",
+          "Salamence",
+          "Kingambit",
+          "Whimsicott",
+          "Floette-Eternal"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Floette (Floettite)",
+          "Froslass (Froslassite)"
+        ],
+        "weathers": [
+          "Snowscape"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 7159,
+      "sha256": "bd64ea9ed3487411c09115797a4126c42bb90a2c342ca56c6bea3fd68eea09b8"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2710113540",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2710113540.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2710113540",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2710113540.json",
+      "players": [
+        "Porygoned",
+        "BrxlMd"
+      ],
+      "playerPairKey": "brxlmd::porygoned",
+      "winner": "BrxlMd",
+      "rating": 1701,
+      "uploadtime": 1793985923,
+      "uploadedAt": "2026-11-06T17:25:23.000Z",
+      "views": "71",
+      "turns": 6,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Salamence",
+          "Floette-Eternal",
+          "Armarouge",
+          "Sneasler",
+          "Indeedee-F",
+          "Kingambit"
+        ],
+        "p2": [
+          "Delphox",
+          "Golisopod",
+          "Sinistcha",
+          "Incineroar",
+          "Sneasler",
+          "Archaludon"
+        ]
+      },
+      "tags": [
+        "mega",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Delphox (Delphoxite)",
+          "Floette (Floettite)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 6560,
+      "sha256": "25bc11ad7464113f90e68d614be4f100a23fc591dc654f2ce1ea54d1b769e997"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2701846231",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2701846231.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2701846231",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2701846231.json",
+      "players": [
+        "NeruNeru37",
+        "MysteriousWind"
+      ],
+      "playerPairKey": "mysteriouswind::neruneru37",
+      "winner": "MysteriousWind",
+      "rating": 1671,
+      "uploadtime": 1792529894,
+      "uploadedAt": "2026-10-20T20:58:14.000Z",
+      "views": "99",
+      "turns": 9,
+      "forfeited": true,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Staraptor",
+          "Metagross",
+          "Whimsicott",
+          "Garchomp",
+          "Kingambit",
+          "Basculegion"
+        ],
+        "p2": [
+          "Froslass",
+          "Raichu",
+          "Sneasler",
+          "Arcanine-Hisui",
+          "Rillaboom",
+          "Kingambit"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Froslass (Froslassite)",
+          "Metagross (Metagrossite)"
+        ],
+        "weathers": [
+          "Snowscape"
+        ],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "frz"
+        ]
+      },
+      "bytes": 8312,
+      "sha256": "70815cdae2cf7413b4b79f2f0802f03687beb9c4f15fb5144fc74f16f47306a2"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2704404512",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2704404512.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2704404512",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2704404512.json",
+      "players": [
+        "thaduck",
+        "vicenteguedes"
+      ],
+      "playerPairKey": "thaduck::vicenteguedes",
+      "winner": "thaduck",
+      "rating": 1670,
+      "uploadtime": 1792948011,
+      "uploadedAt": "2026-10-25T17:06:51.000Z",
+      "views": "76",
+      "turns": 6,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Basculegion",
+          "Kingambit",
+          "Froslass",
+          "Raichu",
+          "Scovillain",
+          "Sneasler"
+        ],
+        "p2": [
+          "Sneasler",
+          "Charizard",
+          "Basculegion-F",
+          "Pelipper",
+          "Golisopod",
+          "Archaludon"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Golisopod (Golisopite)",
+          "Raichu (Raichunite X)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [
+          "Electric Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "slp"
+        ]
+      },
+      "bytes": 5490,
+      "sha256": "63a462ae88c818cda51aac1188050c4ec2890773376ee3dad67153f1b79818a4"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2698512543",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2698512543.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2698512543",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2698512543.json",
+      "players": [
+        "CrusaderBigDam",
+        "bernardosoares"
+      ],
+      "playerPairKey": "bernardosoares::crusaderbigdam",
+      "winner": "bernardosoares",
+      "rating": 1670,
+      "uploadtime": 1792012026,
+      "uploadedAt": "2026-10-14T21:07:06.000Z",
+      "views": "93",
+      "turns": 9,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Indeedee-F",
+          "Gardevoir",
+          "Basculegion",
+          "Pelipper",
+          "Archaludon",
+          "Sneasler"
+        ],
+        "p2": [
+          "Arcanine-Hisui",
+          "Gholdengo",
+          "Milotic",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ]
+      },
+      "tags": [
+        "mega",
+        "trick_room",
+        "weather",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Raichu (Raichunite Y)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [
+          "Grassy Terrain",
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "par",
+          "slp"
+        ]
+      },
+      "bytes": 8496,
+      "sha256": "f978cf5090528b6d6a4d5b694820e547bf75cf3ea8b90354c5f6b4a04cdad898"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2700392806",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2700392806.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700392806",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700392806.json",
+      "players": [
+        "NeruNeru37",
+        "alvarodecampos"
+      ],
+      "playerPairKey": "alvarodecampos::neruneru37",
+      "winner": "NeruNeru37",
+      "rating": 1651,
+      "uploadtime": 1792309311,
+      "uploadedAt": "2026-10-18T07:41:51.000Z",
+      "views": "49",
+      "turns": 11,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Staraptor",
+          "Floette-Eternal",
+          "Whimsicott",
+          "Garchomp",
+          "Kingambit",
+          "Basculegion"
+        ],
+        "p2": [
+          "Sneasler",
+          "Garchomp",
+          "Basculegion-F",
+          "Pelipper",
+          "Golisopod",
+          "Archaludon"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Golisopod (Golisopite)",
+          "Staraptor (Staraptite)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 8608,
+      "sha256": "fcb6d0ceb74d3a852b3b8d7f5102c3b062494a1c380b127b39501b2a97e2449d"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2699182484",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2699182484.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2699182484",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2699182484.json",
+      "players": [
+        "iloveiqos",
+        "CrusaderBigDam"
+      ],
+      "playerPairKey": "crusaderbigdam::iloveiqos",
+      "winner": "iloveiqos",
+      "rating": 1633,
+      "uploadtime": 1792110194,
+      "uploadedAt": "2026-10-16T00:23:14.000Z",
+      "views": "60",
+      "turns": 9,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Froslass",
+          "Sneasler",
+          "Rillaboom",
+          "Blaziken",
+          "Primarina",
+          "Dragonite"
+        ],
+        "p2": [
+          "Dragonite",
+          "Kingambit",
+          "Sneasler",
+          "Basculegion",
+          "Delphox",
+          "Garchomp"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Delphox (Delphoxite)",
+          "Froslass (Froslassite)"
+        ],
+        "weathers": [
+          "Snowscape"
+        ],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 8766,
+      "sha256": "206f236ceed98deee905d8653fce5c26cdd3cd1599434298b2fe860692d82667"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2698790919",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2698790919.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2698790919",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2698790919.json",
+      "players": [
+        "bernardosoares",
+        "Raythesecind"
+      ],
+      "playerPairKey": "bernardosoares::raythesecind",
+      "winner": "bernardosoares",
+      "rating": 1628,
+      "uploadtime": 1792060388,
+      "uploadedAt": "2026-10-15T10:33:08.000Z",
+      "views": "110",
+      "turns": 5,
+      "forfeited": true,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Arcanine-Hisui",
+          "Gholdengo",
+          "Milotic",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ],
+        "p2": [
+          "Floette-Eternal",
+          "Incineroar",
+          "Sneasler",
+          "Kingambit",
+          "Delphox",
+          "Sinistcha"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Delphox (Delphoxite)",
+          "Staraptor (Staraptite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": [
+          "slp"
+        ]
+      },
+      "bytes": 5563,
+      "sha256": "35e128db7026f975d15933931c50c977b6b92f3a311a2e2b36dc8837bc3973fc"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2699713547",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2699713547.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2699713547",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2699713547.json",
+      "players": [
+        "CrusaderBigDam",
+        "albertocaeiro"
+      ],
+      "playerPairKey": "albertocaeiro::crusaderbigdam",
+      "winner": "albertocaeiro",
+      "rating": 1627,
+      "uploadtime": 1792190093,
+      "uploadedAt": "2026-10-16T22:34:53.000Z",
+      "views": "31",
+      "turns": 16,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Dragonite",
+          "Basculegion",
+          "Garchomp",
+          "Kingambit",
+          "Sneasler",
+          "Froslass"
+        ],
+        "p2": [
+          "Arcanine-Hisui",
+          "Gholdengo",
+          "Milotic",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Froslass (Froslassite)",
+          "Raichu (Raichunite Y)"
+        ],
+        "weathers": [
+          "Snowscape"
+        ],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "slp"
+        ]
+      },
+      "bytes": 10823,
+      "sha256": "b20be3acb329452c5f20c0c386fe43709d51947dbfe0fe5efc9a340135482d92"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2703404953",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2703404953.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2703404953",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2703404953.json",
+      "players": [
+        "failandimprove3",
+        "northyliam"
+      ],
+      "playerPairKey": "failandimprove3::northyliam",
+      "winner": "failandimprove3",
+      "rating": 1616,
+      "uploadtime": 1792769449,
+      "uploadedAt": "2026-10-23T15:30:49.000Z",
+      "views": "28",
+      "turns": 7,
+      "forfeited": true,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Venusaur",
+          "Charizard",
+          "Farigiraf",
+          "Garchomp",
+          "Incineroar",
+          "Sylveon"
+        ],
+        "p2": [
+          "Incineroar",
+          "Charizard",
+          "Venusaur",
+          "Sylveon",
+          "Garchomp",
+          "Dragonite"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Charizard (Charizardite Y)"
+        ],
+        "weathers": [
+          "SunnyDay"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 6909,
+      "sha256": "5b865fcc0b18910a9e67a22664ea73e937bc336315843857dca0286c4f7f2b5a"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2700388082",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2700388082.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700388082",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700388082.json",
+      "players": [
+        "VeganoGay",
+        "alvarodecampos"
+      ],
+      "playerPairKey": "alvarodecampos::veganogay",
+      "winner": "VeganoGay",
+      "rating": 1616,
+      "uploadtime": 1792307949,
+      "uploadedAt": "2026-10-18T07:19:09.000Z",
+      "views": "24",
+      "turns": 10,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Pelipper",
+          "Basculegion-F",
+          "Archaludon",
+          "Golisopod",
+          "Sneasler",
+          "Raichu"
+        ],
+        "p2": [
+          "Sneasler",
+          "Garchomp",
+          "Basculegion-F",
+          "Pelipper",
+          "Golisopod",
+          "Archaludon"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Garchomp (Garchompite Z)",
+          "Golisopod (Golisopite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 7877,
+      "sha256": "63534b4ef34a42307ee48808d961431efa6ea5284289fadda8e91eacdb24e41f"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2700880268",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2700880268.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700880268",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700880268.json",
+      "players": [
+        "NeruNeru37",
+        "CyberTronco"
+      ],
+      "playerPairKey": "cybertronco::neruneru37",
+      "winner": "NeruNeru37",
+      "rating": 1610,
+      "uploadtime": 1792393353,
+      "uploadedAt": "2026-10-19T07:02:33.000Z",
+      "views": "26",
+      "turns": 11,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Staraptor",
+          "Floette-Eternal",
+          "Whimsicott",
+          "Garchomp",
+          "Kingambit",
+          "Basculegion"
+        ],
+        "p2": [
+          "Pelipper",
+          "Basculegion-F",
+          "Archaludon",
+          "Golisopod",
+          "Sneasler",
+          "Raichu"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "weather",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Raichu (Raichunite Y)",
+          "Staraptor (Staraptite)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": [
+          "par"
+        ]
+      },
+      "bytes": 8019,
+      "sha256": "875779868497d545b6ba424363381219b9ad7def17ed5a24dc9f2e1e6e6b3307"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2701260993",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2701260993.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2701260993",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2701260993.json",
+      "players": [
+        "Politoed34",
+        "caZISA"
+      ],
+      "playerPairKey": "cazisa::politoed34",
+      "winner": "caZISA",
+      "rating": 1603,
+      "uploadtime": 1792444762,
+      "uploadedAt": "2026-10-19T21:19:22.000Z",
+      "views": "38",
+      "turns": 6,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Dragonite",
+          "Sneasler",
+          "Kingambit",
+          "Basculegion",
+          "Garchomp",
+          "Froslass"
+        ],
+        "p2": [
+          "Charizard",
+          "Raichu",
+          "Garchomp",
+          "Venusaur",
+          "Incineroar",
+          "Sylveon"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Dragonite (Dragoninite)",
+          "Raichu (Raichunite Y)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": [
+          "par"
+        ]
+      },
+      "bytes": 6782,
+      "sha256": "b64e19a19e90134f54f54b5323afe9ee4cba5bb8ac4619d464a3a291f5f022be"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2701017094",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2701017094.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2701017094",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2701017094.json",
+      "players": [
+        "KitWilsonMentality",
+        "DouglassalguoD"
+      ],
+      "playerPairKey": "douglassalguod::kitwilsonmentality",
+      "winner": "KitWilsonMentality",
+      "rating": 1601,
+      "uploadtime": 1792417082,
+      "uploadedAt": "2026-10-19T13:38:02.000Z",
+      "views": "23",
+      "turns": 8,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Indeedee-F",
+          "Sneasler",
+          "Armarouge",
+          "Milotic",
+          "Kommo-o",
+          "Gardevoir"
+        ],
+        "p2": [
+          "Arcanine-Hisui",
+          "Gholdengo",
+          "Milotic",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ]
+      },
+      "tags": [
+        "mega",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Raichu (Raichunite Y)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Grassy Terrain",
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "par",
+          "slp"
+        ]
+      },
+      "bytes": 6880,
+      "sha256": "e28c734ede9be6344070a1f15f3a647c7786047777138a0428bbe6b9ba29a923"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2700945124",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2700945124.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700945124",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700945124.json",
+      "players": [
+        "Politoed35",
+        "shheikout"
+      ],
+      "playerPairKey": "politoed35::shheikout",
+      "winner": "shheikout",
+      "rating": 1600,
+      "uploadtime": 1792406117,
+      "uploadedAt": "2026-10-19T10:35:17.000Z",
+      "views": "35",
+      "turns": 9,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Dragonite",
+          "Sneasler",
+          "Kingambit",
+          "Basculegion",
+          "Garchomp",
+          "Froslass"
+        ],
+        "p2": [
+          "Archaludon",
+          "Basculegion",
+          "Dragonite",
+          "Pelipper",
+          "Scizor",
+          "Sneasler"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Dragonite (Dragoninite)",
+          "Scizor (Scizorite)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 7572,
+      "sha256": "7b840b62f253ffc87ba60bffc604875a49fd99dbd9b5375e56db16fd72e420cd"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2698533655",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2698533655.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2698533655",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2698533655.json",
+      "players": [
+        "Gozante",
+        "bernardosoares"
+      ],
+      "playerPairKey": "bernardosoares::gozante",
+      "winner": "Gozante",
+      "rating": 1599,
+      "uploadtime": 1792014702,
+      "uploadedAt": "2026-10-14T21:51:42.000Z",
+      "views": "30",
+      "turns": 9,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Staraptor",
+          "Rillaboom",
+          "Primarina",
+          "Gholdengo",
+          "Raichu",
+          "Arcanine-Hisui"
+        ],
+        "p2": [
+          "Arcanine-Hisui",
+          "Gholdengo",
+          "Milotic",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ]
+      },
+      "tags": [
+        "mega",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Staraptor (Staraptite)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "par",
+          "slp"
+        ]
+      },
+      "bytes": 7670,
+      "sha256": "2e825ff005d4d4f966ff1624f27d58bd4fd6e7a2762f754ea66544f2a2a62130"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2700995275",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2700995275.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700995275",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700995275.json",
+      "players": [
+        "VeganoGay",
+        "shheikout"
+      ],
+      "playerPairKey": "shheikout::veganogay",
+      "winner": "VeganoGay",
+      "rating": 1598,
+      "uploadtime": 1792414265,
+      "uploadedAt": "2026-10-19T12:51:05.000Z",
+      "views": "11",
+      "turns": 8,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Pelipper",
+          "Basculegion-F",
+          "Archaludon",
+          "Golisopod",
+          "Sneasler",
+          "Raichu"
+        ],
+        "p2": [
+          "Archaludon",
+          "Basculegion",
+          "Dragonite",
+          "Pelipper",
+          "Scizor",
+          "Sneasler"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Dragonite (Dragoninite)",
+          "Golisopod (Golisopite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 7778,
+      "sha256": "f8d60aeff02544819230175adb534456fe1d795168a780d6b51aa40ab269cf4b"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2699739735",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2699739735.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2699739735",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2699739735.json",
+      "players": [
+        "slucin",
+        "albertocaeiro"
+      ],
+      "playerPairKey": "albertocaeiro::slucin",
+      "winner": "slucin",
+      "rating": 1595,
+      "uploadtime": 1792193865,
+      "uploadedAt": "2026-10-16T23:37:45.000Z",
+      "views": "13",
+      "turns": 6,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Indeedee-F",
+          "Gardevoir",
+          "Basculegion",
+          "Pelipper",
+          "Archaludon",
+          "Sneasler"
+        ],
+        "p2": [
+          "Arcanine-Hisui",
+          "Gholdengo",
+          "Primarina",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "weather",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Gardevoir (Gardevoirite)",
+          "Raichu (Raichunite Y)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [
+          "Grassy Terrain",
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "par"
+        ]
+      },
+      "bytes": 7468,
+      "sha256": "a4aaef0df04e7d73c1b3dce3052b904be2f291e917535e080acd5860d278bfdb"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2698386833",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2698386833.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2698386833",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2698386833.json",
+      "players": [
+        "KKirby",
+        "bernardosoares"
+      ],
+      "playerPairKey": "bernardosoares::kkirby",
+      "winner": "bernardosoares",
+      "rating": 1595,
+      "uploadtime": 1791997862,
+      "uploadedAt": "2026-10-14T17:11:02.000Z",
+      "views": "44",
+      "turns": 7,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Charizard",
+          "Venusaur",
+          "Kommo-o",
+          "Kingambit",
+          "Aerodactyl",
+          "Floette-Eternal"
+        ],
+        "p2": [
+          "Arcanine-Hisui",
+          "Gholdengo",
+          "Milotic",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Floette (Floettite)",
+          "Staraptor (Staraptite)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 8110,
+      "sha256": "0f788e965eff677f0aebc78a53b7133193641e7a494d3319de54bb1cc334e141"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2700444992",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2700444992.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700444992",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700444992.json",
+      "players": [
+        "Omega Jarona!",
+        "alvarodecampos"
+      ],
+      "playerPairKey": "alvarodecampos::omegajarona",
+      "winner": "alvarodecampos",
+      "rating": 1594,
+      "uploadtime": 1792321823,
+      "uploadedAt": "2026-10-18T11:10:23.000Z",
+      "views": "20",
+      "turns": 5,
+      "forfeited": true,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Charizard",
+          "Swampert",
+          "Venusaur",
+          "Pelipper",
+          "Archaludon",
+          "Farigiraf"
+        ],
+        "p2": [
+          "Sneasler",
+          "Floette-Eternal",
+          "Basculegion-F",
+          "Pelipper",
+          "Golisopod",
+          "Archaludon"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Floette (Floettite)",
+          "Swampert (Swampertite)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 5833,
+      "sha256": "4336b6f17bfb0999ea37b8ef93da1349027708ae3a3809b4aecf7cebe582730b"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2701004931",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2701004931.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2701004931",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2701004931.json",
+      "players": [
+        "CyberTronco",
+        "DouglassalguoD"
+      ],
+      "playerPairKey": "cybertronco::douglassalguod",
+      "winner": "DouglassalguoD",
+      "rating": 1592,
+      "uploadtime": 1792415495,
+      "uploadedAt": "2026-10-19T13:11:35.000Z",
+      "views": "17",
+      "turns": 8,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Pelipper",
+          "Basculegion-F",
+          "Archaludon",
+          "Golisopod",
+          "Sneasler",
+          "Raichu"
+        ],
+        "p2": [
+          "Arcanine-Hisui",
+          "Gholdengo",
+          "Milotic",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Golisopod (Golisopite)",
+          "Raichu (Raichunite Y)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 8740,
+      "sha256": "54290441254218306f036b1c2fafdb745cbdb46f20d038685a2137a4e38c4f43"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2704624028",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2704624028.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2704624028",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2704624028.json",
+      "players": [
+        "Porygoned",
+        "MysteriousWind"
+      ],
+      "playerPairKey": "mysteriouswind::porygoned",
+      "winner": "Porygoned",
+      "rating": 1591,
+      "uploadtime": 1792981040,
+      "uploadedAt": "2026-10-26T02:17:20.000Z",
+      "views": "44",
+      "turns": 8,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Salamence",
+          "Raichu",
+          "Gholdengo",
+          "Rillaboom",
+          "Milotic",
+          "Arcanine-Hisui"
+        ],
+        "p2": [
+          "Floette-Eternal",
+          "Sneasler",
+          "Incineroar",
+          "Rillaboom",
+          "Basculegion",
+          "Salamence"
+        ]
+      },
+      "tags": [
+        "mega",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Salamence (Salamencite)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 8262,
+      "sha256": "d40f3ef8a467b71c652cd5af3bcfc89277e442ce6889d549091d00266f52f8e1"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2699726408",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2699726408.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2699726408",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2699726408.json",
+      "players": [
+        "NeruNeru37",
+        "albertocaeiro"
+      ],
+      "playerPairKey": "albertocaeiro::neruneru37",
+      "winner": "NeruNeru37",
+      "rating": 1591,
+      "uploadtime": 1792191896,
+      "uploadedAt": "2026-10-16T23:04:56.000Z",
+      "views": "19",
+      "turns": 11,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Staraptor",
+          "Metagross",
+          "Whimsicott",
+          "Garchomp",
+          "Kingambit",
+          "Basculegion"
+        ],
+        "p2": [
+          "Ceruledge",
+          "Gholdengo",
+          "Milotic",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Metagross (Metagrossite)",
+          "Raichu (Raichunite Y)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "slp"
+        ]
+      },
+      "bytes": 8824,
+      "sha256": "668f97406177eee298b5169b0074f4a3e60317e09f59767524b8677e57f25d66"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2702195166",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2702195166.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2702195166",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2702195166.json",
+      "players": [
+        "KitWilsonMentality",
+        "ihateiqos"
+      ],
+      "playerPairKey": "ihateiqos::kitwilsonmentality",
+      "winner": "ihateiqos",
+      "rating": 1588,
+      "uploadtime": 1792591241,
+      "uploadedAt": "2026-10-21T14:00:41.000Z",
+      "views": "17",
+      "turns": 5,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Indeedee-F",
+          "Sneasler",
+          "Armarouge",
+          "Gardevoir",
+          "Basculegion-F",
+          "Talonflame"
+        ],
+        "p2": [
+          "Froslass",
+          "Kingambit",
+          "Volcarona",
+          "Raichu",
+          "Milotic",
+          "Glimmora"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "terrain",
+        "hazards",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Raichu (Raichunite X)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Electric Terrain",
+          "Psychic Terrain"
+        ],
+        "hazards": [
+          "Toxic Spikes"
+        ],
+        "statuses": []
+      },
+      "bytes": 6267,
+      "sha256": "92f639c77b5b3adf564275065d98ba1a4c48c150299820c1b03018e984e10df9"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2702861494",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2702861494.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2702861494",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2702861494.json",
+      "players": [
+        "Test 12414",
+        "L Coco"
+      ],
+      "playerPairKey": "lcoco::test12414",
+      "winner": "Test 12414",
+      "rating": 1587,
+      "uploadtime": 1792686186,
+      "uploadedAt": "2026-10-22T16:23:06.000Z",
+      "views": "35",
+      "turns": 6,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Indeedee-F",
+          "Armarouge",
+          "Dragapult",
+          "Excadrill",
+          "Tyranitar",
+          "Staraptor"
+        ],
+        "p2": [
+          "Pelipper",
+          "Archaludon",
+          "Garchomp",
+          "Charizard",
+          "Gholdengo",
+          "Vivillon"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Charizard (Charizardite Y)",
+          "Staraptor (Staraptite)"
+        ],
+        "weathers": [
+          "RainDance",
+          "Sandstorm",
+          "SunnyDay"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 7209,
+      "sha256": "b06d03995ca93bd2db4ca4a52ebc5e0f56e42af4ec49cb0d79c42a5807e003e9"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2700990654",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2700990654.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700990654",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700990654.json",
+      "players": [
+        "DouglassalguoD",
+        "Politoed34"
+      ],
+      "playerPairKey": "douglassalguod::politoed34",
+      "winner": "Politoed34",
+      "rating": 1587,
+      "uploadtime": 1792413542,
+      "uploadedAt": "2026-10-19T12:39:02.000Z",
+      "views": "19",
+      "turns": 15,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Arcanine-Hisui",
+          "Gholdengo",
+          "Milotic",
+          "Raichu",
+          "Rillaboom",
+          "Staraptor"
+        ],
+        "p2": [
+          "Dragonite",
+          "Sneasler",
+          "Kingambit",
+          "Basculegion",
+          "Garchomp",
+          "Froslass"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "weather",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Froslass (Froslassite)",
+          "Staraptor (Staraptite)"
+        ],
+        "weathers": [
+          "Snowscape"
+        ],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "slp"
+        ]
+      },
+      "bytes": 10851,
+      "sha256": "48151adec8c66efd41afe96443839a60f9b46dc00c5f150ddd6b915498d8ace6"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2705559353",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2705559353.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2705559353",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2705559353.json",
+      "players": [
+        "MichaelderBeste2",
+        "emma grande"
+      ],
+      "playerPairKey": "emmagrande::michaelderbeste2",
+      "winner": "MichaelderBeste2",
+      "rating": 1582,
+      "uploadtime": 1793178653,
+      "uploadedAt": "2026-10-28T09:10:53.000Z",
+      "views": "74",
+      "turns": 6,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Kingambit",
+          "Salamence",
+          "Charizard",
+          "Whimsicott",
+          "Basculegion",
+          "Sneasler"
+        ],
+        "p2": [
+          "Salamence",
+          "Charizard",
+          "Whimsicott",
+          "Basculegion",
+          "Kingambit",
+          "Sneasler"
+        ]
+      },
+      "tags": [
+        "mega",
+        "tailwind",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Charizard (Charizardite Y)",
+          "Salamence (Salamencite)"
+        ],
+        "weathers": [
+          "SunnyDay"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 6829,
+      "sha256": "5a8df235eb75bfafd8263a597263972bdce477a3208d7e007c607e27a0a834d6"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2704411887",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2704411887.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2704411887",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2704411887.json",
+      "players": [
+        "vicenteguedes",
+        "emma grande"
+      ],
+      "playerPairKey": "emmagrande::vicenteguedes",
+      "winner": "emma grande",
+      "rating": 1581,
+      "uploadtime": 1792949200,
+      "uploadedAt": "2026-10-25T17:26:40.000Z",
+      "views": "42",
+      "turns": 10,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Sneasler",
+          "Charizard",
+          "Basculegion-F",
+          "Pelipper",
+          "Golisopod",
+          "Archaludon"
+        ],
+        "p2": [
+          "Salamence",
+          "Charizard",
+          "Whimsicott",
+          "Basculegion",
+          "Kingambit",
+          "Sneasler"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Charizard (Charizardite Y)"
+        ],
+        "weathers": [
+          "RainDance",
+          "SunnyDay"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 8563,
+      "sha256": "5b0a6038ce144dde2132934c33a0b0f99d24680c95ec865d33432bc70fd0513a"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2700441321",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2700441321.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700441321",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700441321.json",
+      "players": [
+        "CrusaderBigDam",
+        "alvarodecampos"
+      ],
+      "playerPairKey": "alvarodecampos::crusaderbigdam",
+      "winner": "CrusaderBigDam",
+      "rating": 1581,
+      "uploadtime": 1792321215,
+      "uploadedAt": "2026-10-18T11:00:15.000Z",
+      "views": "19",
+      "turns": 8,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Dragonite",
+          "Sneasler",
+          "Kingambit",
+          "Basculegion",
+          "Garchomp",
+          "Froslass"
+        ],
+        "p2": [
+          "Basculegion",
+          "Kingambit",
+          "Froslass",
+          "Sneasler",
+          "Incineroar",
+          "Delphox"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Froslass (Froslassite)"
+        ],
+        "weathers": [
+          "Snowscape"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 7249,
+      "sha256": "4cf8fe0eaba78c73358c63b6beadcb8a713b963cc365042ca573fd0a35d86a9a"
+    },
+    {
+      "id": "gen9championsvgc2026regmcbo3-2700284144",
+      "category": "doubles",
+      "format": "[Gen 9 Champions] VGC 2026 Reg M-C (Bo3)",
+      "formatid": "gen9championsvgc2026regmcbo3",
+      "file": "doubles/gen9championsvgc2026regmcbo3-2700284144.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700284144",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsvgc2026regmcbo3-2700284144.json",
+      "players": [
+        "Porygoned",
+        "alvarodecampos"
+      ],
+      "playerPairKey": "alvarodecampos::porygoned",
+      "winner": "Porygoned",
+      "rating": 1581,
+      "uploadtime": 1792287474,
+      "uploadedAt": "2026-10-18T01:37:54.000Z",
+      "views": "11",
+      "turns": 10,
+      "forfeited": false,
+      "hasShowteam": true,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Salamence",
+          "Gholdengo",
+          "Milotic",
+          "Sneasler",
+          "Indeedee",
+          "Arcanine-Hisui"
+        ],
+        "p2": [
+          "Kingambit",
+          "Salamence",
+          "Basculegion",
+          "Sneasler",
+          "Froslass",
+          "Blaziken"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Froslass (Froslassite)",
+          "Salamence (Salamencite)"
+        ],
+        "weathers": [
+          "Snowscape"
+        ],
+        "terrains": [
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 8760,
+      "sha256": "86bfbc555507f7d7e39b0e79179ec881d58fc22b8483dfbfa3251c6e2ad30518"
+    },
+    {
+      "id": "gen9championsbssregmc-2700839338",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700839338.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700839338",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700839338.json",
+      "players": [
+        "MegaShyvana",
+        "paurutan"
+      ],
+      "playerPairKey": "megashyvana::paurutan",
+      "winner": "MegaShyvana",
+      "rating": 1547,
+      "uploadtime": 1792384279,
+      "uploadedAt": "2026-10-19T04:31:19.000Z",
+      "views": "94",
+      "turns": 7,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Banette",
+          "Pawmot",
+          "Basculegion",
+          "Archaludon",
+          "Kingambit",
+          "Victreebel"
+        ],
+        "p2": [
+          "Primarina",
+          "Metagross",
+          "Mimikyu",
+          "Garchomp",
+          "Greninja",
+          "Aegislash"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Garchomp (Garchompite Z)",
+          "Victreebel (Victreebelite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 3816,
+      "sha256": "5de79fbeeee0d547c26c0c6d3e34e8b02aef498561c957ecfb78c754bb899d93"
+    },
+    {
+      "id": "gen9championsbssregmc-2700046702",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700046702.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700046702",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700046702.json",
+      "players": [
+        "huhaoxuan",
+        "Cloysterthebest"
+      ],
+      "playerPairKey": "cloysterthebest::huhaoxuan",
+      "winner": "huhaoxuan",
+      "rating": 1517,
+      "uploadtime": 1792252337,
+      "uploadedAt": "2026-10-17T15:52:17.000Z",
+      "views": "57",
+      "turns": 10,
+      "forfeited": true,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Archaludon",
+          "Zoroark-Hisui",
+          "Starmie",
+          "Sneasler",
+          "Cinderace",
+          "Hatterene"
+        ],
+        "p2": [
+          "Blastoise",
+          "Samurott-Hisui",
+          "Baxcalibur",
+          "Ninetales-Alola",
+          "Indeedee",
+          "Tinkaton"
+        ]
+      },
+      "tags": [
+        "mega",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Blastoise (Blastoisinite)",
+          "Starmie (Starminite)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4120,
+      "sha256": "119af7ec4fbc4d79a05eb9551607a6a1244fb9a0326bf7fc1e041fd83d763e3b"
+    },
+    {
+      "id": "gen9championsbssregmc-2700867580",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700867580.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700867580",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700867580.json",
+      "players": [
+        "kenemaru",
+        "MegaShyvana"
+      ],
+      "playerPairKey": "kenemaru::megashyvana",
+      "winner": "MegaShyvana",
+      "rating": 1512,
+      "uploadtime": 1792390458,
+      "uploadedAt": "2026-10-19T06:14:18.000Z",
+      "views": "23",
+      "turns": 13,
+      "forfeited": true,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Starmie",
+          "Lucario",
+          "Ditto",
+          "Sableye",
+          "Bellibolt",
+          "Clefable"
+        ],
+        "p2": [
+          "Hippowdon",
+          "Metagross",
+          "Primarina",
+          "Garchomp",
+          "Gholdengo",
+          "Mimikyu"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Garchomp (Garchompite Z)",
+          "Starmie (Starminite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 5051,
+      "sha256": "65c36419ad198aeffb7d577a506f537c3bc7518690cd699dc059944ee5f74ec2"
+    },
+    {
+      "id": "gen9championsbssregmc-2701005071",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2701005071.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701005071",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701005071.json",
+      "players": [
+        "Better Than pU",
+        "MegaShyvana"
+      ],
+      "playerPairKey": "betterthanpu::megashyvana",
+      "winner": "MegaShyvana",
+      "rating": 1484,
+      "uploadtime": 1792415622,
+      "uploadedAt": "2026-10-19T13:13:42.000Z",
+      "views": "22",
+      "turns": 24,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Clefable",
+          "Scolipede",
+          "Slowbro",
+          "Farigiraf",
+          "Rotom-Wash",
+          "Chimecho"
+        ],
+        "p2": [
+          "Banette",
+          "Pawmot",
+          "Basculegion",
+          "Archaludon",
+          "Kingambit",
+          "Victreebel"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Slowbro (Slowbronite)",
+          "Victreebel (Victreebelite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": [
+          "par",
+          "psn"
+        ]
+      },
+      "bytes": 9054,
+      "sha256": "2fb7cd5235b0cdc10c8a9c3ac455c089791ce504b26f88f05b71311d12241a72"
+    },
+    {
+      "id": "gen9championsbssregmc-2699008326",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2699008326.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2699008326",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2699008326.json",
+      "players": [
+        "MegaShyvana",
+        "Cloysterthebest"
+      ],
+      "playerPairKey": "cloysterthebest::megashyvana",
+      "winner": "Cloysterthebest",
+      "rating": 1483,
+      "uploadtime": 1792087610,
+      "uploadedAt": "2026-10-15T18:06:50.000Z",
+      "views": "35",
+      "turns": 14,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Hippowdon",
+          "Lucario",
+          "Dragonite",
+          "Mimikyu",
+          "Aegislash",
+          "Basculegion"
+        ],
+        "p2": [
+          "Samurott-Hisui",
+          "Ninetales-Alola",
+          "Baxcalibur",
+          "Aegislash",
+          "Blaziken",
+          "Venusaur"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "hazards",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Lucario (Lucarionite Z)",
+          "Venusaur (Venusaurite)"
+        ],
+        "weathers": [
+          "Sandstorm",
+          "Snowscape"
+        ],
+        "terrains": [],
+        "hazards": [
+          "Spikes"
+        ],
+        "statuses": [
+          "slp"
+        ]
+      },
+      "bytes": 6162,
+      "sha256": "bfcdb6befb26ab3c14d1c29cc35194df07be324c25609ec3f0d08dbd66a3519b"
+    },
+    {
+      "id": "gen9championsbssregmc-2714260166",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2714260166.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2714260166",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2714260166.json",
+      "players": [
+        "paurutan",
+        "BLK DG"
+      ],
+      "playerPairKey": "blkdg::paurutan",
+      "winner": "BLK DG",
+      "rating": 1478,
+      "uploadtime": 1794720006,
+      "uploadedAt": "2026-11-15T05:20:06.000Z",
+      "views": "2",
+      "turns": 8,
+      "forfeited": true,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Mimikyu",
+          "Sneasler",
+          "Sylveon",
+          "Blastoise",
+          "Garchomp",
+          "Lucario"
+        ],
+        "p2": [
+          "Raichu",
+          "Greninja",
+          "Mimikyu",
+          "Hippowdon",
+          "Goodra-Hisui",
+          "Cinderace"
+        ]
+      },
+      "tags": [
+        "mega",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Blastoise (Blastoisinite)",
+          "Greninja (Greninjite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": [
+          "psn"
+        ]
+      },
+      "bytes": 3952,
+      "sha256": "7ceb232e33c16676405b3900547f3a57aba3ba4f5027e5d5bcf861d8520c0b10"
+    },
+    {
+      "id": "gen9championsbssregmc-2701053369",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2701053369.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701053369",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701053369.json",
+      "players": [
+        "MikuMiku39",
+        "MegaShyvana"
+      ],
+      "playerPairKey": "megashyvana::mikumiku39",
+      "winner": "MikuMiku39",
+      "rating": 1467,
+      "uploadtime": 1792421306,
+      "uploadedAt": "2026-10-19T14:48:26.000Z",
+      "views": "6",
+      "turns": 10,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Baxcalibur",
+          "Mimikyu",
+          "Lucario",
+          "Rotom-Wash",
+          "Volcarona",
+          "Kingambit"
+        ],
+        "p2": [
+          "Indeedee",
+          "Basculegion",
+          "Golisopod",
+          "Hippowdon",
+          "Floette-Eternal",
+          "Charizard"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Baxcalibur (Baxcalibrite)",
+          "Charizard (Charizardite Y)"
+        ],
+        "weathers": [
+          "SunnyDay"
+        ],
+        "terrains": [
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 5066,
+      "sha256": "4427039fe8714db8cf3ea4965917b443105f644a90ca3edb5731aa06d08aeaaf"
+    },
+    {
+      "id": "gen9championsbssregmc-2702554735",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2702554735.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2702554735",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2702554735.json",
+      "players": [
+        "Helloguystest2",
+        "Adrift and Alone"
+      ],
+      "playerPairKey": "adriftandalone::helloguystest2",
+      "winner": "Adrift and Alone",
+      "rating": 1465,
+      "uploadtime": 1792634403,
+      "uploadedAt": "2026-10-22T02:00:03.000Z",
+      "views": "14",
+      "turns": 22,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Golisopod",
+          "Gholdengo",
+          "Garchomp",
+          "Gyarados",
+          "Hippowdon",
+          "Sylveon"
+        ],
+        "p2": [
+          "Archaludon",
+          "Pelipper",
+          "Swampert",
+          "Sneasler",
+          "Indeedee",
+          "Salamence"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "hazards",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Golisopod (Golisopite)",
+          "Swampert (Swampertite)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [],
+        "hazards": [
+          "Stealth Rock"
+        ],
+        "statuses": []
+      },
+      "bytes": 8882,
+      "sha256": "e8c2c22c7fe071663e14f8cb7db55e5693821a5ea1759e53e62e8d26c715cfb0"
+    },
+    {
+      "id": "gen9championsbssregmc-2688548425",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2688548425.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2688548425",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2688548425.json",
+      "players": [
+        "sky2132",
+        "Ghostofcolress"
+      ],
+      "playerPairKey": "ghostofcolress::sky2132",
+      "winner": "Ghostofcolress",
+      "rating": 1460,
+      "uploadtime": 1790488727,
+      "uploadedAt": "2026-09-27T05:58:47.000Z",
+      "views": "49",
+      "turns": 11,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Golisopod",
+          "Pelipper",
+          "Swampert",
+          "Archaludon",
+          "Cinderace",
+          "Garchomp"
+        ],
+        "p2": [
+          "Samurott-Hisui",
+          "Aegislash",
+          "Ninetales-Alola",
+          "Baxcalibur",
+          "Venusaur",
+          "Cinderace"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "hazards",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Golisopod (Golisopite)"
+        ],
+        "weathers": [
+          "RainDance",
+          "Snowscape"
+        ],
+        "terrains": [],
+        "hazards": [
+          "Spikes"
+        ],
+        "statuses": []
+      },
+      "bytes": 5349,
+      "sha256": "18242c223cf3a297f8334780b961dfabc3a9180d1ff38e22c8852a176c9019aa"
+    },
+    {
+      "id": "gen9championsbssregmc-2700933384",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700933384.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700933384",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700933384.json",
+      "players": [
+        "MegaShyvana",
+        "Arcaniner52"
+      ],
+      "playerPairKey": "arcaniner52::megashyvana",
+      "winner": "Arcaniner52",
+      "rating": 1458,
+      "uploadtime": 1792403995,
+      "uploadedAt": "2026-10-19T09:59:55.000Z",
+      "views": "4",
+      "turns": 12,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Hippowdon",
+          "Metagross",
+          "Primarina",
+          "Garchomp",
+          "Gholdengo",
+          "Mimikyu"
+        ],
+        "p2": [
+          "Salamence",
+          "Mimikyu",
+          "Lucario",
+          "Empoleon",
+          "Rotom-Heat",
+          "Meowscarada"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Lucario (Lucarionite Z)",
+          "Metagross (Metagrossite)"
+        ],
+        "weathers": [
+          "Sandstorm"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 5380,
+      "sha256": "a46b10513ead978dc41260ef476542edeed785ccbb2e88bd66cee05941efa346"
+    },
+    {
+      "id": "gen9championsbssregmc-2700508362",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700508362.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700508362",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700508362.json",
+      "players": [
+        "kumoyuki831",
+        "Adrift and Alone"
+      ],
+      "playerPairKey": "adriftandalone::kumoyuki831",
+      "winner": "Adrift and Alone",
+      "rating": 1457,
+      "uploadtime": 1792333887,
+      "uploadedAt": "2026-10-18T14:31:27.000Z",
+      "views": "13",
+      "turns": 8,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Floette-Eternal",
+          "Garchomp",
+          "Toxapex",
+          "Corviknight",
+          "Indeedee",
+          "Blastoise"
+        ],
+        "p2": [
+          "Archaludon",
+          "Pelipper",
+          "Swampert",
+          "Sneasler",
+          "Indeedee",
+          "Salamence"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Floette (Floettite)",
+          "Swampert (Swampertite)"
+        ],
+        "weathers": [
+          "RainDance"
+        ],
+        "terrains": [
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4257,
+      "sha256": "f621a794224bd804d4a6cb2849f028a64f52125f516d7965486fc99fe74f3336"
+    },
+    {
+      "id": "gen9championsbssregmc-2700758636",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700758636.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700758636",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700758636.json",
+      "players": [
+        "4jyoudebu",
+        "MegaShyvana"
+      ],
+      "playerPairKey": "4jyoudebu::megashyvana",
+      "winner": "MegaShyvana",
+      "rating": 1455,
+      "uploadtime": 1792370580,
+      "uploadedAt": "2026-10-19T00:43:00.000Z",
+      "views": "1",
+      "turns": 15,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Floette-Eternal",
+          "Garchomp",
+          "Hippowdon",
+          "Toxapex",
+          "Ditto",
+          "Gholdengo"
+        ],
+        "p2": [
+          "Indeedee",
+          "Basculegion",
+          "Golisopod",
+          "Hippowdon",
+          "Floette-Eternal",
+          "Charizard"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Floette (Floettite)",
+          "Garchomp (Garchompite Z)"
+        ],
+        "weathers": [
+          "Sandstorm"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": [
+          "tox"
+        ]
+      },
+      "bytes": 6480,
+      "sha256": "9cc25063363d34d17d313df339813775812a9f691ce38fe30fa09f717deb6b5a"
+    },
+    {
+      "id": "gen9championsbssregmc-2701040983",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2701040983.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701040983",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701040983.json",
+      "players": [
+        "MegaShyvana",
+        "huhaoxuan"
+      ],
+      "playerPairKey": "huhaoxuan::megashyvana",
+      "winner": "MegaShyvana",
+      "rating": 1454,
+      "uploadtime": 1792419946,
+      "uploadedAt": "2026-10-19T14:25:46.000Z",
+      "views": "2",
+      "turns": 8,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Hippowdon",
+          "Metagross",
+          "Primarina",
+          "Garchomp",
+          "Gholdengo",
+          "Mimikyu"
+        ],
+        "p2": [
+          "Archaludon",
+          "Starmie",
+          "Zoroark-Hisui",
+          "Sneasler",
+          "Salamence",
+          "Blaziken"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Garchomp (Garchompite Z)",
+          "Starmie (Starminite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4313,
+      "sha256": "8ba707830acc52a8620d9e3f7d46af6fae0661a034754f135a31f9a8f715e000"
+    },
+    {
+      "id": "gen9championsbssregmc-2700923637",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700923637.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700923637",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700923637.json",
+      "players": [
+        "demiru_09",
+        "MegaShyvana"
+      ],
+      "playerPairKey": "demiru09::megashyvana",
+      "winner": "MegaShyvana",
+      "rating": 1448,
+      "uploadtime": 1792402141,
+      "uploadedAt": "2026-10-19T09:29:01.000Z",
+      "views": "7",
+      "turns": 10,
+      "forfeited": true,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Starmie",
+          "Hippowdon",
+          "Kingambit",
+          "Dragonite",
+          "Floette-Eternal",
+          "Glimmora"
+        ],
+        "p2": [
+          "Indeedee",
+          "Basculegion",
+          "Golisopod",
+          "Hippowdon",
+          "Floette-Eternal",
+          "Charizard"
+        ]
+      },
+      "tags": [
+        "mega",
+        "trick_room",
+        "weather",
+        "terrain",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Golisopod (Golisopite)",
+          "Starmie (Starminite)"
+        ],
+        "weathers": [
+          "Sandstorm"
+        ],
+        "terrains": [
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": [
+          "slp"
+        ]
+      },
+      "bytes": 4561,
+      "sha256": "25f9255ad214c534eedf880ea63ae4c5f8c892aaa43dbcfe99531465821bdf04"
+    },
+    {
+      "id": "gen9championsbssregmc-2697788466",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2697788466.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2697788466",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2697788466.json",
+      "players": [
+        "EAGLENEST100",
+        "noseqponer777"
+      ],
+      "playerPairKey": "eaglenest100::noseqponer777",
+      "winner": "noseqponer777",
+      "rating": 1445,
+      "uploadtime": 1791911054,
+      "uploadedAt": "2026-10-13T17:04:14.000Z",
+      "views": "7",
+      "turns": 8,
+      "forfeited": true,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Charizard",
+          "Bellibolt",
+          "Scolipede",
+          "Indeedee-F",
+          "Malamar",
+          "Clefable"
+        ],
+        "p2": [
+          "Salamence",
+          "Metagross",
+          "Garchomp",
+          "Ninetales-Alola",
+          "Primarina",
+          "Empoleon"
+        ]
+      },
+      "tags": [
+        "mega",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Clefable (Clefablite)",
+          "Salamence (Salamencite)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4267,
+      "sha256": "2fea8f1e2af9e7c4800194a0aabd8b5fda2d7c9dad812d0ff20c8e8f735f62dc"
+    },
+    {
+      "id": "gen9championsbssregmc-2700185422",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700185422.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700185422",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700185422.json",
+      "players": [
+        "MegaShyvana",
+        "scpfoundation-lo"
+      ],
+      "playerPairKey": "megashyvana::scpfoundationlo",
+      "winner": "MegaShyvana",
+      "rating": 1443,
+      "uploadtime": 1792271522,
+      "uploadedAt": "2026-10-17T21:12:02.000Z",
+      "views": "3",
+      "turns": 10,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Metagross",
+          "Primarina",
+          "Archaludon",
+          "Gyarados",
+          "Mimikyu",
+          "Hippowdon"
+        ],
+        "p2": [
+          "Charizard",
+          "Primarina",
+          "Mimikyu",
+          "Garchomp",
+          "Staraptor",
+          "Basculegion"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Gyarados (Gyaradosite)",
+          "Staraptor (Staraptite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4847,
+      "sha256": "67b25dca66cf140ea5e310390df0baf650581022c98acae997d84c1f5266a075"
+    },
+    {
+      "id": "gen9championsbssregmc-2698619444",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2698619444.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2698619444",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2698619444.json",
+      "players": [
+        "TallPoorHandsome",
+        "Ghostofcolress"
+      ],
+      "playerPairKey": "ghostofcolress::tallpoorhandsome",
+      "winner": "Ghostofcolress",
+      "rating": 1442,
+      "uploadtime": 1792027500,
+      "uploadedAt": "2026-10-15T01:25:00.000Z",
+      "views": "12",
+      "turns": 12,
+      "forfeited": true,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Archaludon",
+          "Lopunny",
+          "Espathra",
+          "Clefable",
+          "Swampert",
+          "Pelipper"
+        ],
+        "p2": [
+          "Blastoise",
+          "Samurott-Hisui",
+          "Baxcalibur",
+          "Ninetales-Alola",
+          "Indeedee",
+          "Tinkaton"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Clefable (Clefablite)"
+        ],
+        "weathers": [
+          "Snowscape"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4620,
+      "sha256": "b2633475700a5eeb92413dcbeb52c911bf6e8f73e33f8d73d0a68c77bd054020"
+    },
+    {
+      "id": "gen9championsbssregmc-2700569653",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700569653.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700569653",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700569653.json",
+      "players": [
+        "NormChomsky",
+        "fuguier"
+      ],
+      "playerPairKey": "fuguier::normchomsky",
+      "winner": "fuguier",
+      "rating": 1441,
+      "uploadtime": 1792342971,
+      "uploadedAt": "2026-10-18T17:02:51.000Z",
+      "views": "10",
+      "turns": 19,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Baxcalibur",
+          "Charizard",
+          "Corviknight",
+          "Garchomp",
+          "Metagross",
+          "Mimikyu"
+        ],
+        "p2": [
+          "Floette-Eternal",
+          "Aegislash",
+          "Pyroar",
+          "Rotom-Wash",
+          "Garchomp",
+          "Meowscarada"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Charizard (Charizardite Y)",
+          "Pyroar (Pyroarite)"
+        ],
+        "weathers": [
+          "SunnyDay"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": [
+          "brn"
+        ]
+      },
+      "bytes": 7492,
+      "sha256": "e55e04534e9966fe863728074dc8f0e5921cd9a247f5643d8d66180620797014"
+    },
+    {
+      "id": "gen9championsbssregmc-2702002657",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2702002657.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2702002657",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2702002657.json",
+      "players": [
+        "takasic17",
+        "paurutan"
+      ],
+      "playerPairKey": "paurutan::takasic17",
+      "winner": "takasic17",
+      "rating": 1434,
+      "uploadtime": 1792555914,
+      "uploadedAt": "2026-10-21T04:11:54.000Z",
+      "views": "3",
+      "turns": 11,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Charizard",
+          "Corviknight",
+          "Primarina",
+          "Garchomp",
+          "Archaludon",
+          "Metagross"
+        ],
+        "p2": [
+          "Primarina",
+          "Metagross",
+          "Mimikyu",
+          "Garchomp",
+          "Greninja",
+          "Gyarados"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Metagross (Metagrossite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4302,
+      "sha256": "f4096dbfc3c8e0e9df6e4cb32e652204d90cdfad931b816752b6faede1619c35"
+    },
+    {
+      "id": "gen9championsbssregmc-2700735046",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700735046.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700735046",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700735046.json",
+      "players": [
+        "mei_con",
+        "MegaShyvana"
+      ],
+      "playerPairKey": "megashyvana::meicon",
+      "winner": "mei_con",
+      "rating": 1434,
+      "uploadtime": 1792366890,
+      "uploadedAt": "2026-10-18T23:41:30.000Z",
+      "views": "3",
+      "turns": 9,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Mimikyu",
+          "Golisopod",
+          "Pelipper",
+          "Swampert",
+          "Archaludon",
+          "Pawmot"
+        ],
+        "p2": [
+          "Indeedee",
+          "Basculegion",
+          "Golisopod",
+          "Hippowdon",
+          "Floette-Eternal",
+          "Charizard"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "terrain"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Swampert (Swampertite)"
+        ],
+        "weathers": [
+          "RainDance",
+          "Sandstorm"
+        ],
+        "terrains": [
+          "Psychic Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4392,
+      "sha256": "6de59eead69bd3f7d7643c7e223da6fd486231d96d027e87f5d507b3540d1339"
+    },
+    {
+      "id": "gen9championsbssregmc-2701003050",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2701003050.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701003050",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701003050.json",
+      "players": [
+        "xczjfjf",
+        "MegaShyvana"
+      ],
+      "playerPairKey": "megashyvana::xczjfjf",
+      "winner": "MegaShyvana",
+      "rating": 1432,
+      "uploadtime": 1792415285,
+      "uploadedAt": "2026-10-19T13:08:05.000Z",
+      "views": "9",
+      "turns": 10,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Hippowdon",
+          "Lucario",
+          "Dragonite",
+          "Mimikyu",
+          "Aegislash",
+          "Basculegion"
+        ],
+        "p2": [
+          "Banette",
+          "Pawmot",
+          "Basculegion",
+          "Archaludon",
+          "Kingambit",
+          "Victreebel"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Lucario (Lucarionite Z)",
+          "Victreebel (Victreebelite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4673,
+      "sha256": "5eadbe9592db63c79aad6e118e22744f9747e39371d3b85174839b1555fa3b95"
+    },
+    {
+      "id": "gen9championsbssregmc-2697078478",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2697078478.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2697078478",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2697078478.json",
+      "players": [
+        "jamel1",
+        "Teitv"
+      ],
+      "playerPairKey": "jamel1::teitv",
+      "winner": "Teitv",
+      "rating": 1430,
+      "uploadtime": 1791810258,
+      "uploadedAt": "2026-10-12T13:04:18.000Z",
+      "views": "11",
+      "turns": 10,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Scolipede",
+          "Hatterene",
+          "Vaporeon",
+          "Gengar",
+          "Polteageist",
+          "Corviknight"
+        ],
+        "p2": [
+          "Salamence",
+          "Archaludon",
+          "Rillaboom",
+          "Tyranitar",
+          "Bellibolt",
+          "Corviknight"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Tyranitar (Tyranitarite)"
+        ],
+        "weathers": [
+          "Sandstorm"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 5041,
+      "sha256": "3553ab04881639393ec7dfbf9d5aa217ec083c49b09679efbc1b20440648ba3a"
+    },
+    {
+      "id": "gen9championsbssregmc-2703703080",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2703703080.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2703703080",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2703703080.json",
+      "players": [
+        "posking",
+        "xczjfjf"
+      ],
+      "playerPairKey": "posking::xczjfjf",
+      "winner": "posking",
+      "rating": 1429,
+      "uploadtime": 1792812750,
+      "uploadedAt": "2026-10-24T03:32:30.000Z",
+      "views": "1",
+      "turns": 10,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Primarina",
+          "Baxcalibur",
+          "Garchomp",
+          "Golisopod",
+          "Salamence",
+          "Gholdengo"
+        ],
+        "p2": [
+          "Hippowdon",
+          "Lucario",
+          "Mimikyu",
+          "Aegislash",
+          "Salamence",
+          "Archaludon"
+        ]
+      },
+      "tags": [
+        "mega",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Golisopod (Golisopite)",
+          "Lucario (Lucarionite Z)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 5029,
+      "sha256": "b6c1e47108c6d177ffe71430e5041c49ea3886449302d927e493c67407ccf538"
+    },
+    {
+      "id": "gen9championsbssregmc-2700918741",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700918741.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700918741",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700918741.json",
+      "players": [
+        "dfghsdhj",
+        "MegaShyvana"
+      ],
+      "playerPairKey": "dfghsdhj::megashyvana",
+      "winner": "MegaShyvana",
+      "rating": 1429,
+      "uploadtime": 1792401332,
+      "uploadedAt": "2026-10-19T09:15:32.000Z",
+      "views": "2",
+      "turns": 6,
+      "forfeited": true,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Meganium",
+          "Garchomp",
+          "Ninetales-Alola",
+          "Mimikyu",
+          "Sneasler",
+          "Archaludon"
+        ],
+        "p2": [
+          "Banette",
+          "Pawmot",
+          "Basculegion",
+          "Archaludon",
+          "Kingambit",
+          "Victreebel"
+        ]
+      },
+      "tags": [
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [],
+        "weathers": [
+          "Snowscape"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 3550,
+      "sha256": "656982e9e8f6681e82eafc74cad45b50b32c304df56467277c7ea911668fb3da"
+    },
+    {
+      "id": "gen9championsbssregmc-2683599297",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2683599297.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2683599297",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2683599297.json",
+      "players": [
+        "Dragalge THL",
+        "mk7juju"
+      ],
+      "playerPairKey": "dragalgethl::mk7juju",
+      "winner": "Dragalge THL",
+      "rating": 1428,
+      "uploadtime": 1789743808,
+      "uploadedAt": "2026-09-18T15:03:28.000Z",
+      "views": "50",
+      "turns": 26,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Sableye",
+          "Sylveon",
+          "Samurott-Hisui",
+          "Dragalge",
+          "Gholdengo",
+          "Toxapex"
+        ],
+        "p2": [
+          "Grimmsnarl",
+          "Empoleon",
+          "Golisopod",
+          "Salamence",
+          "Volcarona",
+          "Gholdengo"
+        ]
+      },
+      "tags": [
+        "mega",
+        "hazards",
+        "boost",
+        "status"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Golisopod (Golisopite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [
+          "Spikes"
+        ],
+        "statuses": [
+          "brn"
+        ]
+      },
+      "bytes": 9076,
+      "sha256": "94e6d78f830e9546f51d8c6791f852ea5ff06e33094f32768e60438b51d76202"
+    },
+    {
+      "id": "gen9championsbssregmc-2701047110",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2701047110.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701047110",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2701047110.json",
+      "players": [
+        "LsAlt48",
+        "MegaShyvana"
+      ],
+      "playerPairKey": "lsalt48::megashyvana",
+      "winner": "MegaShyvana",
+      "rating": 1425,
+      "uploadtime": 1792420637,
+      "uploadedAt": "2026-10-19T14:37:17.000Z",
+      "views": "1",
+      "turns": 9,
+      "forfeited": true,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Staraptor",
+          "Indeedee",
+          "Rillaboom",
+          "Rotom-Heat",
+          "Baxcalibur",
+          "Charizard"
+        ],
+        "p2": [
+          "Banette",
+          "Pawmot",
+          "Basculegion",
+          "Archaludon",
+          "Kingambit",
+          "Victreebel"
+        ]
+      },
+      "tags": [
+        "mega",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Staraptor (Staraptite)",
+          "Victreebel (Victreebelite)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4178,
+      "sha256": "41267792cba59fa869c20c741da174d920bd7f25cdd461c870f898c555e3c02d"
+    },
+    {
+      "id": "gen9championsbssregmc-2700563235",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700563235.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700563235",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700563235.json",
+      "players": [
+        "MikuMiku39",
+        "NormChomsky"
+      ],
+      "playerPairKey": "mikumiku39::normchomsky",
+      "winner": "NormChomsky",
+      "rating": 1425,
+      "uploadtime": 1792341958,
+      "uploadedAt": "2026-10-18T16:45:58.000Z",
+      "views": "2",
+      "turns": 10,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Baxcalibur",
+          "Mimikyu",
+          "Lucario",
+          "Rotom-Wash",
+          "Volcarona",
+          "Kingambit"
+        ],
+        "p2": [
+          "Baxcalibur",
+          "Charizard",
+          "Corviknight",
+          "Garchomp",
+          "Metagross",
+          "Mimikyu"
+        ]
+      },
+      "tags": [
+        "mega",
+        "weather",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Baxcalibur (Baxcalibrite)",
+          "Charizard (Charizardite Y)"
+        ],
+        "weathers": [
+          "SunnyDay"
+        ],
+        "terrains": [],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4599,
+      "sha256": "c29b0e22a3a5bf3033f30957426abbdcb36e336cd18a0be3b458392ab9ceac9a"
+    },
+    {
+      "id": "gen9championsbssregmc-2696230196",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2696230196.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2696230196",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2696230196.json",
+      "players": [
+        "NimusG5Search",
+        "NormChomsky"
+      ],
+      "playerPairKey": "nimusg5search::normchomsky",
+      "winner": "NormChomsky",
+      "rating": 1425,
+      "uploadtime": 1791660925,
+      "uploadedAt": "2026-10-10T19:35:25.000Z",
+      "views": "14",
+      "turns": 17,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Golisopod",
+          "Salamence",
+          "Gholdengo",
+          "Primarina",
+          "Baxcalibur",
+          "Garchomp"
+        ],
+        "p2": [
+          "Baxcalibur",
+          "Charizard",
+          "Corviknight",
+          "Garchomp",
+          "Metagross",
+          "Mimikyu"
+        ]
+      },
+      "tags": [
+        "mega",
+        "hazards",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Golisopod (Golisopite)",
+          "Metagross (Metagrossite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [
+          "Stealth Rock"
+        ],
+        "statuses": []
+      },
+      "bytes": 5697,
+      "sha256": "b627288c2651d27a891a41e71884bb5ebd0bd5c240dbed8dfb5bef5eee4a0342"
+    },
+    {
+      "id": "gen9championsbssregmc-2706377830",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2706377830.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2706377830",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2706377830.json",
+      "players": [
+        "Ghostofcolress",
+        "Pillahuinco"
+      ],
+      "playerPairKey": "ghostofcolress::pillahuinco",
+      "winner": "Ghostofcolress",
+      "rating": 1424,
+      "uploadtime": 1793300736,
+      "uploadedAt": "2026-10-29T19:05:36.000Z",
+      "views": "16",
+      "turns": 7,
+      "forfeited": false,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Samurott-Hisui",
+          "Ninetales-Alola",
+          "Baxcalibur",
+          "Lucario",
+          "Gyarados",
+          "Gholdengo"
+        ],
+        "p2": [
+          "Metagross",
+          "Primarina",
+          "Hydreigon",
+          "Cinderace",
+          "Garchomp",
+          "Gholdengo"
+        ]
+      },
+      "tags": [
+        "mega",
+        "hazards",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Gyarados (Gyaradosite)",
+          "Metagross (Metagrossite)"
+        ],
+        "weathers": [],
+        "terrains": [],
+        "hazards": [
+          "Spikes"
+        ],
+        "statuses": []
+      },
+      "bytes": 4032,
+      "sha256": "f0a2ff73e6700dac0574499ca439d6dd56e786bee654a405ce2f401534fc6a47"
+    },
+    {
+      "id": "gen9championsbssregmc-2700853750",
+      "category": "singles",
+      "format": "[Gen 9 Champions] BSS Reg M-C",
+      "formatid": "gen9championsbssregmc",
+      "file": "singles/gen9championsbssregmc-2700853750.json",
+      "url": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700853750",
+      "apiUrl": "https://replay.pokemonshowdown.com/gen9championsbssregmc-2700853750.json",
+      "players": [
+        "MegaShyvana",
+        "fuguier"
+      ],
+      "playerPairKey": "fuguier::megashyvana",
+      "winner": "MegaShyvana",
+      "rating": 1423,
+      "uploadtime": 1792387493,
+      "uploadedAt": "2026-10-19T05:24:53.000Z",
+      "views": "2",
+      "turns": 9,
+      "forfeited": true,
+      "hasShowteam": false,
+      "hasInputlog": false,
+      "teams": {
+        "p1": [
+          "Hippowdon",
+          "Metagross",
+          "Primarina",
+          "Garchomp",
+          "Gholdengo",
+          "Mimikyu"
+        ],
+        "p2": [
+          "Venusaur",
+          "Corviknight",
+          "Mamoswine",
+          "Pyroar",
+          "Primarina",
+          "Rillaboom"
+        ]
+      },
+      "tags": [
+        "mega",
+        "terrain",
+        "boost"
+      ],
+      "tagDetails": {
+        "megas": [
+          "Metagross (Metagrossite)",
+          "Pyroar (Pyroarite)"
+        ],
+        "weathers": [],
+        "terrains": [
+          "Grassy Terrain"
+        ],
+        "hazards": [],
+        "statuses": []
+      },
+      "bytes": 4718,
+      "sha256": "0ce93a0a904369062af9aac3a1d7b6d8013cd9a4b53791b45348df5ce446f5cb"
+    }
+  ]
+}
