@@ -1,10 +1,18 @@
 import {toID} from '@pkmn/sim';
-import {FeatureBit, type BoostStat, type StatusId, type TerrainId, type WeatherId} from '../types';
+import {
+  FeatureBit,
+  type AbilityOptimizationTraits,
+  type BoostStat,
+  type StatusId,
+  type TerrainId,
+  type WeatherId,
+} from '../types';
 
 export interface CompiledAbilitySpec {
   id: string;
   supported: boolean;
   featureBits: number;
+  optTraits: AbilityOptimizationTraits;
   // Weather & Terrain setters on switch-in
   setsWeather?: WeatherId;
   setsTerrain?: TerrainId;
@@ -203,7 +211,9 @@ export interface CompiledAbilitySpec {
   noOpInBattle?: boolean;       // Abilities with no competitive battle effect (Illuminate, Pickup, etc.)
 }
 
-const ABILITY_SPECS: Record<string, Omit<CompiledAbilitySpec, 'id' | 'supported' | 'featureBits'> & {featureBits?: number}> = {
+type AbilityEffectFields = Omit<CompiledAbilitySpec, 'id' | 'supported' | 'featureBits' | 'optTraits'>;
+
+const ABILITY_SPECS: Record<string, AbilityEffectFields & {featureBits?: number}> = {
   // --- Champions new abilities (7/7 = 100%) ---
   auraguard: {auraGuard: true},
   dragonize: {ateType: 'Dragon'},
@@ -451,19 +461,306 @@ const ABILITY_SPECS: Record<string, Omit<CompiledAbilitySpec, 'id' | 'supported'
   forewarn: {noOpInBattle: true},
 };
 
+type AbilityFlagRole =
+  | 'safe'
+  | 'terrain-setter'
+  | 'mutates-abilities'
+  | 'mutates-abilities-and-boosts'
+  | 'mutates-berry'
+  | 'heals-self'
+  | 'heals-both'
+  | 'reads-boosts'
+  | 'hp-pinch'
+  | 'hp-half'
+  | 'hp-below-max';
+
+/**
+ * Exhaustive optimization classification of every effect field on CompiledAbilitySpec.
+ * Adding a new ability effect field fails `tsc --noEmit` until classified here,
+ * preventing future rules updates from silently breaking soundness.
+ */
+const ABILITY_FLAG_CLASS: Record<keyof AbilityEffectFields, AbilityFlagRole> = {
+  setsWeather: 'safe',
+  setsTerrain: 'terrain-setter',
+  speedDoubleWeather: 'safe',
+  speedDoubleTerrain: 'safe',
+  evasionWeather: 'safe',
+  grassPelt: 'safe',
+  cloudNine: 'safe',
+  pinchType: 'hp-pinch',
+  offenseTypeBoost: 'safe',
+  ateType: 'safe',
+  liquidVoice: 'safe',
+  immuneType: 'safe',
+  immuneHealQuarter: 'heals-self',
+  immuneBoostStat: 'safe',
+  immuneBoostStages: 'safe',
+  drySkin: 'heals-self',
+  flashFire: 'safe',
+  soundproof: 'safe',
+  bulletproof: 'safe',
+  goodAsGold: 'safe',
+  hugePower: 'safe',
+  toughClaws: 'safe',
+  technician: 'safe',
+  sheerForce: 'safe',
+  sharpness: 'safe',
+  strongJaw: 'safe',
+  ironFist: 'safe',
+  megaLauncher: 'safe',
+  reckless: 'safe',
+  adaptability: 'safe',
+  tintedLens: 'safe',
+  sniper: 'safe',
+  sandForce: 'safe',
+  guts: 'safe',
+  marvelScale: 'safe',
+  hustle: 'safe',
+  waterBubble: 'safe',
+  punkRock: 'safe',
+  megaSol: 'safe',
+  analytic: 'safe',
+  fairyAura: 'safe',
+  steelySpirit: 'safe',
+  stakeout: 'safe',
+  supremeOverlord: 'safe',
+  plusMinus: 'safe',
+  merciless: 'safe',
+  parentalBond: 'safe',
+  multiscale: 'safe',
+  teraShell: 'safe',
+  auraGuard: 'safe',
+  filter: 'safe',
+  thickFat: 'safe',
+  furCoat: 'safe',
+  fluffy: 'safe',
+  iceScales: 'safe',
+  heatproof: 'safe',
+  purifyingSalt: 'safe',
+  battleArmor: 'safe',
+  shieldDust: 'safe',
+  overcoat: 'safe',
+  magicGuard: 'safe',
+  unaware: 'safe',
+  friendGuard: 'safe',
+  telepathy: 'safe',
+  damp: 'safe',
+  intimidate: 'safe',
+  embodyAspectStat: 'safe',
+  curiousMedicine: 'reads-boosts',
+  hospitality: 'heals-self',
+  screenCleaner: 'safe',
+  supersweetSyrup: 'safe',
+  regenerator: 'heals-self',
+  naturalCure: 'safe',
+  moxie: 'safe',
+  eelevate: 'safe',
+  disguise: 'safe',
+  sturdy: 'safe',
+  stamina: 'safe',
+  roughSkin: 'safe',
+  aftermath: 'safe',
+  innardsOut: 'safe',
+  contactStatus: 'safe',
+  effectSpore: 'safe',
+  gooey: 'safe',
+  poisonTouch: 'safe',
+  stench: 'safe',
+  spicyspray: 'safe',
+  angerPoint: 'safe',
+  electromorphosis: 'safe',
+  rattled: 'safe',
+  thermalExchange: 'safe',
+  sandSpit: 'safe',
+  seedSower: 'heals-both',
+  toxicDebris: 'safe',
+  defiant: 'reads-boosts',
+  competitive: 'reads-boosts',
+  guardDog: 'safe',
+  mirrorArmor: 'reads-boosts',
+  opportunist: 'reads-boosts',
+  synchronize: 'safe',
+  steadfast: 'safe',
+  clearBody: 'safe',
+  hyperCutter: 'safe',
+  bigPecks: 'safe',
+  innerFocus: 'safe',
+  oblivious: 'safe',
+  ownTempo: 'safe',
+  aromaVeil: 'safe',
+  flowerVeil: 'safe',
+  sweetVeil: 'safe',
+  leafGuard: 'safe',
+  statusImmune: 'safe',
+  corrosion: 'safe',
+  earlyBird: 'safe',
+  contrary: 'reads-boosts',
+  prankster: 'safe',
+  galeWings: 'hp-below-max',
+  moldBreaker: 'safe',
+  protectBypassContact: 'safe',
+  infiltrator: 'safe',
+  compoundEyes: 'safe',
+  noGuard: 'safe',
+  sereneGrace: 'safe',
+  skillLink: 'safe',
+  superLuck: 'safe',
+  speedBoost: 'safe',
+  protean: 'safe',
+  rockHead: 'safe',
+  unburden: 'safe',
+  weakArmor: 'safe',
+  justified: 'safe',
+  berserk: 'hp-half',
+  scrappy: 'safe',
+  priorityBlock: 'safe',
+  magicBounce: 'safe',
+  pressure: 'safe',
+  healer: 'safe',
+  hydration: 'safe',
+  shedSkin: 'safe',
+  harvest: 'mutates-berry',
+  rainDish: 'heals-self',
+  iceBody: 'heals-self',
+  solarPower: 'safe',
+  poisonHeal: 'heals-self',
+  quickFeet: 'safe',
+  lightMetal: 'safe',
+  heavyMetal: 'safe',
+  longReach: 'safe',
+  stickyHold: 'safe',
+  suctionCups: 'safe',
+  klutz: 'safe',
+  unnerve: 'safe',
+  cheekPouch: 'heals-self',
+  ripen: 'safe',
+  gluttony: 'safe',
+  liquidOoze: 'safe',
+  shadowTag: 'safe',
+  stalwart: 'safe',
+  stall: 'safe',
+  quickDraw: 'safe',
+  tangledFeet: 'safe',
+  rivalry: 'safe',
+  cursedBody: 'safe',
+  cuteCharm: 'safe',
+  moody: 'reads-boosts',
+  cudChew: 'safe',
+  emergencyExit: 'hp-half',
+  mimicry: 'safe',
+  battleBond: 'safe',
+  mummy: 'mutates-abilities',
+  wanderingSpirit: 'mutates-abilities',
+  trace: 'mutates-abilities',
+  receiver: 'mutates-abilities',
+  magician: 'mutates-berry',
+  pickpocket: 'mutates-berry',
+  symbiosis: 'mutates-berry',
+  illusion: 'safe',
+  zeroToHero: 'safe',
+  iceFace: 'safe',
+  shieldsDown: 'hp-half',
+  stanceChange: 'safe',
+  forecast: 'safe',
+  hungerSwitch: 'safe',
+  gulpMissile: 'hp-half',
+  imposter: 'mutates-abilities-and-boosts',
+  noOpInBattle: 'safe',
+};
+
+const SAFE_ABILITY_TRAITS: AbilityOptimizationTraits = {
+  mutatesAbilities: false,
+  mutatesBerry: false,
+  canHealSelf: false,
+  canHealFoe: false,
+  readsGlobalBoosts: false,
+  hpThreshold: 'none',
+};
+
+const UNSAFE_ABILITY_TRAITS: AbilityOptimizationTraits = {
+  mutatesAbilities: true,
+  mutatesBerry: true,
+  canHealSelf: true,
+  canHealFoe: true,
+  readsGlobalBoosts: true,
+  hpThreshold: 'below-maxhp',
+};
+
+function deriveAbilityOptTraits(spec: AbilityEffectFields): AbilityOptimizationTraits {
+  let mutatesAbilities = false;
+  let mutatesBerry = false;
+  let canHealSelf = false;
+  let canHealFoe = false;
+  let readsGlobalBoosts = false;
+  let hpThreshold: AbilityOptimizationTraits['hpThreshold'] = 'none';
+
+  for (const key of Object.keys(spec) as (keyof AbilityEffectFields | 'featureBits')[]) {
+    if (key === 'featureBits') continue;
+    const val = spec[key];
+    if (!val) continue;
+    const role = ABILITY_FLAG_CLASS[key];
+    if (!role) {
+      // Fail closed if an unclassified field somehow appears at runtime
+      return UNSAFE_ABILITY_TRAITS;
+    }
+    switch (role) {
+      case 'safe':
+        break;
+      case 'terrain-setter':
+        if (val === 'grassy') {
+          canHealSelf = true;
+          canHealFoe = true;
+        }
+        break;
+      case 'mutates-abilities':
+        mutatesAbilities = true;
+        break;
+      case 'mutates-abilities-and-boosts':
+        mutatesAbilities = true;
+        readsGlobalBoosts = true;
+        break;
+      case 'mutates-berry':
+        mutatesBerry = true;
+        break;
+      case 'heals-self':
+        canHealSelf = true;
+        break;
+      case 'heals-both':
+        canHealSelf = true;
+        canHealFoe = true;
+        break;
+      case 'reads-boosts':
+        readsGlobalBoosts = true;
+        break;
+      case 'hp-pinch':
+        hpThreshold = 'pinch-third';
+        break;
+      case 'hp-half':
+        hpThreshold = 'half-maxhp';
+        break;
+      case 'hp-below-max':
+        hpThreshold = 'below-maxhp';
+        break;
+    }
+  }
+
+  return {mutatesAbilities, mutatesBerry, canHealSelf, canHealFoe, readsGlobalBoosts, hpThreshold};
+}
+
 export function compileAbilitySpec(abilityIdRaw: string): CompiledAbilitySpec {
   const id = toID(abilityIdRaw);
   if (!id) {
-    return {id: '', supported: true, featureBits: FeatureBit.NONE};
+    return {id: '', supported: true, featureBits: FeatureBit.NONE, optTraits: SAFE_ABILITY_TRAITS};
   }
   const spec = ABILITY_SPECS[id];
   if (!spec) {
-    return {id, supported: false, featureBits: FeatureBit.NONE};
+    return {id, supported: false, featureBits: FeatureBit.NONE, optTraits: UNSAFE_ABILITY_TRAITS};
   }
   return {
     id,
     supported: true,
     featureBits: spec.featureBits ?? FeatureBit.NONE,
+    optTraits: deriveAbilityOptTraits(spec),
     ...spec,
   };
 }

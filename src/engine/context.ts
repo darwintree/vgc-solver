@@ -300,43 +300,15 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
     }
   }
 
-  // Determine whether SpA (boosts[2]) and SpD (boosts[3]) can ever be observed.
-  const anyGlobalBoostReader = [0, 1].some(s => {
-    const moves = allTeamMoves(s as 0 | 1);
-    const abs = allTeamAbilities(s as 0 | 1);
-    const items = sides[s as 0 | 1].team.map(p => p.itemSpec);
-    return (
-      moves.some(m =>
-        m.specialKind === 'stored-power' ||
-        m.specialKind === 'psych-up' ||
-        m.specialKind === 'power-swap' ||
-        m.specialKind === 'guard-swap' ||
-        m.specialKind === 'topsy-turvy' ||
-        m.specialKind === 'baton-pass' ||
-        m.specialKind === 'stockpile' ||
-        m.specialKind === 'shell-side-arm' ||
-        m.specialKind === 'acupressure' ||
-        m.specialKind === 'lash-out' ||
-        m.specialKind === 'stomping-tantrum' ||
-        m.specialKind === 'transform' ||
-        m.specialKind === 'copycat' ||
-        m.specialKind === 'sleep-talk'
-      ) ||
-      abs.some(a =>
-        a.defiant ||
-        a.competitive ||
-        a.contrary ||
-        a.mirrorArmor ||
-        a.opportunist ||
-        a.moody ||
-        a.imposter ||
-        a.curiousMedicine
-      ) ||
-      items.some(it => it.archetype === 'white-herb')
-    );
-  });
+  // Determine whether SpA (boosts[2]) and SpD (boosts[3]) can ever be observed
+  // from co-located fail-closed optimization traits on moves, abilities, and items.
+  const anyGlobalBoostReader = ([0, 1] as const).some(s =>
+    allTeamMoves(s).some(m => m.optTraits.readsGlobalBoosts) ||
+    allTeamAbilities(s).some(a => a.optTraits.readsGlobalBoosts) ||
+    sides[s].team.some(p => p.itemSpec.optTraits.readsGlobalBoosts)
+  );
   const sideHasSpecialMove = (s: 0 | 1) =>
-    allTeamMoves(s).some(m => m.category === 'Special' || m.specialKind === 'shell-side-arm');
+    allTeamMoves(s).some(m => m.optTraits.canBeSpecial);
   const trackSpaBoost: [boolean, boolean] = [
     anyGlobalBoostReader || sideHasSpecialMove(0),
     anyGlobalBoostReader || sideHasSpecialMove(1),

@@ -18,7 +18,6 @@ import type {
   DynamicState,
   HpEntry,
   HpOutputMode,
-  MoveSpecialKind,
   SideAction,
   StaticBattleContext,
   StaticPokemonData,
@@ -32,75 +31,6 @@ export interface EngineAdapterOptions {
   hpOutputMode?: HpOutputMode;
 }
 
-const GLOBAL_NON_MONOTONE_MOVES = new Set<MoveSpecialKind>([
-  'pain-split',
-  'copycat',
-  'transform',
-  'sleep-talk',
-  'skill-swap',
-  'role-play',
-  'entrainment',
-  'worry-seed',
-  'simple-beam',
-  'gastro-acid',
-]);
-
-const SELF_NON_MONOTONE_MOVES = new Set<MoveSpecialKind>([
-  'flail',
-  'endeavor',
-  'rest',
-]);
-
-const BERRY_RESTORE_OR_TRANSFER_MOVES = new Set<MoveSpecialKind>([
-  'recycle',
-  'trick',
-  'steal-item',
-  'steal-berry',
-  'teatime',
-]);
-
-const SELF_HEAL_MOVES = new Set<MoveSpecialKind>([
-  'heal-half',
-  'roost',
-  'heal-weather',
-  'rest',
-  'wish',
-  'swallow',
-  'aqua-ring',
-  'ingrain',
-  'leech-seed',
-  'strength-sap',
-  'pain-split',
-  'pollen-puff',
-  'heal-pulse',
-  'healing-wish',
-  'revival-blessing',
-  'set-terrain',
-]);
-
-function abilityMutatesAbilities(ab: CompiledAbilitySpec): boolean {
-  return !!(ab.mummy || ab.wanderingSpirit || ab.trace || ab.imposter || ab.receiver);
-}
-
-function abilityRestoresOrTransfersBerry(ab: CompiledAbilitySpec): boolean {
-  return !!(ab.harvest || ab.magician || ab.pickpocket || ab.symbiosis);
-}
-
-function abilityCanHeal(ab: CompiledAbilitySpec): boolean {
-  return !!(
-    ab.rainDish ||
-    ab.iceBody ||
-    ab.drySkin ||
-    ab.poisonHeal ||
-    ab.immuneHealQuarter ||
-    ab.regenerator ||
-    ab.hospitality ||
-    ab.setsTerrain === 'grassy' ||
-    ab.seedSower ||
-    ab.cheekPouch
-  );
-}
-
 function allStaticAbilities(sp: StaticPokemonData): CompiledAbilitySpec[] {
   return sp.megaForme ? [sp.abilitySpec, sp.megaForme.abilitySpec] : [sp.abilitySpec];
 }
@@ -108,9 +38,7 @@ function allStaticAbilities(sp: StaticPokemonData): CompiledAbilitySpec[] {
 function sideHasMoveOfTypeOrDynamic(sp: StaticPokemonData, targetType: string, ab: CompiledAbilitySpec): boolean {
   for (const m of sp.moves) {
     if (m.category === 'Status') continue;
-    if (m.type === targetType) return true;
-    if (m.specialKind === 'weather-ball' || m.specialKind === 'terrain-pulse' ||
-        m.specialKind === 'aura-wheel' || m.specialKind === 'raging-bull') return true;
+    if (m.type === targetType || m.optTraits.dynamicMoveType) return true;
     if (ab.liquidVoice && targetType === 'Water' && m.sound) return true;
     if (ab.ateType === targetType && m.type === 'Normal') return true;
   }
@@ -118,15 +46,11 @@ function sideHasMoveOfTypeOrDynamic(sp: StaticPokemonData, targetType: string, a
 }
 
 /**
- * Build a strictly sound HP-monotonicity signature function for 1v1 singles
- * battles. For any two turn-phase states in the same `groupKey`:
+ * Build a strictly sound HP-monotonicity analyzer for 1v1 singles battles from
+ * co-located fail-closed optimization traits on moves, abilities, and items.
+ * For any two turn-phase states in the same `groupKey`:
  * - higher `h1` (when non-null) is guaranteed to have value >= lower `h1`
  * - lower `h2` (when non-null) is guaranteed to have value >= higher `h2`
- *
- * Any mechanic that can invert HP ordering (HP-threshold berries while active,
- * pinch/half-HP abilities while HP > threshold or healing remains possible,
- * Flail/Endeavor/Pain Split/Hard Press/Rest/Drain/Shell Bell, or ability/berry
- * mutators) conservatively disables the affected axis (returning null for it).
  */
 export interface MonotoneAnalyzer {
   anyAxisAllowed: boolean;
@@ -146,27 +70,22 @@ export function createMonotoneAnalyzer(ctx: StaticBattleContext): MonotoneAnalyz
 
   const sp: [StaticPokemonData, StaticPokemonData] = [ctx.sides[0].team[0], ctx.sides[1].team[0]];
 
-  // Global disqualifiers (ability copy/swap, move copy, symmetric HP inversion)
   let battleHasHpBerry = false;
-  let battleHasBerryRestore = false;
+  let battleHasBerryMutator = false;
   for (let s = 0; s < 2; s++) {
     const mon = sp[s];
-    if (mon.itemSpec.archetype === 'sitrus-berry' || mon.itemSpec.archetype === 'oran-berry') {
-      battleHasHpBerry = true;
-    }
+    if (mon.itemSpec.optTraits.hpThresholdBerry) battleHasHpBerry = true;
     for (const m of mon.moves) {
-      if (GLOBAL_NON_MONOTONE_MOVES.has(m.specialKind)) return disabled;
-      if (BERRY_RESTORE_OR_TRANSFER_MOVES.has(m.specialKind)) battleHasBerryRestore = true;
+      if (m.optTraits.hpMonotone === 'unsafe-both') return disabled;
+      if (m.optTraits.canMutateBerry) battleHasBerryMutator = true;
     }
     for (const ab of allStaticAbilities(mon)) {
-      if (abilityMutatesAbilities(ab)) return disabled;
-      if (abilityRestoresOrTransfersBerry(ab)) battleHasBerryRestore = true;
+      if (ab.optTraits.mutatesAbilities) return disabled;
+      if (ab.optTraits.mutatesBerry) battleHasBerryMutator = true;
     }
   }
 
-  // If a berry exists and any restore/transfer mechanic exists, neither side can
-  // safely treat a consumed berry as permanently gone.
-  if (battleHasHpBerry && battleHasBerryRestore) {
+  if (battleHasHpBerry && battleHasBerryMutator) {
     return disabled;
   }
 
@@ -178,27 +97,21 @@ export function createMonotoneAnalyzer(ctx: StaticBattleContext): MonotoneAnalyz
     const foe = sp[1 - s];
 
     for (const m of self.moves) {
-      if (SELF_NON_MONOTONE_MOVES.has(m.specialKind)) staticAxisAllowed[s] = false;
-      if (SELF_HEAL_MOVES.has(m.specialKind) || m.drain !== null) canHealWithoutBerry[s] = true;
+      if (m.optTraits.hpMonotone === 'unsafe-self') staticAxisAllowed[s] = false;
+      if (m.optTraits.canHealSelf) canHealWithoutBerry[s] = true;
     }
-    if (self.itemSpec.archetype === 'leftovers' || self.itemSpec.archetype === 'shell-bell') {
-      canHealWithoutBerry[s] = true;
-    }
+    if (self.itemSpec.optTraits.canHealWithoutBerry) canHealWithoutBerry[s] = true;
     for (const ab of allStaticAbilities(self)) {
-      if (abilityCanHeal(ab)) canHealWithoutBerry[s] = true;
+      if (ab.optTraits.canHealSelf) canHealWithoutBerry[s] = true;
     }
 
     for (const m of foe.moves) {
-      if (m.specialKind === 'hard-press' || m.drain !== null) staticAxisAllowed[s] = false;
-      if (m.specialKind === 'set-terrain' || m.specialKind === 'heal-pulse' || m.specialKind === 'pollen-puff') {
-        canHealWithoutBerry[s] = true;
-      }
+      if (m.optTraits.hpMonotone === 'unsafe-target') staticAxisAllowed[s] = false;
+      if (m.optTraits.canHealFoe) canHealWithoutBerry[s] = true;
     }
-    if (foe.itemSpec.archetype === 'shell-bell') {
-      staticAxisAllowed[s] = false;
-    }
+    if (foe.itemSpec.optTraits.breaksFoeHpMonotonicity) staticAxisAllowed[s] = false;
     for (const ab of allStaticAbilities(foe)) {
-      if (ab.setsTerrain === 'grassy' || ab.seedSower) canHealWithoutBerry[s] = true;
+      if (ab.optTraits.canHealFoe) canHealWithoutBerry[s] = true;
     }
   }
 
@@ -214,8 +127,7 @@ export function createMonotoneAnalyzer(ctx: StaticBattleContext): MonotoneAnalyz
 
     const mon = sp[s];
     const itemSpec = p.itemActive ? activeItemSpec(ctx, mon, p) : null;
-    const hasActiveHpBerry = !!itemSpec && (itemSpec.archetype === 'sitrus-berry' || itemSpec.archetype === 'oran-berry');
-    if (hasActiveHpBerry || p.cudchewBerry !== '') return false;
+    if (itemSpec?.optTraits.hpThresholdBerry || p.cudchewBerry !== '') return false;
 
     const canHealNow =
       canHealWithoutBerry[s] ||
@@ -226,16 +138,17 @@ export function createMonotoneAnalyzer(ctx: StaticBattleContext): MonotoneAnalyz
       state.sides[1 - s].pokemon[0].leechSeedSlot >= 0;
 
     const checkAbility = (ab: CompiledAbilitySpec): boolean => {
-      if (ab.pinchType && sideHasMoveOfTypeOrDynamic(mon, ab.pinchType, ab)) {
-        if (hp > Math.floor(mon.maxhp / 3) || canHealNow) return false;
+      switch (ab.optTraits.hpThreshold) {
+        case 'none':
+          return true;
+        case 'pinch-third':
+          return !ab.pinchType || !sideHasMoveOfTypeOrDynamic(mon, ab.pinchType, ab) ||
+            (hp <= Math.floor(mon.maxhp / 3) && !canHealNow);
+        case 'half-maxhp':
+          return hp <= Math.floor(mon.maxhp / 2) && !canHealNow;
+        case 'below-maxhp':
+          return hp < mon.maxhp && !canHealNow;
       }
-      if (ab.berserk || ab.shieldsDown || ab.gulpMissile || ab.emergencyExit) {
-        if (hp > Math.floor(mon.maxhp / 2) || canHealNow) return false;
-      }
-      if (ab.galeWings) {
-        if (hp >= mon.maxhp || canHealNow) return false;
-      }
-      return true;
     };
 
     if (p.abilityActive && !p.gastroAcid) {

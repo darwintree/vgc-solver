@@ -1,6 +1,12 @@
 import type {Battle} from '@pkmn/sim';
 import {toID} from '@pkmn/sim';
-import {FeatureBit, type StatusId, type TerrainId, type WeatherId} from '../types';
+import {
+  FeatureBit,
+  type ItemOptimizationTraits,
+  type StatusId,
+  type TerrainId,
+  type WeatherId,
+} from '../types';
 
 export type ItemArchetype =
   | 'none'
@@ -53,6 +59,7 @@ export interface CompiledItemSpec {
   supported: boolean;
   removable: boolean;
   featureBits: number;
+  optTraits: ItemOptimizationTraits;
   /** Mega Evolution target species ID when archetype === 'mega-stone'. */
   megaSpeciesId?: string;
   /** Required base species ID for Mega Evolution (from item.megaEvolves). */
@@ -184,6 +191,70 @@ const UNIQUE_ITEMS: Record<string, {archetype: ItemArchetype; featureBits: numbe
   powerherb: {archetype: 'power-herb', featureBits: FeatureBit.NONE},
 };
 
+const SAFE_ITEM_TRAITS: ItemOptimizationTraits = {
+  hpThresholdBerry: false,
+  breaksFoeHpMonotonicity: false,
+  canHealWithoutBerry: false,
+  readsGlobalBoosts: false,
+};
+
+const UNSAFE_ITEM_TRAITS: ItemOptimizationTraits = {
+  hpThresholdBerry: true,
+  breaksFoeHpMonotonicity: true,
+  canHealWithoutBerry: true,
+  readsGlobalBoosts: true,
+};
+
+/**
+ * Exhaustive optimization traits per ItemArchetype.
+ * Adding a new ItemArchetype fails `tsc --noEmit` until its soundness traits are classified here.
+ */
+const ITEM_ARCHETYPE_TRAITS: Record<ItemArchetype, ItemOptimizationTraits> = {
+  none: SAFE_ITEM_TRAITS,
+  'mega-stone': SAFE_ITEM_TRAITS,
+  'type-boost': SAFE_ITEM_TRAITS,
+  'resist-berry': SAFE_ITEM_TRAITS,
+  'status-berry': SAFE_ITEM_TRAITS,
+  'terrain-seed': SAFE_ITEM_TRAITS,
+  'weather-rock': SAFE_ITEM_TRAITS,
+  'terrain-extender': SAFE_ITEM_TRAITS,
+  'light-clay': SAFE_ITEM_TRAITS,
+  'life-orb': SAFE_ITEM_TRAITS,
+  'focus-sash': SAFE_ITEM_TRAITS,
+  'focus-band': SAFE_ITEM_TRAITS,
+  'sitrus-berry': {...SAFE_ITEM_TRAITS, hpThresholdBerry: true},
+  'oran-berry': {...SAFE_ITEM_TRAITS, hpThresholdBerry: true},
+  leftovers: {...SAFE_ITEM_TRAITS, canHealWithoutBerry: true},
+  'choice-scarf': SAFE_ITEM_TRAITS,
+  'rocky-helmet': SAFE_ITEM_TRAITS,
+  'air-balloon': SAFE_ITEM_TRAITS,
+  'scope-lens': SAFE_ITEM_TRAITS,
+  'expert-belt': SAFE_ITEM_TRAITS,
+  'muscle-band': SAFE_ITEM_TRAITS,
+  'wise-glasses': SAFE_ITEM_TRAITS,
+  'wide-lens': SAFE_ITEM_TRAITS,
+  'zoom-lens': SAFE_ITEM_TRAITS,
+  'white-herb': {...SAFE_ITEM_TRAITS, readsGlobalBoosts: true},
+  'eject-button': SAFE_ITEM_TRAITS,
+  'red-card': SAFE_ITEM_TRAITS,
+  'leppa-berry': SAFE_ITEM_TRAITS,
+  'shell-bell': {...SAFE_ITEM_TRAITS, breaksFoeHpMonotonicity: true, canHealWithoutBerry: true},
+  'big-root': SAFE_ITEM_TRAITS,
+  'bright-powder': SAFE_ITEM_TRAITS,
+  'quick-claw': SAFE_ITEM_TRAITS,
+  'kings-rock': SAFE_ITEM_TRAITS,
+  metronome: SAFE_ITEM_TRAITS,
+  'normal-gem': SAFE_ITEM_TRAITS,
+  'iron-ball': SAFE_ITEM_TRAITS,
+  'light-ball': SAFE_ITEM_TRAITS,
+  leek: SAFE_ITEM_TRAITS,
+  'mental-herb': SAFE_ITEM_TRAITS,
+  'shed-shell': SAFE_ITEM_TRAITS,
+  'binding-band': SAFE_ITEM_TRAITS,
+  'safety-goggles': SAFE_ITEM_TRAITS,
+  'power-herb': SAFE_ITEM_TRAITS,
+};
+
 /**
  * Compile any item directly from Dex metadata + generic family rules.
  * Covers 166/166 (100%) of all Pokémon Champions items — and automatically supports
@@ -192,7 +263,14 @@ const UNIQUE_ITEMS: Record<string, {archetype: ItemArchetype; featureBits: numbe
 export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): CompiledItemSpec {
   const id = toID(itemIdRaw);
   if (!id) {
-    return {id: '', archetype: 'none', supported: true, removable: false, featureBits: FeatureBit.NONE};
+    return {
+      id: '',
+      archetype: 'none',
+      supported: true,
+      removable: false,
+      featureBits: FeatureBit.NONE,
+      optTraits: ITEM_ARCHETYPE_TRAITS.none,
+    };
   }
 
   const raw: any = dex.items.get(id);
@@ -219,6 +297,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       supported: !!megaSpeciesId,
       removable: false,
       featureBits: FeatureBit.MEGA,
+      optTraits: ITEM_ARCHETYPE_TRAITS['mega-stone'],
       megaSpeciesId,
       megaEvolves,
     };
@@ -242,6 +321,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       supported: true,
       removable,
       featureBits: FeatureBit.NONE,
+      optTraits: ITEM_ARCHETYPE_TRAITS['type-boost'],
       affectedType: TYPE_BOOST_ITEMS[id],
       ...meta,
     };
@@ -255,6 +335,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       supported: true,
       removable,
       featureBits: FeatureBit.NONE,
+      optTraits: ITEM_ARCHETYPE_TRAITS['resist-berry'],
       affectedType: RESIST_BERRIES[id],
       ...meta,
     };
@@ -268,6 +349,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       supported: true,
       removable,
       featureBits: FeatureBit.NONE,
+      optTraits: ITEM_ARCHETYPE_TRAITS['status-berry'],
       curesStatus: STATUS_BERRIES[id],
       ...meta,
     };
@@ -281,6 +363,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       supported: true,
       removable,
       featureBits: FeatureBit.NONE,
+      optTraits: ITEM_ARCHETYPE_TRAITS['terrain-seed'],
       seedTerrain: TERRAIN_SEEDS[id].terrain,
       seedStat: TERRAIN_SEEDS[id].stat,
       ...meta,
@@ -295,6 +378,7 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       supported: true,
       removable,
       featureBits: FeatureBit.NONE,
+      optTraits: ITEM_ARCHETYPE_TRAITS['weather-rock'],
       extendedWeather: WEATHER_ROCKS[id],
       ...meta,
     };
@@ -309,10 +393,19 @@ export function compileItemSpec(dex: Battle['dex'], itemIdRaw: string): Compiled
       supported: true,
       removable,
       featureBits: unique.featureBits,
+      optTraits: ITEM_ARCHETYPE_TRAITS[unique.archetype],
       affectedType: id === 'normalgem' ? 'Normal' : undefined,
       ...meta,
     };
   }
 
-  return {id, archetype: 'none', supported: false, removable, featureBits: FeatureBit.NONE, ...meta};
+  return {
+    id,
+    archetype: 'none',
+    supported: false,
+    removable,
+    featureBits: FeatureBit.NONE,
+    optTraits: UNSAFE_ITEM_TRAITS,
+    ...meta,
+  };
 }

@@ -4,8 +4,9 @@ import type {MatrixSolution} from './types';
 // offset + 1, then B is strictly positive and
 // value(A) = scale * (value(B) + offset - 1).
 const SIMPLEX_EPS = 1e-15;
+const PIVOT_EPS = 1e-12;
 const DUALITY_EPS = 1e-9;
-const ENUMERATION_MAX_DIMENSION = 6;
+const ENUMERATION_MAX_DIMENSION = 8;
 
 function normalizeStrategy(strategy: number[]): number[] {
   if (strategy.some(x => x < -1e-9)) {
@@ -72,7 +73,7 @@ function simplexPositiveCover(matrix: number[][]) {
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     let entering = -1;
     for (let j = 0; j < totalVariables; j++) {
-      if (objective[j] > SIMPLEX_EPS) {
+      if (objective[j] > PIVOT_EPS) {
         entering = j;
         break;
       }
@@ -86,11 +87,11 @@ function simplexPositiveCover(matrix: number[][]) {
     let bestRatio = Infinity;
     for (let i = 0; i < constraints; i++) {
       const coefficient = tableau[i][entering];
-      if (coefficient <= SIMPLEX_EPS) continue;
+      if (coefficient <= PIVOT_EPS) continue;
       const ratio = tableau[i][rhsColumn] / coefficient;
       // Bland tie-breaking is important for repeated rows and columns.
-      if (ratio < bestRatio - SIMPLEX_EPS ||
-          (Math.abs(ratio - bestRatio) <= SIMPLEX_EPS &&
+      if (ratio < bestRatio - PIVOT_EPS ||
+          (Math.abs(ratio - bestRatio) <= PIVOT_EPS &&
            (leaving < 0 || basis[i] < basis[leaving]))) {
         bestRatio = ratio;
         leaving = i;
@@ -283,18 +284,112 @@ function solveByEnumeration(payoff: number[][]): MatrixSolution {
   return result;
 }
 
-/** Solve a finite zero-sum matrix game. Payoffs are from player 1's perspective. */
-function solveZeroSumMatrix(payoff: number[][]): MatrixSolution {
-  if (!Array.isArray(payoff) || payoff.length === 0 ||
-      !Array.isArray(payoff[0]) || payoff[0].length === 0) {
-    throw new Error('Payoff matrix must be non-empty');
-  }
-  const width = payoff[0].length;
-  if (!payoff.every(row => Array.isArray(row) && row.length === width &&
-      row.every(Number.isFinite))) {
-    throw new Error('Payoff matrix must be rectangular and finite');
+/**
+ * Iteratively eliminate weakly dominated (and duplicate) rows and columns.
+ * In a two-player zero-sum game, weak dominance preserves the exact minimax
+ * value and every equilibrium of the reduced subgame lifts (with zero weight
+ * on eliminated actions) to an exact equilibrium of the original game.
+ */
+function reduceDominated(payoff: number[][]): {
+  matrix: number[][];
+  rowIndices: number[];
+  colIndices: number[];
+} {
+  let rowIndices = Array.from({length: payoff.length}, (_, i) => i);
+  let colIndices = Array.from({length: payoff[0].length}, (_, j) => j);
+
+  let changed = true;
+  while (changed && (rowIndices.length > 1 || colIndices.length > 1)) {
+    changed = false;
+
+    if (rowIndices.length > 1) {
+      const keptRows: number[] = [];
+      for (let a = 0; a < rowIndices.length; a++) {
+        const ra = rowIndices[a];
+        let dominated = false;
+        for (let b = 0; b < rowIndices.length; b++) {
+          if (a === b) continue;
+          const rb = rowIndices[b];
+          let allLe = true;
+          let anyLt = false;
+          for (let k = 0; k < colIndices.length; k++) {
+            const c = colIndices[k];
+            const va = payoff[ra][c];
+            const vb = payoff[rb][c];
+            if (va > vb) {
+              allLe = false;
+              break;
+            }
+            if (va < vb) anyLt = true;
+          }
+          if (allLe && (anyLt || ra > rb)) {
+            dominated = true;
+            break;
+          }
+        }
+        if (dominated) changed = true;
+        else keptRows.push(ra);
+      }
+      if (keptRows.length > 0) rowIndices = keptRows;
+    }
+
+    if (colIndices.length > 1) {
+      const keptCols: number[] = [];
+      for (let a = 0; a < colIndices.length; a++) {
+        const ca = colIndices[a];
+        let dominated = false;
+        for (let b = 0; b < colIndices.length; b++) {
+          if (a === b) continue;
+          const cb = colIndices[b];
+          let allGe = true;
+          let anyGt = false;
+          for (let k = 0; k < rowIndices.length; k++) {
+            const r = rowIndices[k];
+            const va = payoff[r][ca];
+            const vb = payoff[r][cb];
+            if (va < vb) {
+              allGe = false;
+              break;
+            }
+            if (va > vb) anyGt = true;
+          }
+          if (allGe && (anyGt || ca > cb)) {
+            dominated = true;
+            break;
+          }
+        }
+        if (dominated) changed = true;
+        else keptCols.push(ca);
+      }
+      if (keptCols.length > 0) colIndices = keptCols;
+    }
   }
 
+  const matrix = rowIndices.map(r => colIndices.map(c => payoff[r][c]));
+  return {matrix, rowIndices, colIndices};
+}
+
+function solvePositiveViaSimplex(positive: number[][]): MatrixSolution {
+  const columnCover = simplexPositiveCover(positive);
+  const p2 = normalizeStrategy(columnCover.solution);
+  const p1 = normalizeStrategy(columnCover.dual);
+  const columnValue = 1 / columnCover.objective;
+  const rowObjective = columnCover.dual.reduce((a, b) => a + b, 0);
+  const rowValue = 1 / rowObjective;
+  const gap = Math.abs(columnValue - rowValue);
+  if (gap > DUALITY_EPS * Math.max(1, Math.abs(columnValue), Math.abs(rowValue))) {
+    throw new Error(`LP duality gap is too large: ${rowValue} vs ${columnValue}`);
+  }
+  const result = {
+    value: (columnValue + rowValue) / 2,
+    p1,
+    p2,
+  };
+  validateEquilibrium(positive, result);
+  return result;
+}
+
+function solveReducedMatrix(payoff: number[][]): MatrixSolution {
   const pure = findPureSaddle(payoff);
   if (pure) {
     validateEquilibrium(payoff, pure);
@@ -315,42 +410,86 @@ function solveZeroSumMatrix(payoff: number[][]): MatrixSolution {
     row.map(entry => entry - normalizedOffset + 1)
   );
 
-  // For positive B, max sum(y) s.t. B*y <= 1 gives p2 after normalization.
-  // The final basis reconstruction in simplexPositiveCover supplies the dual
-  // solution for p1 without solving a second, unrelated transposed game.
+  // 1. Primary primal simplex on positive B.
+  let lastError: unknown = null;
   try {
-    const columnCover = simplexPositiveCover(positive);
-    const p2 = normalizeStrategy(columnCover.solution);
-    const p1 = normalizeStrategy(columnCover.dual);
-    const columnValue = 1 / columnCover.objective;
-    const rowObjective = columnCover.dual.reduce((a, b) => a + b, 0);
-    const rowValue = 1 / rowObjective;
-    const gap = Math.abs(columnValue - rowValue);
-    if (gap > DUALITY_EPS * Math.max(1, Math.abs(columnValue), Math.abs(rowValue))) {
-      throw new Error(`LP duality gap is too large: ${rowValue} vs ${columnValue}`);
-    }
-
-    const positiveValue = (columnValue + rowValue) / 2;
+    const sol = solvePositiveViaSimplex(positive);
     const result = {
-      value: scale * (positiveValue + normalizedOffset - 1),
-      p1,
-      p2,
+      value: scale * (sol.value + normalizedOffset - 1),
+      p1: sol.p1,
+      p2: sol.p2,
     };
     validateEquilibrium(payoff, result);
     return result;
   } catch (error) {
-    if (Math.max(payoff.length, width) > ENUMERATION_MAX_DIMENSION) throw error;
-    // Run the bounded fallback on the normalized positive matrix. This keeps
-    // its feasibility tolerances independent of the caller's payoff scale.
-    const fallback = solveByEnumeration(positive);
+    lastError = error;
+  }
+
+  // 2. Transposed-negated simplex fallback (-B^T has a different pivot path & basis conditioning).
+  try {
+    const negT = Array.from({length: normalized[0].length}, (_, j) =>
+      Array.from({length: normalized.length}, (_, i) => -normalized[i][j])
+    );
+    let minNeg = Infinity;
+    for (const row of negT) {
+      for (const entry of row) minNeg = Math.min(minNeg, entry);
+    }
+    const positiveT = negT.map(row => row.map(entry => entry - minNeg + 1));
+    const solT = solvePositiveViaSimplex(positiveT);
+    const negValue = solT.value + minNeg - 1;
     const result = {
-      value: scale * (fallback.value + normalizedOffset - 1),
-      p1: fallback.p1,
-      p2: fallback.p2,
+      value: -scale * negValue,
+      p1: solT.p2,
+      p2: solT.p1,
     };
     validateEquilibrium(payoff, result);
     return result;
+  } catch (error) {
+    lastError = error;
   }
+
+  // 3. Bounded vertex enumeration fallback on small reduced matrices.
+  if (Math.max(payoff.length, payoff[0].length) > ENUMERATION_MAX_DIMENSION) {
+    throw lastError;
+  }
+  const fallback = solveByEnumeration(positive);
+  const result = {
+    value: scale * (fallback.value + normalizedOffset - 1),
+    p1: fallback.p1,
+    p2: fallback.p2,
+  };
+  validateEquilibrium(payoff, result);
+  return result;
+}
+
+/** Solve a finite zero-sum matrix game. Payoffs are from player 1's perspective. */
+function solveZeroSumMatrix(payoff: number[][]): MatrixSolution {
+  if (!Array.isArray(payoff) || payoff.length === 0 ||
+      !Array.isArray(payoff[0]) || payoff[0].length === 0) {
+    throw new Error('Payoff matrix must be non-empty');
+  }
+  const width = payoff[0].length;
+  if (!payoff.every(row => Array.isArray(row) && row.length === width &&
+      row.every(Number.isFinite))) {
+    throw new Error('Payoff matrix must be rectangular and finite');
+  }
+
+  const pure = findPureSaddle(payoff);
+  if (pure) {
+    validateEquilibrium(payoff, pure);
+    return pure;
+  }
+
+  const {matrix: reduced, rowIndices, colIndices} = reduceDominated(payoff);
+  const sub = solveReducedMatrix(reduced);
+
+  const p1 = Array(payoff.length).fill(0);
+  const p2 = Array(width).fill(0);
+  for (let i = 0; i < rowIndices.length; i++) p1[rowIndices[i]] = sub.p1[i];
+  for (let j = 0; j < colIndices.length; j++) p2[colIndices[j]] = sub.p2[j];
+  const result = {value: sub.value, p1, p2};
+  validateEquilibrium(payoff, result);
+  return result;
 }
 
 export {solveZeroSumMatrix};

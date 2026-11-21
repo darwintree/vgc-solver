@@ -271,6 +271,33 @@ export interface MoveSecondarySpec {
   volatileStatus?: 'flinch' | 'confusion';
 }
 
+export interface MoveOptimizationTraits {
+  hpMonotone: 'safe' | 'unsafe-self' | 'unsafe-target' | 'unsafe-both';
+  canHealSelf: boolean;
+  canHealFoe: boolean;
+  canMutateBerry: boolean;
+  readsGlobalBoosts: boolean;
+  dynamicMoveType: boolean;
+  canBeSpecial: boolean;
+}
+
+export interface ItemOptimizationTraits {
+  hpThresholdBerry: boolean;
+  breaksFoeHpMonotonicity: boolean;
+  canHealWithoutBerry: boolean;
+  readsGlobalBoosts: boolean;
+}
+
+export interface AbilityOptimizationTraits {
+  mutatesAbilities: boolean;
+  mutatesBerry: boolean;
+  canHealSelf: boolean;
+  canHealFoe: boolean;
+  readsGlobalBoosts: boolean;
+  /** Non-monotone HP threshold requirement on self active HP, if any. */
+  hpThreshold: 'none' | 'pinch-third' | 'half-maxhp' | 'below-maxhp';
+}
+
 export interface StaticMoveData {
   id: string;
   name: string;
@@ -319,6 +346,7 @@ export interface StaticMoveData {
   protect: boolean;
   encore: boolean;
   stealthRock: boolean;
+  optTraits: MoveOptimizationTraits;
 }
 
 export interface StaticStats {
