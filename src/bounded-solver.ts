@@ -29,15 +29,35 @@ export interface MonotoneBoxOutcome {
   upperSnapshot: Snapshot | null;
   split: () => (import('./types').Outcome | MonotoneBoxOutcome)[];
 }
+export interface BoundedTransitionCursor {
+  advance: (options?: {maxRuns?: number; deadline?: number}) => {
+    outcomes: (import('./types').Outcome | MonotoneBoxOutcome)[];
+    remainingProbability: number;
+    simulatorRuns: number;
+    cacheHits?: number;
+    complete: boolean;
+  };
+}
+
+export interface PpSignature {
+  /** Key identifying identical non-PP state (with low PP <= 2 kept exact). */
+  groupKey: string;
+  /** Flat move PP vector for all non-fainted Pokemon in deterministic order. */
+  pp: number[];
+  /** Maximum PP a single move can lose per turn (1 normally, 2+ with Pressure). */
+  maxPpLossPerTurn: number;
+}
+
 export interface BoundedAdapter {
   // Custom adapters may use primitive state IDs and action IDs.
   snapshotBattle?: (battle: any) => any;
   restoreBattle?: (snapshot: any) => any;
   stateKey?: (snapshot: any) => string;
   monotoneSignature?: (snapshot: any) => MonotoneSignature | null;
+  ppSignature?: (snapshot: any) => PpSignature | null;
   terminalUtility?: (battle: any) => number | null;
   legalActions?: (battle: any, side: number) => (Action | string | number)[];
-  createTurnCursor?: (snapshot: any, p1: any, p2: any, options?: any) => TransitionCursor;
+  createTurnCursor?: (snapshot: any, p1: any, p2: any, options?: any) => BoundedTransitionCursor;
   enumerateTurn: (snapshot: any, p1: any, p2: any, options?: any) => {
     outcomes: (import('./types').Outcome | MonotoneBoxOutcome)[];
     simulatorRuns?: number;
@@ -83,22 +103,28 @@ interface BoundedOutcome {
   split?: (() => (import('./types').Outcome | MonotoneBoxOutcome)[]) | null;
 }
 interface BoundedCell {
-  cursor?: TransitionCursor | null;
+  cursor?: BoundedTransitionCursor | null;
   remainingProbability?: number;
   outcomes: BoundedOutcome[] | null;
   lower: number;
   upper: number;
+  lowerDepth?: number;
+  upperDepth?: number;
 }
 interface MonotoneFrontier2D {
   h1: number;
   h2: number;
   val: number;
+  depth: number;
 }
 interface MonotoneGroup {
   kind: 'h1' | 'h2' | '2d';
   nodes: SearchNode[];
   lowerFrontier: MonotoneFrontier2D[];
   upperFrontier: MonotoneFrontier2D[];
+}
+interface PpGroup {
+  nodes: SearchNode[];
 }
 export interface SearchNode {
   key: string;
@@ -110,6 +136,8 @@ export interface SearchNode {
   cells: BoundedCell[][] | null;
   lower: number;
   upper: number;
+  lowerDepth: number;
+  upperDepth: number;
   lowerMatrix: number[][] | null;
   upperMatrix: number[][] | null;
   lowerSolution: MatrixSolution | null;
@@ -120,12 +148,25 @@ export interface SearchNode {
   monoGroup?: MonotoneGroup | null;
   monoH1?: number | null;
   monoH2?: number | null;
+  ppGroup?: PpGroup | null;
+  ppVec?: number[] | null;
+  ppLossPerTurn?: number;
 }
 
 const DEFAULT_LOWER = -1;
 const DEFAULT_UPPER = 1;
 const EPSILON = 1e-12;
 const FRONTIER_TIE_EPSILON = 1e-9;
+const MAX_PP_PROP_DEPTH = 32;
+const MAX_PP_GROUP_NODES = 128;
+
+function ppVectorsCompatible(a: number[], b: number[], threshold: number): boolean {
+  if (a.length !== b.length) return false;
+  for (let k = 0; k < a.length; k++) {
+    if (a[k] !== b[k] && (a[k] <= threshold || b[k] <= threshold)) return false;
+  }
+  return true;
+}
 
 /**
  * Exact O(M*N) pure saddle-point check before invoking general LP/matrix reduction.
@@ -208,6 +249,7 @@ function createStats() {
     prepareMs: 0,
     terminalEnvelopes: 0,
     monotoneUpdates: 0,
+    ppBoundUpdates: 0,
     boxSplits: 0,
   };
 }
@@ -228,6 +270,7 @@ class BoundedSearch {
   declare nodes: Map<string, SearchNode>;
   declare snapshotKeyCache: WeakMap<object, string>;
   declare monotoneGroups: Map<string, MonotoneGroup>;
+  declare ppGroups: Map<string, PpGroup>;
   declare monoCornerTurn: number;
   declare stats: ReturnType<typeof createStats>;
   declare limitReached: boolean;
@@ -278,6 +321,7 @@ class BoundedSearch {
     this.nodes = new Map();
     this.snapshotKeyCache = new WeakMap();
     this.monotoneGroups = new Map();
+    this.ppGroups = new Map();
     this.monoCornerTurn = 0;
     this.stats = createStats();
     this.limitReached = false;
@@ -457,6 +501,8 @@ class BoundedSearch {
       cells: null,
       lower: terminal === null ? DEFAULT_LOWER : terminal,
       upper: terminal === null ? DEFAULT_UPPER : terminal,
+      lowerDepth: 0,
+      upperDepth: 0,
       lowerMatrix: null,
       upperMatrix: null,
       lowerSolution: null,
@@ -467,8 +513,9 @@ class BoundedSearch {
     this.nodes.set(key, node);
     this.stats.discoveredStates++;
     this.stats.solvedStates = this.stats.discoveredStates;
-    if (terminal === null && this.rootNode !== null && this.adapter.monotoneSignature) {
-      this._registerMonotone(node);
+    if (terminal === null && this.rootNode !== null) {
+      if (this.adapter.monotoneSignature) this._registerMonotone(node);
+      if (this.adapter.ppSignature) this._registerPp(node);
     }
     return node;
   }
@@ -499,9 +546,18 @@ class BoundedSearch {
         if (mc < coord) lo = mid + 1;
         else hi = mid;
       }
-      if (lo > 0) node.lower = Math.max(node.lower, list[lo - 1].lower);
-      if (lo < list.length) node.upper = Math.min(node.upper, list[lo].upper);
-      if (node.lower > node.upper) node.upper = node.lower;
+      if (lo > 0 && list[lo - 1].lower > node.lower) {
+        node.lower = list[lo - 1].lower;
+        node.lowerDepth = list[lo - 1].lowerDepth;
+      }
+      if (lo < list.length && list[lo].upper < node.upper) {
+        node.upper = list[lo].upper;
+        node.upperDepth = list[lo].upperDepth;
+      }
+      if (node.lower > node.upper) {
+        node.upper = node.lower;
+        node.upperDepth = Math.max(node.lowerDepth, node.upperDepth);
+      }
       list.splice(lo, 0, node);
       if (node.lower > DEFAULT_LOWER + EPSILON || node.upper < DEFAULT_UPPER - EPSILON) {
         this.stats.monotoneUpdates++;
@@ -511,24 +567,81 @@ class BoundedSearch {
 
     const h1 = sig.h1!;
     const h2 = sig.h2!;
-    let bestL = DEFAULT_LOWER;
+    let bestL = node.lower;
+    let bestLDepth = node.lowerDepth;
     for (const f of group.lowerFrontier) {
-      if (f.h1 <= h1 && f.h2 >= h2 && f.val > bestL) bestL = f.val;
+      if (f.h1 <= h1 && f.h2 >= h2 && f.val > bestL) {
+        bestL = f.val;
+        bestLDepth = f.depth;
+      }
     }
-    let bestU = DEFAULT_UPPER;
+    let bestU = node.upper;
+    let bestUDepth = node.upperDepth;
     for (const f of group.upperFrontier) {
-      if (f.h1 >= h1 && f.h2 <= h2 && f.val < bestU) bestU = f.val;
+      if (f.h1 >= h1 && f.h2 <= h2 && f.val < bestU) {
+        bestU = f.val;
+        bestUDepth = f.depth;
+      }
     }
     node.lower = bestL;
-    node.upper = Math.max(bestL, bestU);
+    node.lowerDepth = bestLDepth;
+    if (bestU < bestL) {
+      node.upper = bestL;
+      node.upperDepth = Math.max(bestLDepth, bestUDepth);
+    } else {
+      node.upper = bestU;
+      node.upperDepth = bestUDepth;
+    }
     group.nodes.push(node);
     if (bestL > DEFAULT_LOWER + EPSILON || bestU < DEFAULT_UPPER - EPSILON) {
       this.stats.monotoneUpdates++;
     }
   }
 
+  _registerPp(node: SearchNode) {
+    const sig = this.adapter.ppSignature!(node.snapshot);
+    if (!sig) return;
+    let group = this.ppGroups.get(sig.groupKey);
+    if (!group) {
+      group = {nodes: []};
+      this.ppGroups.set(sig.groupKey, group);
+    }
+    node.ppGroup = group;
+    node.ppVec = sig.pp;
+    node.ppLossPerTurn = sig.maxPpLossPerTurn;
+
+    const oldLower = node.lower;
+    const oldUpper = node.upper;
+    for (let i = 0; i < group.nodes.length; i++) {
+      const peer = group.nodes[i];
+      if (peer.lower > node.lower + EPSILON && peer.lowerDepth > 0 && peer.lowerDepth <= MAX_PP_PROP_DEPTH) {
+        if (ppVectorsCompatible(sig.pp, peer.ppVec!, sig.maxPpLossPerTurn * peer.lowerDepth)) {
+          node.lower = Math.min(node.upper, peer.lower);
+          node.lowerDepth = peer.lowerDepth;
+        }
+      }
+      if (peer.upper < node.upper - EPSILON && peer.upperDepth > 0 && peer.upperDepth <= MAX_PP_PROP_DEPTH) {
+        if (ppVectorsCompatible(sig.pp, peer.ppVec!, sig.maxPpLossPerTurn * peer.upperDepth)) {
+          node.upper = Math.max(node.lower, peer.upper);
+          node.upperDepth = peer.upperDepth;
+        }
+      }
+    }
+    if (group.nodes.length < MAX_PP_GROUP_NODES) {
+      group.nodes.push(node);
+    }
+    if (node.lower > oldLower + EPSILON || node.upper < oldUpper - EPSILON) {
+      this.stats.ppBoundUpdates++;
+    }
+  }
+
   _transitionOptions() {
-    if (this.adapter !== nativeAdapter) return {};
+    if (this.adapter !== nativeAdapter) {
+      return {
+        deadline: this.deadline,
+        tolerance: this.options.tolerance,
+      };
+    }
     return {
       maxSimulatorRunsPerTransition: this.options.maxSimulatorRunsPerTransition,
       deadline: this.deadline,
@@ -665,8 +778,12 @@ class BoundedSearch {
     const skipTerminal = this.adapter === nativeAdapter;
     const subs = rawSubs.map(sub => this._internOutcome(node, sub, skipTerminal));
     const sum = subs.reduce((acc, s) => acc + s.probability, 0);
-    if (Math.abs(sum - outcome.probability) > PROBABILITY_SUM_TOLERANCE) {
+    if (!(sum > 0) || Math.abs(sum - outcome.probability) > 2 * PROBABILITY_SUM_TOLERANCE) {
       throw new Error(`Split sub-outcome probabilities sum to ${sum}, expected ${outcome.probability}`);
+    }
+    if (sum !== outcome.probability) {
+      const scale = outcome.probability / sum;
+      for (const s of subs) s.probability *= scale;
     }
     cell.outcomes.splice(outcomeIndex, 1, ...subs);
     node.dirty = true;
@@ -718,6 +835,8 @@ class BoundedSearch {
     const oldUpper = cell.upper;
     let lower = -(cell.remainingProbability || 0);
     let upper = cell.remainingProbability || 0;
+    let cLowerDepth = 0;
+    let cUpperDepth = 0;
     const outcomes = cell.outcomes;
     for (let k = 0; k < outcomes.length; k++) {
       const outcome = outcomes[k];
@@ -727,10 +846,29 @@ class BoundedSearch {
         if (outcome.split) {
           childLower = outcome.child ? outcome.child.lower : DEFAULT_LOWER;
           childUpper = outcome.upperChild ? outcome.upperChild.upper : DEFAULT_UPPER;
+          if (childLower > DEFAULT_LOWER + EPSILON && outcome.child) {
+            const d = outcome.child.lowerDepth + 1;
+            if (d > cLowerDepth) cLowerDepth = d;
+          }
+          if (childUpper < DEFAULT_UPPER - EPSILON && outcome.upperChild) {
+            const d = outcome.upperChild.upperDepth + 1;
+            if (d > cUpperDepth) cUpperDepth = d;
+          }
         } else {
           childLower = outcome.child ? outcome.child.lower : DEFAULT_LOWER;
           childUpper = outcome.child ? outcome.child.upper : DEFAULT_UPPER;
+          if (childLower > DEFAULT_LOWER + EPSILON && outcome.child) {
+            const d = outcome.child.lowerDepth + 1;
+            if (d > cLowerDepth) cLowerDepth = d;
+          }
+          if (childUpper < DEFAULT_UPPER - EPSILON && outcome.child) {
+            const d = outcome.child.upperDepth + 1;
+            if (d > cUpperDepth) cUpperDepth = d;
+          }
         }
+      } else {
+        if (childLower > DEFAULT_LOWER + EPSILON && cLowerDepth < 1) cLowerDepth = 1;
+        if (childUpper < DEFAULT_UPPER - EPSILON && cUpperDepth < 1) cUpperDepth = 1;
       }
       const p = outcome.probability;
       lower += p * childLower;
@@ -740,8 +878,18 @@ class BoundedSearch {
     const nextUpper = upper < DEFAULT_LOWER ? DEFAULT_LOWER : (upper > DEFAULT_UPPER ? DEFAULT_UPPER : upper);
     // Bellman interval updates are monotone. Retaining the previous endpoint
     // also protects a certificate from a tiny floating-point reversal.
-    cell.lower = Math.min(cell.upper, Math.max(cell.lower, nextLower));
-    cell.upper = Math.max(cell.lower, Math.min(cell.upper, nextUpper));
+    if (nextLower > cell.lower + EPSILON) {
+      cell.lower = Math.min(cell.upper, nextLower);
+      cell.lowerDepth = nextLower > cell.upper ? Math.max(cLowerDepth, cell.upperDepth || 0) : cLowerDepth;
+    } else if (nextLower > cell.lower) {
+      cell.lower = Math.min(cell.upper, nextLower);
+    }
+    if (nextUpper < cell.upper - EPSILON) {
+      cell.upper = Math.max(cell.lower, nextUpper);
+      cell.upperDepth = nextUpper < cell.lower ? Math.max(cUpperDepth, cell.lowerDepth || 0) : cUpperDepth;
+    } else if (nextUpper < cell.upper) {
+      cell.upper = Math.max(cell.lower, nextUpper);
+    }
     let mask = 0;
     if (cell.lower !== oldLower) mask |= 1;
     if (cell.upper !== oldUpper) mask |= 2;
@@ -789,7 +937,28 @@ class BoundedSearch {
       }
       const lowerValue = lowerSecurity - 1e-10;
       const boundedLower = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, lowerValue));
-      node.lower = Math.min(node.upper, Math.max(node.lower, boundedLower));
+      if (boundedLower > node.lower + EPSILON) {
+        let nextLowerDepth = 0;
+        for (let i = 0; i < cells.length; i++) {
+          if ((lowerSolution.p1[i] || 0) <= 1e-12) continue;
+          const row = cells[i];
+          for (let j = 0; j < row.length; j++) {
+            if (row[j].lower > DEFAULT_LOWER + EPSILON) {
+              const d = row[j].lowerDepth || (row[j].outcomes ? 1 : 1);
+              if (d > nextLowerDepth) nextLowerDepth = d;
+            }
+          }
+        }
+        if (boundedLower > node.upper) {
+          node.lower = node.upper;
+          node.lowerDepth = Math.max(nextLowerDepth, node.upperDepth);
+        } else {
+          node.lower = boundedLower;
+          node.lowerDepth = nextLowerDepth;
+        }
+      } else if (boundedLower > node.lower) {
+        node.lower = Math.min(node.upper, boundedLower);
+      }
       node.lowerMatrix = lowerMatrix;
       node.lowerSolution = lowerSolution;
     }
@@ -807,7 +976,28 @@ class BoundedSearch {
       }
       const upperValue = upperSecurity + 1e-10;
       const boundedUpper = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, upperValue));
-      node.upper = Math.max(node.lower, Math.min(node.upper, boundedUpper));
+      if (boundedUpper < node.upper - EPSILON) {
+        let nextUpperDepth = 0;
+        for (let j = 0; j < cells[0].length; j++) {
+          if ((upperSolution.p2[j] || 0) <= 1e-12) continue;
+          for (let i = 0; i < cells.length; i++) {
+            const c = cells[i][j];
+            if (c.upper < DEFAULT_UPPER - EPSILON) {
+              const d = c.upperDepth || (c.outcomes ? 1 : 1);
+              if (d > nextUpperDepth) nextUpperDepth = d;
+            }
+          }
+        }
+        if (boundedUpper < node.lower) {
+          node.upper = node.lower;
+          node.upperDepth = Math.max(nextUpperDepth, node.lowerDepth);
+        } else {
+          node.upper = boundedUpper;
+          node.upperDepth = nextUpperDepth;
+        }
+      } else if (boundedUpper < node.upper) {
+        node.upper = Math.max(node.lower, boundedUpper);
+      }
       node.upperMatrix = upperMatrix;
       node.upperSolution = upperSolution;
     }
@@ -852,6 +1042,9 @@ class BoundedSearch {
         if (node.monoGroup && (lowerImproved || upperImproved)) {
           this._propagateMonotone(node, lowerImproved, upperImproved, queue, queued);
         }
+        if (node.ppGroup && (lowerImproved || upperImproved)) {
+          this._propagatePp(node, lowerImproved, upperImproved, queue, queued);
+        }
       }
       // A monotone interval backup on a cycle can only have useful changes
       // while an endpoint moves. This guard prevents pathological adapters
@@ -864,22 +1057,79 @@ class BoundedSearch {
     return updates;
   }
 
+  _propagatePp(
+    source: SearchNode,
+    lowerImproved: boolean,
+    upperImproved: boolean,
+    queue: SearchNode[],
+    queued: Set<SearchNode>,
+    allowMonoHop = true
+  ) {
+    const group = source.ppGroup;
+    if (!group || !source.ppVec || !source.ppLossPerTurn) return;
+    const canLower = lowerImproved && source.lower > DEFAULT_LOWER + EPSILON &&
+      source.lowerDepth > 0 && source.lowerDepth <= MAX_PP_PROP_DEPTH;
+    const canUpper = upperImproved && source.upper < DEFAULT_UPPER - EPSILON &&
+      source.upperDepth > 0 && source.upperDepth <= MAX_PP_PROP_DEPTH;
+    if (!canLower && !canUpper) return;
+
+    const lThr = canLower ? source.ppLossPerTurn * source.lowerDepth : 0;
+    const uThr = canUpper ? source.ppLossPerTurn * source.upperDepth : 0;
+    const srcPp = source.ppVec;
+    const list = group.nodes;
+
+    for (let i = 0; i < list.length; i++) {
+      const peer = list[i];
+      if (peer === source || peer === this.rootNode) continue;
+      let pLower = false;
+      let pUpper = false;
+      if (canLower && peer.lower < source.lower - EPSILON && ppVectorsCompatible(srcPp, peer.ppVec!, lThr)) {
+        peer.lower = Math.min(peer.upper, source.lower);
+        peer.lowerDepth = source.lowerDepth;
+        this.stats.ppBoundUpdates++;
+        pLower = true;
+      }
+      if (canUpper && peer.upper > source.upper + EPSILON && ppVectorsCompatible(srcPp, peer.ppVec!, uThr)) {
+        peer.upper = Math.max(peer.lower, source.upper);
+        peer.upperDepth = source.upperDepth;
+        this.stats.ppBoundUpdates++;
+        pUpper = true;
+      }
+      if (pLower || pUpper) {
+        for (const parent of peer.parents) {
+          parent.dirty = true;
+          if (!queued.has(parent)) {
+            queued.add(parent);
+            queue.push(parent);
+          }
+        }
+        if (allowMonoHop && peer.monoGroup) {
+          this._propagateMonotone(peer, pLower, pUpper, queue, queued, false);
+        }
+      }
+    }
+  }
+
   _propagateMonotone(
     source: SearchNode,
     lowerImproved: boolean,
     upperImproved: boolean,
     queue: SearchNode[],
-    queued: Set<SearchNode>
+    queued: Set<SearchNode>,
+    allowPpHop = true
   ) {
     const group = source.monoGroup;
     if (!group) return;
-    const enqueueParents = (peer: SearchNode) => {
+    const enqueueParents = (peer: SearchNode, pLower: boolean, pUpper: boolean) => {
       for (const parent of peer.parents) {
         parent.dirty = true;
         if (!queued.has(parent)) {
           queued.add(parent);
           queue.push(parent);
         }
+      }
+      if (allowPpHop && peer.ppGroup) {
+        this._propagatePp(peer, pLower, pUpper, queue, queued, false);
       }
     };
 
@@ -900,8 +1150,9 @@ class BoundedSearch {
           if (peer.lower >= source.lower - EPSILON) break;
           if (peer === this.rootNode) continue;
           peer.lower = Math.min(peer.upper, source.lower);
+          peer.lowerDepth = source.lowerDepth;
           this.stats.monotoneUpdates++;
-          enqueueParents(peer);
+          enqueueParents(peer, true, false);
         }
       }
       if (upperImproved) {
@@ -910,8 +1161,9 @@ class BoundedSearch {
           if (peer.upper <= source.upper + EPSILON) break;
           if (peer === this.rootNode) continue;
           peer.upper = Math.max(peer.lower, source.upper);
+          peer.upperDepth = source.upperDepth;
           this.stats.monotoneUpdates++;
-          enqueueParents(peer);
+          enqueueParents(peer, false, true);
         }
       }
       return;
@@ -922,22 +1174,23 @@ class BoundedSearch {
     if (lowerImproved) {
       let dominated = false;
       for (const f of group.lowerFrontier) {
-        if (f.h1 <= h1 && f.h2 >= h2 && f.val >= source.lower - EPSILON) {
+        if (f.h1 <= h1 && f.h2 >= h2 && f.val >= source.lower - EPSILON && f.depth <= source.lowerDepth) {
           dominated = true;
           break;
         }
       }
       if (!dominated) {
         group.lowerFrontier = group.lowerFrontier.filter(
-          f => !(f.h1 >= h1 && f.h2 <= h2 && f.val <= source.lower + EPSILON)
+          f => !(f.h1 >= h1 && f.h2 <= h2 && f.val <= source.lower + EPSILON && f.depth >= source.lowerDepth)
         );
-        group.lowerFrontier.push({h1, h2, val: source.lower});
+        group.lowerFrontier.push({h1, h2, val: source.lower, depth: source.lowerDepth});
         for (const peer of group.nodes) {
           if (peer === source || peer === this.rootNode) continue;
           if (peer.monoH1! >= h1 && peer.monoH2! <= h2 && peer.lower < source.lower - EPSILON) {
             peer.lower = Math.min(peer.upper, source.lower);
+            peer.lowerDepth = source.lowerDepth;
             this.stats.monotoneUpdates++;
-            enqueueParents(peer);
+            enqueueParents(peer, true, false);
           }
         }
       }
@@ -945,22 +1198,23 @@ class BoundedSearch {
     if (upperImproved) {
       let dominated = false;
       for (const f of group.upperFrontier) {
-        if (f.h1 >= h1 && f.h2 <= h2 && f.val <= source.upper + EPSILON) {
+        if (f.h1 >= h1 && f.h2 <= h2 && f.val <= source.upper + EPSILON && f.depth <= source.upperDepth) {
           dominated = true;
           break;
         }
       }
       if (!dominated) {
         group.upperFrontier = group.upperFrontier.filter(
-          f => !(f.h1 <= h1 && f.h2 >= h2 && f.val >= source.upper - EPSILON)
+          f => !(f.h1 <= h1 && f.h2 >= h2 && f.val >= source.upper - EPSILON && f.depth >= source.upperDepth)
         );
-        group.upperFrontier.push({h1, h2, val: source.upper});
+        group.upperFrontier.push({h1, h2, val: source.upper, depth: source.upperDepth});
         for (const peer of group.nodes) {
           if (peer === source || peer === this.rootNode) continue;
           if (peer.monoH1! <= h1 && peer.monoH2! >= h2 && peer.upper > source.upper + EPSILON) {
             peer.upper = Math.max(peer.lower, source.upper);
+            peer.upperDepth = source.upperDepth;
             this.stats.monotoneUpdates++;
-            enqueueParents(peer);
+            enqueueParents(peer, false, true);
           }
         }
       }
@@ -983,13 +1237,57 @@ class BoundedSearch {
       path.add(node);
       if (node.dirty !== false) this._refresh(node);
       if (!directionChosen) {
-        if (root.upper >= DEFAULT_UPPER - EPSILON) {
-          // At the global upper ceiling, keep lower proof while the pessimistic
-          // incumbent row could still reach that ceiling and is actively making
-          // lower-bound progress. If its optimistic floor drops below the ceiling,
-          // or lower progress stalls at the ceiling (e.g. a 90%-accuracy move whose
-          // true value is < 1), alternate upper proof so opponent refutations and
-          // alternative rows can be explored.
+        const atUpperCeiling = root.upper >= DEFAULT_UPPER - EPSILON;
+        const atLowerFloor = root.lower <= DEFAULT_LOWER + EPSILON;
+        if (atUpperCeiling && !atLowerFloor) {
+          // P1 has raised the lower bound while the upper bound is still at +1.
+          // Focus on lower proof while the incumbent row can still reach +1;
+          // probe upper proof periodically (1 in 4 after initial expansion) so
+          // a 90%-accuracy incumbent whose true value is < 1 still gets refuted.
+          let incumbent: {i: number; floor: number; mean: number} | null = null;
+          for (let i = 0; i < root.cells.length; i++) {
+            const row = root.cells[i];
+            const floor = Math.min(...row.map(cell => cell.lower));
+            const mean = row.reduce((sum, cell) => sum + cell.lower, 0) / row.length;
+            if (!incumbent || floor > incumbent.floor + FRONTIER_TIE_EPSILON ||
+                (Math.abs(floor - incumbent.floor) <= FRONTIER_TIE_EPSILON &&
+                 mean > incumbent.mean + FRONTIER_TIE_EPSILON)) {
+              incumbent = {i, floor, mean};
+            }
+          }
+          const optimisticFloor = Math.min(...root.cells[incumbent.i].map(cell => cell.upper));
+          if (optimisticFloor < root.upper - EPSILON) {
+            lowerProof = false;
+          } else if (this.proofTurn > 16 && root.cells[incumbent.i].every(cell => !!cell.outcomes)) {
+            lowerProof = (this.proofTurn & 3) !== 0;
+          } else {
+            lowerProof = true;
+          }
+        } else if (atLowerFloor && !atUpperCeiling) {
+          // Symmetric case: P2 has lowered the upper bound while the lower bound
+          // is still at -1. Focus on upper proof while the incumbent column can
+          // still reach -1; probe lower proof periodically (1 in 4) if stalled.
+          let incumbent: {j: number; ceiling: number; mean: number} | null = null;
+          for (let j = 0; j < root.cells[0].length; j++) {
+            const ceiling = Math.max(...root.cells.map(row => row[j].upper));
+            const mean = root.cells.reduce((sum, row) => sum + row[j].upper, 0) / root.cells.length;
+            if (!incumbent || ceiling < incumbent.ceiling - FRONTIER_TIE_EPSILON ||
+                (Math.abs(ceiling - incumbent.ceiling) <= FRONTIER_TIE_EPSILON &&
+                 mean < incumbent.mean - FRONTIER_TIE_EPSILON)) {
+              incumbent = {j, ceiling, mean};
+            }
+          }
+          const optimisticCeiling = Math.max(...root.cells.map(row => row[incumbent.j].lower));
+          if (optimisticCeiling > root.lower + EPSILON) {
+            lowerProof = true;
+          } else if (this.proofTurn > 16 && root.cells.every(row => !!row[incumbent.j].outcomes)) {
+            lowerProof = (this.proofTurn & 3) === 0;
+          } else {
+            lowerProof = false;
+          }
+        } else if (atUpperCeiling && atLowerFloor) {
+          // Both bounds are still at [-1, +1]: start with lower proof for the
+          // incumbent row, then alternate evenly once its row is expanded.
           let incumbent: {i: number; floor: number; mean: number} | null = null;
           for (let i = 0; i < root.cells.length; i++) {
             const row = root.cells[i];
@@ -1014,10 +1312,41 @@ class BoundedSearch {
         }
         directionChosen = true;
       }
+      // When upperSolution.value is flat at +1 (or lowerSolution.value at -1),
+      // only substitute the opposite matrix's optimal strategy if it ALREADY
+      // achieves that optimal value in the flat matrix. This preserves exact
+      // witnesses (e.g. a single row holding upper=+1) while resolving
+      // degeneracy when multiple actions tie at the global bound.
       const flatUpper = (node.upperSolution?.value ?? DEFAULT_UPPER) >= DEFAULT_UPPER - EPSILON;
       const flatLower = (node.lowerSolution?.value ?? DEFAULT_LOWER) <= DEFAULT_LOWER + EPSILON;
-      const rowStrategy = (flatUpper && !flatLower ? node.lowerSolution?.p1 : node.upperSolution?.p1) || [];
-      const colStrategy = (flatLower && !flatUpper ? node.upperSolution?.p2 : node.lowerSolution?.p2) || [];
+      let useLowerP1 = false;
+      if (flatUpper && !flatLower && node.lowerSolution?.p1) {
+        const lp1 = node.lowerSolution.p1;
+        useLowerP1 = true;
+        for (let j = 0; j < node.cells[0].length; j++) {
+          let ev = 0;
+          for (let i = 0; i < node.cells.length; i++) ev += (lp1[i] || 0) * node.cells[i][j].upper;
+          if (ev < (node.upperSolution?.value ?? DEFAULT_UPPER) - EPSILON) {
+            useLowerP1 = false;
+            break;
+          }
+        }
+      }
+      let useUpperP2 = false;
+      if (flatLower && !flatUpper && node.upperSolution?.p2) {
+        const up2 = node.upperSolution.p2;
+        useUpperP2 = true;
+        for (let i = 0; i < node.cells.length; i++) {
+          let ev = 0;
+          for (let j = 0; j < node.cells[i].length; j++) ev += node.cells[i][j].lower * (up2[j] || 0);
+          if (ev > (node.lowerSolution?.value ?? DEFAULT_LOWER) + EPSILON) {
+            useUpperP2 = false;
+            break;
+          }
+        }
+      }
+      const rowStrategy = (useLowerP1 ? node.lowerSolution?.p1 : node.upperSolution?.p1) || [];
+      const colStrategy = (useUpperP2 ? node.upperSolution?.p2 : node.lowerSolution?.p2) || [];
       const canExpandCell = cell => {
         if (cell.upper - cell.lower <= 1e-9) return false;
         if (!cell.outcomes || cell.cursor) return true;
@@ -1135,6 +1464,29 @@ class BoundedSearch {
                    rowStats[i].mean > rowStats[row].mean + FRONTIER_TIE_EPSILON)) row = i;
             }
           }
+          // Periodically probe the strongest non-incumbent contender row at root
+          // that already beats node.lower on at least half the opponent responses
+          // and still has optFloor >= incumbent.optFloor. This breaks lock-in on
+          // a suboptimal high-floor move (e.g. a 90%-acc move) without diverting
+          // budget into unpromising junk rows.
+          if (node === root && this.proofTurn > 16 && (this.proofTurn & 3) === 3) {
+            const minBeating = Math.ceil(node.cells[0].length / 2);
+            let alt = -1;
+            for (let i = 0; i < rowStats.length; i++) {
+              if (i === row) continue;
+              const s = rowStats[i];
+              if (s.optFloor <= node.lower + this.options.tolerance) continue;
+              if (s.optFloor < rowStats[row].optFloor - EPSILON) continue;
+              if (lowerPotential(node.cells[i]) <= FRONTIER_TIE_EPSILON) continue;
+              let beating = 0;
+              for (const cell of node.cells[i]) {
+                if (cell.lower > node.lower + FRONTIER_TIE_EPSILON) beating++;
+              }
+              if (beating < minBeating) continue;
+              if (alt < 0 || s.mean > rowStats[alt].mean + FRONTIER_TIE_EPSILON) alt = i;
+            }
+            if (alt >= 0) row = alt;
+          }
           if (rowStats[row].optFloor < DEFAULT_UPPER - EPSILON) {
             preferUnexpanded = true;
           }
@@ -1169,6 +1521,24 @@ class BoundedSearch {
                   (Math.abs(columnStats[j].ceiling - columnStats[column].ceiling) <= FRONTIER_TIE_EPSILON &&
                    columnStats[j].mean < columnStats[column].mean - FRONTIER_TIE_EPSILON)) column = j;
             }
+          }
+          if (node === root && this.proofTurn > 16 && (this.proofTurn & 3) === 2) {
+            const minBeating = Math.ceil(node.cells.length / 2);
+            let alt = -1;
+            for (let j = 0; j < columnStats.length; j++) {
+              if (j === column) continue;
+              const s = columnStats[j];
+              if (s.optCeiling >= node.upper - this.options.tolerance) continue;
+              if (s.optCeiling > columnStats[column].optCeiling + EPSILON) continue;
+              if (upperPotential(node.cells.map(r => r[j])) <= FRONTIER_TIE_EPSILON) continue;
+              let beating = 0;
+              for (const r of node.cells) {
+                if (r[j].upper < node.upper - FRONTIER_TIE_EPSILON) beating++;
+              }
+              if (beating < minBeating) continue;
+              if (alt < 0 || s.mean < columnStats[alt].mean - FRONTIER_TIE_EPSILON) alt = j;
+            }
+            if (alt >= 0) column = alt;
           }
           const selectedColumn = node.cells.map(row => row[column]);
           if (columnStats[column].optCeiling > DEFAULT_LOWER + EPSILON) {

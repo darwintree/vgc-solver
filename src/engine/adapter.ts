@@ -29,6 +29,8 @@ export interface EngineActionEntry extends Action {
 
 export interface EngineAdapterOptions {
   hpOutputMode?: HpOutputMode;
+  /** Enable sound progressive tail deferral cursor for BoundedSolver (default true). */
+  progressive?: boolean;
 }
 
 function allStaticAbilities(sp: StaticPokemonData): CompiledAbilitySpec[] {
@@ -230,18 +232,32 @@ function partitionMonotoneAxis(
   const chunks: HpAxisChunk[] = [];
   let monoEntries: HpEntry[] | null = null;
   let monoSum = 0;
+  let prevHp = -1;
+  const flushMono = () => {
+    if (monoEntries && monoEntries.length > 0) {
+      chunks.push({entries: monoEntries, sum: monoSum});
+      monoEntries = null;
+      monoSum = 0;
+    }
+  };
   for (const e of dist) {
     if (isHpMonotone(state, side, e.hp)) {
+      // Split disjoint HP clusters (e.g. a 1/24 crit cluster sitting far below
+      // the 23/24 non-crit range) so a rare tail never widens the main box.
+      if (monoEntries && prevHp >= 0 && e.hp - prevHp > 6) {
+        flushMono();
+      }
       if (!monoEntries) monoEntries = [];
       monoEntries.push(e);
       monoSum += e.prob;
+      prevHp = e.hp;
     } else {
+      flushMono();
+      prevHp = -1;
       chunks.push({entries: [e], sum: e.prob});
     }
   }
-  if (monoEntries && monoEntries.length > 0) {
-    chunks.push({entries: monoEntries, sum: monoSum});
-  }
+  flushMono();
   return chunks;
 }
 
@@ -359,21 +375,28 @@ export function createEngineBoundedAdapter(
   const isDynamicState = (value: any): value is DynamicState =>
     !!value && typeof value === 'object' && 'field' in value && 'sides' in value && 'phase' in value;
 
-  // Exact PP-template transition cache for 1v1 singles:
-  // When no non-linear PP mechanic is present (Leppa Berry, Spite, Transform/Imposter,
-  // Instruct, Copycat, Sleep Talk) and PP >= 3 is bucketed as '+', every single-turn
-  // PP deduction (0, -1, or -2 with Pressure) keeps PP >= 1 and never clamps or ends
-  // Encore/Disable early, so outcomes are bit-for-bit identical up to constant PP deltas.
-  const canUsePpTemplateCache =
-    ctx.activeCount === 1 &&
-    ctx.sides[0].team.length === 1 &&
-    ctx.sides[1].team.length === 1 &&
-    ([0, 1] as const).every(s => {
-      const mon = ctx.sides[s].team[0];
-      if (mon.itemSpec.archetype === 'leppa-berry') return false;
-      for (const ab of allStaticAbilities(mon)) {
-        if (ab.imposter) return false;
+  // Static audit for linear PP mechanics (safe across 1v1, full singles, and doubles):
+  // Rejects Leppa Berry, Imposter/Transform, Spite, Instruct, Copycat, Sleep Talk,
+  // Eerie Spell, Grudge, Trump Card, Lunar Dance. Accounts for opponent Pressure.
+  let ppLinearSafe = true;
+  let maxPressurePerSide = 0;
+  for (let s = 0; s < 2 && ppLinearSafe; s++) {
+    let sidePressure = 0;
+    for (const mon of ctx.sides[s].team) {
+      if (mon.itemSpec.archetype === 'leppa-berry') {
+        ppLinearSafe = false;
+        break;
       }
+      let hasPressure = false;
+      for (const ab of allStaticAbilities(mon)) {
+        if (ab.imposter) {
+          ppLinearSafe = false;
+          break;
+        }
+        if (ab.pressure) hasPressure = true;
+      }
+      if (!ppLinearSafe) break;
+      if (hasPressure) sidePressure++;
       for (const m of mon.moves) {
         if (
           m.specialKind === 'spite' ||
@@ -386,11 +409,42 @@ export function createEngineBoundedAdapter(
           m.id === 'trumpcard' ||
           m.id === 'lunardance'
         ) {
-          return false;
+          ppLinearSafe = false;
+          break;
         }
       }
-      return true;
-    });
+    }
+    if (sidePressure > maxPressurePerSide) maxPressurePerSide = sidePressure;
+  }
+  const maxPpLossPerTurn = 1 + Math.min(ctx.activeCount, maxPressurePerSide);
+
+  // Exact PP-template transition cache for 1v1 singles:
+  const canUsePpTemplateCache =
+    ppLinearSafe &&
+    ctx.activeCount === 1 &&
+    ctx.sides[0].team.length === 1 &&
+    ctx.sides[1].team.length === 1;
+
+  const ppSignature = ppLinearSafe
+    ? (state: DynamicState) => {
+        if (state.phase.kind !== 'turn') return null;
+        const pp: number[] = [];
+        for (let s = 0; s < 2; s++) {
+          const team = state.sides[s].pokemon;
+          for (let i = 0; i < team.length; i++) {
+            const p = team[i];
+            if (p.fainted) continue;
+            if (p.hpDist) return null;
+            for (let m = 0; m < p.pp.length; m++) pp.push(p.pp[m]);
+          }
+        }
+        return {
+          groupKey: canonicalStateKey(ctx, state, undefined, true),
+          pp,
+          maxPpLossPerTurn,
+        };
+      }
+    : undefined;
 
   interface PpTemplateOutcome {
     state: DynamicState;
@@ -398,8 +452,14 @@ export function createEngineBoundedAdapter(
     dpp0: number[] | null;
     dpp1: number[] | null;
   }
-  const ppTemplateCache = canUsePpTemplateCache ? new Map<string, PpTemplateOutcome[]>() : null;
+  interface PpTemplateEntry {
+    entries: PpTemplateOutcome[];
+    remainingMass: number;
+    complete: boolean;
+  }
+  const ppTemplateCache = canUsePpTemplateCache ? new Map<string, PpTemplateEntry>() : null;
   const PP_TEMPLATE_CACHE_LIMIT = 16384;
+  const enableProgressive = options.progressive !== false;
 
   const instantiatePpState = (
     tpl: DynamicState,
@@ -424,7 +484,96 @@ export function createEngineBoundedAdapter(
     };
   };
 
-  return {
+  const instantiateCachedOutcomes = (
+    state: DynamicState,
+    cached: PpTemplateEntry
+  ): Array<{state: DynamicState; probability: number}> => {
+    const inPp0 = state.sides[0].pokemon[0].pp;
+    const inPp1 = state.sides[1].pokemon[0].pp;
+    return cached.entries.map(c => ({
+      state: instantiatePpState(c.state, inPp0, inPp1, c.dpp0, c.dpp1),
+      probability: c.probability,
+    }));
+  };
+
+  const storePpTemplate = (
+    tplKey: string,
+    state: DynamicState,
+    stepOutcomes: Array<{state: DynamicState; probability: number}>,
+    remainingMass: number,
+    complete: boolean
+  ): void => {
+    if (!ppTemplateCache) return;
+    const existing = ppTemplateCache.get(tplKey);
+    if (existing && existing.complete && !complete) return;
+    if (ppTemplateCache.size >= PP_TEMPLATE_CACHE_LIMIT) {
+      ppTemplateCache.clear();
+    }
+    const inPp0 = state.sides[0].pokemon[0].pp;
+    const inPp1 = state.sides[1].pokemon[0].pp;
+    const entries: PpTemplateOutcome[] = stepOutcomes.map(o => {
+      if (o.state.phase.kind === 'ended') {
+        return {state: o.state, probability: o.probability, dpp0: null, dpp1: null};
+      }
+      const outP0 = o.state.sides[0].pokemon[0];
+      const outP1 = o.state.sides[1].pokemon[0];
+      return {
+        state: o.state,
+        probability: o.probability,
+        dpp0: outP0.fainted ? null : outP0.pp.map((v, i) => v - inPp0[i]),
+        dpp1: outP1.fainted ? null : outP1.pp.map((v, i) => v - inPp1[i]),
+      };
+    });
+    ppTemplateCache.set(tplKey, {entries, remainingMass, complete});
+  };
+
+  const formatStepOutcomes = (
+    stepOutcomes: Array<{state: DynamicState; probability: number}>
+  ): (Outcome | MonotoneBoxOutcome)[] => {
+    if (!useMonotoneBoxes) {
+      const outcomes = stepOutcomes.map(o => {
+        const utility = terminalUtilityFromState(o.state);
+        if (utility !== null) {
+          return {utility, probability: o.probability} as const;
+        }
+        return {snapshot: o.state as any, probability: o.probability} as const;
+      }) as Outcome[];
+      return bucketSmallTail(outcomes);
+    }
+
+    const outcomes: (Outcome | MonotoneBoxOutcome)[] = [];
+    for (const o of stepOutcomes) {
+      const utility = terminalUtilityFromState(o.state);
+      if (utility !== null) {
+        outcomes.push({utility, probability: o.probability});
+        continue;
+      }
+      const p0 = o.state.sides[0].pokemon[0];
+      const p1 = o.state.sides[1].pokemon[0];
+      const d0: HpEntry[] = p0.hpDist ?? [{hp: p0.hp, prob: 1}];
+      const d1: HpEntry[] = p1.hpDist ?? [{hp: p1.hp, prob: 1}];
+      if (o.state.phase.kind !== 'turn' || d0.some(e => e.hp <= 0) || d1.some(e => e.hp <= 0)) {
+        for (const ws of expandStateHpDists(o)) {
+          const u = terminalUtilityFromState(ws.state);
+          if (u !== null) outcomes.push({utility: u, probability: ws.probability});
+          else outcomes.push({snapshot: ws.state as any, probability: ws.probability});
+        }
+        continue;
+      }
+      const chunks0 = partitionMonotoneAxis(o.state, 0, d0, analyzer.isHpMonotone);
+      const chunks1 = partitionMonotoneAxis(o.state, 1, d1, analyzer.isHpMonotone);
+      for (const c0 of chunks0) {
+        for (const c1 of chunks1) {
+          const boxProb = o.probability * c0.sum * c1.sum;
+          if (boxProb <= 0) continue;
+          outcomes.push(makeBoxOrSingleton(o.state, boxProb, c0.entries, c1.entries));
+        }
+      }
+    }
+    return bucketSmallTail(outcomes);
+  };
+
+  const adapter: BoundedAdapter = {
     snapshotBattle(battleOrState: Battle | DynamicState): DynamicState {
       return isDynamicState(battleOrState) ? battleOrState : stateFromBattle(ctx, battleOrState);
     },
@@ -436,6 +585,7 @@ export function createEngineBoundedAdapter(
       return canonicalStateKey(ctx, state);
     },
     monotoneSignature: analyzer.monotoneSignature,
+    ppSignature,
     terminalUtility(state: DynamicState): number | null {
       return terminalUtilityFromState(state);
     },
@@ -451,18 +601,15 @@ export function createEngineBoundedAdapter(
     ) {
       let stepOutcomes: Array<{state: DynamicState; probability: number}>;
       let simulatorRuns = 1;
+      let cacheHits = 0;
       const useCache = ppTemplateCache !== null && state.phase.kind === 'turn';
       const tplKey = useCache
         ? `${canonicalStateKey(ctx, state, undefined, true)}|${p1Action.id}|${p2Action.id}`
         : '';
       const cached = useCache ? ppTemplateCache.get(tplKey) : undefined;
-      if (cached) {
-        const inPp0 = state.sides[0].pokemon[0].pp;
-        const inPp1 = state.sides[1].pokemon[0].pp;
-        stepOutcomes = cached.map(c => ({
-          state: instantiatePpState(c.state, inPp0, inPp1, c.dpp0, c.dpp1),
-          probability: c.probability,
-        }));
+      if (cached && cached.complete) {
+        stepOutcomes = instantiateCachedOutcomes(state, cached);
+        cacheHits = 1;
       } else {
         const res = stepBattle(ctx, state, p1Action.sideAction, p2Action.sideAction, {
           mode: 'certified',
@@ -478,80 +625,132 @@ export function createEngineBoundedAdapter(
         }
         simulatorRuns = res.stats.forks + 1;
         stepOutcomes = res.outcomes;
-        if (useCache) {
-          if (ppTemplateCache.size >= PP_TEMPLATE_CACHE_LIMIT) {
-            ppTemplateCache.clear();
-          }
-          const inPp0 = state.sides[0].pokemon[0].pp;
-          const inPp1 = state.sides[1].pokemon[0].pp;
-          const tplEntries: PpTemplateOutcome[] = stepOutcomes.map(o => {
-            if (o.state.phase.kind === 'ended') {
-              return {state: o.state, probability: o.probability, dpp0: null, dpp1: null};
-            }
-            const outP0 = o.state.sides[0].pokemon[0];
-            const outP1 = o.state.sides[1].pokemon[0];
-            return {
-              state: o.state,
-              probability: o.probability,
-              dpp0: outP0.fainted ? null : outP0.pp.map((v, i) => v - inPp0[i]),
-              dpp1: outP1.fainted ? null : outP1.pp.map((v, i) => v - inPp1[i]),
-            };
-          });
-          ppTemplateCache.set(tplKey, tplEntries);
-        }
+        if (useCache) storePpTemplate(tplKey, state, stepOutcomes, 0, true);
       }
 
-      if (!useMonotoneBoxes) {
-        const outcomes = stepOutcomes.map(o => {
-          const utility = terminalUtilityFromState(o.state);
-          if (utility !== null) {
-            return {utility, probability: o.probability} as const;
-          }
-          return {snapshot: o.state as any, probability: o.probability} as const;
-        }) as Outcome[];
-        return {
-          outcomes: bucketSmallTail(outcomes),
-          simulatorRuns,
-          complete: true,
-        };
-      }
-
-      const outcomes: (Outcome | MonotoneBoxOutcome)[] = [];
-      for (const o of stepOutcomes) {
-        const utility = terminalUtilityFromState(o.state);
-        if (utility !== null) {
-          outcomes.push({utility, probability: o.probability});
-          continue;
-        }
-        const p0 = o.state.sides[0].pokemon[0];
-        const p1 = o.state.sides[1].pokemon[0];
-        const d0: HpEntry[] = p0.hpDist ?? [{hp: p0.hp, prob: 1}];
-        const d1: HpEntry[] = p1.hpDist ?? [{hp: p1.hp, prob: 1}];
-        if (o.state.phase.kind !== 'turn' || d0.some(e => e.hp <= 0) || d1.some(e => e.hp <= 0)) {
-          for (const ws of expandStateHpDists(o)) {
-            const u = terminalUtilityFromState(ws.state);
-            if (u !== null) outcomes.push({utility: u, probability: ws.probability});
-            else outcomes.push({snapshot: ws.state as any, probability: ws.probability});
-          }
-          continue;
-        }
-        const chunks0 = partitionMonotoneAxis(o.state, 0, d0, analyzer.isHpMonotone);
-        const chunks1 = partitionMonotoneAxis(o.state, 1, d1, analyzer.isHpMonotone);
-        for (const c0 of chunks0) {
-          for (const c1 of chunks1) {
-            const boxProb = o.probability * c0.sum * c1.sum;
-            if (boxProb <= 0) continue;
-            outcomes.push(makeBoxOrSingleton(o.state, boxProb, c0.entries, c1.entries));
-          }
-        }
-      }
       return {
-        outcomes: bucketSmallTail(outcomes),
+        outcomes: formatStepOutcomes(stepOutcomes),
         simulatorRuns,
+        cacheHits,
         complete: true,
       };
     },
   };
+
+  if (enableProgressive) {
+    adapter.createTurnCursor = (
+      state: DynamicState,
+      p1Action: EngineActionEntry,
+      p2Action: EngineActionEntry,
+      turnOptions: {deadline?: number; tolerance?: number} = {}
+    ) => {
+      const tol = turnOptions?.tolerance ?? 0.02;
+      const maxDeferredMass = tol > 0 ? Math.min(0.002, tol * 0.1) : 0;
+      const deferMinProb = maxDeferredMass > 0 ? Math.min(0.0008, maxDeferredMass * 0.4) : 0;
+      const useCache = ppTemplateCache !== null && state.phase.kind === 'turn';
+      const tplKey = useCache
+        ? `${canonicalStateKey(ctx, state, undefined, true)}|${p1Action.id}|${p2Action.id}`
+        : '';
+      let stage: 0 | 1 | 2 = 0;
+      let lastOutcomes: (Outcome | MonotoneBoxOutcome)[] = [];
+      let lastRemaining = 1;
+
+      return {
+        advance(stepOpts: {maxRuns?: number; deadline?: number} = {}) {
+          const deadline = stepOpts.deadline ?? turnOptions?.deadline;
+          if (stage === 2) {
+            return {
+              outcomes: lastOutcomes,
+              remainingProbability: 0,
+              simulatorRuns: 0,
+              complete: true,
+            };
+          }
+
+          const cached = useCache ? ppTemplateCache.get(tplKey) : undefined;
+          if (cached && cached.complete) {
+            lastOutcomes = formatStepOutcomes(instantiateCachedOutcomes(state, cached));
+            lastRemaining = 0;
+            stage = 2;
+            return {
+              outcomes: lastOutcomes,
+              remainingProbability: 0,
+              simulatorRuns: 0,
+              cacheHits: 1,
+              complete: true,
+            };
+          }
+
+          if (stage === 0 && maxDeferredMass > 0) {
+            if (cached) {
+              lastOutcomes = formatStepOutcomes(instantiateCachedOutcomes(state, cached));
+              lastRemaining = cached.remainingMass;
+              stage = 1;
+              return {
+                outcomes: lastOutcomes,
+                remainingProbability: lastRemaining,
+                simulatorRuns: 0,
+                cacheHits: 1,
+                complete: false,
+              };
+            }
+            const res = stepBattle(ctx, state, p1Action.sideAction, p2Action.sideAction, {
+              mode: 'certified',
+              hpOutputMode,
+              deadline,
+              deferMinProb,
+              maxDeferredMass,
+            });
+            const deadlineHit = deadline !== undefined && performance.now() >= deadline && res.remainingMass > maxDeferredMass + 1e-6;
+            if (!deadlineHit && useCache) {
+              storePpTemplate(tplKey, state, res.outcomes, res.remainingMass, res.complete);
+            }
+            lastOutcomes = formatStepOutcomes(res.outcomes);
+            lastRemaining = res.complete ? 0 : Math.min(1, Math.max(0, res.remainingMass));
+            stage = res.complete ? 2 : 1;
+            return {
+              outcomes: lastOutcomes,
+              remainingProbability: lastRemaining,
+              simulatorRuns: res.stats.forks + 1,
+              complete: res.complete,
+            };
+          }
+
+          // Stage 1 (or tolerance === 0): run full exact stepBattle.
+          const res = stepBattle(ctx, state, p1Action.sideAction, p2Action.sideAction, {
+            mode: 'certified',
+            hpOutputMode,
+            deadline,
+          });
+          if (res.complete) {
+            if (useCache) storePpTemplate(tplKey, state, res.outcomes, 0, true);
+            lastOutcomes = formatStepOutcomes(res.outcomes);
+            lastRemaining = 0;
+            stage = 2;
+            return {
+              outcomes: lastOutcomes,
+              remainingProbability: 0,
+              simulatorRuns: res.stats.forks + 1,
+              complete: true,
+            };
+          }
+          // Deadline hit during exact refinement: keep sound partial distribution.
+          if (res.outcomes.length > 0) {
+            lastOutcomes = formatStepOutcomes(res.outcomes);
+            lastRemaining = Math.min(1, Math.max(0, res.remainingMass));
+          }
+          return {
+            outcomes: lastOutcomes,
+            remainingProbability: lastRemaining,
+            simulatorRuns: res.stats.forks + 1,
+            complete: false,
+          };
+        },
+      };
+    };
+  }
+
+  return adapter;
 }
 
 function makeLazyTailBucket(

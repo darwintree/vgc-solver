@@ -72,7 +72,7 @@ if (showParity) {
 }
 
 const adapter = createEngineBoundedAdapter(battle);
-let tStep = 0, nStep = 0, tRefresh = 0, nRefresh = 0;
+let tStep = 0, nStep = 0, nDefer = 0, nRefine = 0, tRefresh = 0, nRefresh = 0;
 if (showProfile) {
   const origEnum = adapter.enumerateTurn;
   adapter.enumerateTurn = (...callArgs) => {
@@ -82,6 +82,25 @@ if (showProfile) {
     nStep++;
     return r;
   };
+  if (adapter.createTurnCursor) {
+    const origCursor = adapter.createTurnCursor;
+    adapter.createTurnCursor = (...callArgs) => {
+      const cur = origCursor(...callArgs);
+      let calls = 0;
+      return {
+        advance(...advArgs) {
+          const t0 = performance.now();
+          const r = cur.advance(...advArgs);
+          tStep += performance.now() - t0;
+          nStep++;
+          calls++;
+          if (!r.complete) nDefer++;
+          else if (calls > 1) nRefine++;
+          return r;
+        },
+      };
+    };
+  }
 }
 const solver = new BoundedSolver({adapter, tolerance: 0.02, maxSearchMs: searchMs, lazyCells: false});
 if (showProfile) {
@@ -95,9 +114,9 @@ if (showProfile) {
   };
 }
 const res = solver.solve(battle);
-console.log(`  Result: converged=${res.converged} stop=${res.stopReason} bounds=[${res.lowerBound.toFixed(4)}, ${res.upperBound.toFixed(4)}] search=${res.stats.searchMs.toFixed(1)}ms nodes=${res.stats.nodes} matSolves=${res.stats.matrixSolves} monoUpd=${res.stats.monotoneUpdates} boxSplits=${res.stats.boxSplits}`);
+console.log(`  Result: converged=${res.converged} stop=${res.stopReason} bounds=[${res.lowerBound.toFixed(4)}, ${res.upperBound.toFixed(4)}] search=${res.stats.searchMs.toFixed(1)}ms nodes=${res.stats.nodes} matSolves=${res.stats.matrixSolves} monoUpd=${res.stats.monotoneUpdates} ppUpd=${res.stats.ppBoundUpdates} boxSplits=${res.stats.boxSplits}`);
 if (showProfile) {
-  console.log(`  Profile: enumerateTurn=${tStep.toFixed(1)}ms (${nStep} calls) _refresh=${tRefresh.toFixed(1)}ms (${nRefresh} calls)`);
+  console.log(`  Profile: step=${tStep.toFixed(1)}ms (${nStep} calls, defer=${nDefer}, refine=${nRefine}) _refresh=${tRefresh.toFixed(1)}ms (${nRefresh} calls)`);
 }
 if (showMatrix && solver.rootNode) {
   const root = solver.rootNode;

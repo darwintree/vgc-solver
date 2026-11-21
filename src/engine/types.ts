@@ -677,6 +677,17 @@ export interface BranchPolicy {
   minBranchProb?: number;
   /** Whether 'pruned' mode renormalizes surviving branches to sum to 1 (default false keeps exact dropped mass in remainingMass). */
   renormalize?: boolean;
+  /**
+   * Sound tail deferral in 'certified' mode: branches whose probability falls
+   * below this threshold stop expanding immediately and add their exact
+   * probability mass to `remainingMass` (never renormalized), up to
+   * `maxDeferredMass`. Sets `complete = false` whenever mass is deferred.
+   */
+  deferMinProb?: number;
+  /** Maximum cumulative probability mass deferred in 'certified' mode. */
+  maxDeferredMass?: number;
+  /** Minimum active branch count required before deferring micro-branches in 'certified' mode (default 12). */
+  deferMinBranches?: number;
 }
 
 export interface StepStats {

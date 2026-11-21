@@ -714,3 +714,80 @@ test('opaque continuation yields to another cell before depth expansion', () => 
   assert.ok(expanded.includes('root:opaque:c1'));
   assert.ok(!expanded.some(entry => entry.startsWith('opaque-state:')));
 });
+
+test('global lower boundary focuses upper proof while incumbent column can reach -1', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'security'});
+  solver._refresh = () => false;
+  solver.proofTurn = 1;
+  const root = securityFrontierNode(
+    [[-1, -1], [-1, -1]],
+    [[1, -0.5], [1, -0.8]],
+    -1, -0.5
+  );
+  solver.rootNode = root;
+  const frontier = solver._selectFrontier(root, 'security');
+  assert.deepEqual({i: frontier.i, j: frontier.j}, {i: 0, j: 1});
+});
+
+test('joint selector preserves sharp upper-bound witness row when lower strategy does not achieve +1', () => {
+  const solver = new BoundedSolver({selectionPolicy: 'joint'});
+  solver._refresh = () => false;
+  const root = {
+    terminal: null,
+    initialized: true,
+    lower: -0.5,
+    upper: 1,
+    cells: [
+      [{lower: 1, upper: 1, outcomes: null}, {lower: -1, upper: 0.3, outcomes: null}],
+      [{lower: 1, upper: 1, outcomes: null}, {lower: -1, upper: 1, outcomes: null}],
+      [{lower: -1, upper: -1, outcomes: null}, {lower: -0.2, upper: 0.1, outcomes: null}],
+    ],
+    // lowerSolution puts weight on r0 and r2 (ignoring r1), while r1 is the sole witness keeping upper=+1
+    lowerSolution: {value: -0.5, p1: [0.5, 0, 0.5], p2: [0.5, 0.5]},
+    upperSolution: {value: 1, p1: [0, 1, 0], p2: [0.5, 0.5]},
+  } as any;
+  const frontier = solver._selectFrontier(root, 'joint');
+  assert.deepEqual({i: frontier.i, j: frontier.j}, {i: 1, j: 1});
+});
+
+test('finite-horizon ppSignature reuses bounds when differing PP exceeds proof horizon and blocks unsafe low-PP reuse', () => {
+  const expanded = new Set<string>();
+  const adapter: any = {
+    snapshotBattle: (s: string) => s,
+    restoreBattle: (s: string) => s,
+    stateKey: (s: string) => s,
+    ppSignature: (s: string) => {
+      const m = /^s:(\d+)$/.exec(s);
+      if (!m) return null;
+      return {groupKey: 's', pp: [Number(m[1])], maxPpLossPerTurn: 1};
+    },
+    terminalUtility: () => null,
+    legalActions: () => ['a'],
+    enumerateTurn(s: string) {
+      expanded.add(s);
+      if (s === 'root') {
+        return {
+          outcomes: [
+            {snapshot: 's:5', probability: 0.5},
+            {snapshot: 's:4', probability: 0.25},
+            {snapshot: 's:1', probability: 0.25},
+          ],
+          complete: true,
+        };
+      }
+      // At pp=1 (depth 1 -> reaches pp=0), utility diverges to -1; for pp >= 2 (depth 1), utility is +1!
+      if (s === 's:1') return {outcomes: [{utility: -1, probability: 1}], complete: true};
+      return {outcomes: [{utility: 1, probability: 1}], complete: true};
+    },
+  };
+  const result = new BoundedSolver({adapter, tolerance: 0.01, lazyCells: false}).solve('root');
+  assert.equal(result.converged, true);
+  // True value: 0.5*(+1) + 0.25*(+1) + 0.25*(-1) = +0.5
+  assert.ok(result.lowerBound <= 0.5 + 1e-9 && result.upperBound >= 0.5 - 1e-9, `interval=[${result.lowerBound},${result.upperBound}]`);
+  assert.ok(Math.abs(result.value - 0.5) <= 0.01);
+  // s:4 shares the depth-1 proof with s:5 (both > 1), while s:1 (<= 1) must be expanded independently!
+  assert.ok(expanded.has('s:1'), 'low-PP state s:1 must not inherit incompatible high-PP bound');
+  assert.ok(!(expanded.has('s:5') && expanded.has('s:4')), 'compatible high-PP sibling should reuse bound');
+  assert.ok(result.stats.ppBoundUpdates > 0);
+});
+

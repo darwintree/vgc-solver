@@ -46,6 +46,7 @@ import {
   type SideAction,
   type StaticBattleContext,
   type StaticMoveData,
+  type StaticPokemonData,
   type StatusId,
   type StepResult,
   type StepStats,
@@ -113,8 +114,20 @@ function isUnnerved(ctx: StaticBattleContext, state: DynamicState, sideIdx: 0 | 
   return sideHasActiveAbility(ctx, state, oppSide, a => !!a.unnerve);
 }
 
-function midTurnBranchKey(ctx: StaticBattleContext, ab: ActiveBranch): string {
-  let k = canonicalStateKey(ctx, ab.state);
+function pokeReadsExactDamage(sp: StaticPokemonData): boolean {
+  for (let i = 0; i < sp.moves.length; i++) {
+    const sk = sp.moves[i].specialKind;
+    if (sk === 'counter' || sk === 'mirror-coat' || sk === 'metal-burst') return true;
+  }
+  return false;
+}
+
+function midTurnBranchKey(
+  ctx: StaticBattleContext,
+  ab: ActiveBranch,
+  maskPoke?: {side: 0 | 1; idx: number}
+): string {
+  let k = canonicalStateKey(ctx, ab.state, undefined, false, maskPoke);
   for (let s = 0; s < 2; s++) {
     const side = ab.state.sides[s];
     if (side.wideGuard || side.quickGuard) k += `|WG${s}:${side.wideGuard ? 1 : 0}${side.quickGuard ? 1 : 0}`;
@@ -123,7 +136,10 @@ function midTurnBranchKey(ctx: StaticBattleContext, ab: ActiveBranch): string {
       const p = side.pokemon[idx];
       if (p.protecting || p.enduring || p.roosted || p.flinched || p.movedThisTurn || p.switchedInThisTurn ||
           p.helpingHandCount || p.redirectKind || p.damagedThisTurn || p.statLoweredThisTurn) {
-        k += `|M${s}.${idx}:${p.protecting ? p.protectKind || 1 : 0}${p.enduring ? 1 : 0}${p.roosted ? 1 : 0}${p.flinched ? 1 : 0}${p.movedThisTurn ? 1 : 0}${p.switchedInThisTurn ? 1 : 0}:${p.helpingHandCount}:${p.redirectKind}:${p.damagedThisTurn}:${p.damagedCategory}:${p.statLoweredThisTurn ? 1 : 0}`;
+        const dmgKey = p.damagedThisTurn > 0
+          ? (pokeReadsExactDamage(ctx.sides[s].team[idx]) ? p.damagedThisTurn : 1)
+          : 0;
+        k += `|M${s}.${idx}:${p.protecting ? p.protectKind || 1 : 0}${p.enduring ? 1 : 0}${p.roosted ? 1 : 0}${p.flinched ? 1 : 0}${p.movedThisTurn ? 1 : 0}${p.switchedInThisTurn ? 1 : 0}:${p.helpingHandCount}:${p.redirectKind}:${dmgKey}:${p.damagedCategory}:${p.statLoweredThisTurn ? 1 : 0}`;
       }
     }
   }
@@ -133,6 +149,75 @@ function midTurnBranchKey(ctx: StaticBattleContext, ab: ActiveBranch): string {
       .join(',');
   }
   return k;
+}
+
+/**
+ * Exact single-Pokemon marginal HP folding: merges branches whose non-HP state
+ * and EVERY other Pokemon's HP distribution are bit-for-bit identical, combining
+ * only `(side, idx)`'s HP distribution weighted by branch probability.
+ * Preserves all cross-Pokemon joint couplings identically.
+ */
+function foldBranchesByPokeHp(
+  ctx: StaticBattleContext,
+  batch: ActiveBranch[],
+  side: 0 | 1,
+  idx: number,
+  stats: StepStats
+): ActiveBranch[] {
+  if (batch.length <= 1) return batch;
+  const maskPoke = {side, idx};
+  const groups = new Map<string, ActiveBranch[]>();
+  const passthrough: ActiveBranch[] = [];
+  for (let i = 0; i < batch.length; i++) {
+    const ab = batch[i];
+    if (ab.probability <= EPS) continue;
+    if (ab.state.phase.kind === 'ended') {
+      passthrough.push(ab);
+      continue;
+    }
+    const p = ab.state.sides[side].pokemon[idx];
+    if (!p || p.fainted || p.hp <= 0) {
+      passthrough.push(ab);
+      continue;
+    }
+    const key = midTurnBranchKey(ctx, ab, maskPoke);
+    let g = groups.get(key);
+    if (!g) {
+      g = [ab];
+      groups.set(key, g);
+    } else {
+      g.push(ab);
+    }
+  }
+  if (groups.size + passthrough.length === batch.length) return batch;
+  const out: ActiveBranch[] = [...passthrough];
+  for (const g of groups.values()) {
+    if (g.length === 1) {
+      out.push(g[0]);
+      continue;
+    }
+    let totalProb = 0;
+    const hpMap = new Map<number, number>();
+    for (let i = 0; i < g.length; i++) {
+      const ab = g[i];
+      totalProb += ab.probability;
+      const entries = getHpEntries(ab.state.sides[side].pokemon[idx]);
+      for (let j = 0; j < entries.length; j++) {
+        const e = entries[j];
+        hpMap.set(e.hp, (hpMap.get(e.hp) ?? 0) + ab.probability * e.prob);
+      }
+    }
+    const target = g[0];
+    target.probability = totalProb;
+    const combined: HpEntry[] = [];
+    for (const [hp, w] of hpMap) {
+      combined.push({hp, prob: w / totalProb});
+    }
+    setNormalizedHpDist(target.state.sides[side].pokemon[idx], combined);
+    stats.merges += g.length - 1;
+    out.push(target);
+  }
+  return out;
 }
 
 function mergeActiveBranches(
@@ -153,9 +238,99 @@ function mergeActiveBranches(
       map.set(key, ab);
     }
   }
-  const out = [...map.values()];
+  let out = [...map.values()];
+  if (out.length > 1) {
+    // Fold HP-only differences one active Pokemon at a time (exact in singles & doubles).
+    for (let s = 0; s < 2 && out.length > 1; s++) {
+      const sideIdx: 0 | 1 = s === 0 ? 0 : 1;
+      const seenIdx = new Set<number>();
+      for (let i = 0; i < out.length; i++) {
+        const act = out[i].state.sides[sideIdx].active;
+        for (let sl = 0; sl < act.length; sl++) {
+          if (act[sl] >= 0) seenIdx.add(act[sl]);
+        }
+      }
+      for (const idx of seenIdx) {
+        if (out.length <= 1) break;
+        out = foldBranchesByPokeHp(ctx, out, sideIdx, idx, stats);
+      }
+    }
+  }
   if (out.length > stats.peakBranches) stats.peakBranches = out.length;
   return out;
+}
+
+interface DeferTracker {
+  minProb: number;
+  maxMass: number;
+  minBranches: number;
+  deferredMass: number;
+}
+
+function deferLowProbBranches(
+  batch: ActiveBranch[],
+  defer?: DeferTracker
+): ActiveBranch[] {
+  if (!defer || defer.minProb <= 0 || batch.length < defer.minBranches) return batch;
+  if (defer.deferredMass >= defer.maxMass - EPS) return batch;
+  let hasSmall = false;
+  for (let i = 0; i < batch.length; i++) {
+    if (batch[i].probability < defer.minProb) {
+      hasSmall = true;
+      break;
+    }
+  }
+  if (!hasSmall) return batch;
+  const small: ActiveBranch[] = [];
+  const kept: ActiveBranch[] = [];
+  for (let i = 0; i < batch.length; i++) {
+    const ab = batch[i];
+    if (ab.probability < defer.minProb) small.push(ab);
+    else kept.push(ab);
+  }
+  if (small.length > 1) small.sort((a, b) => a.probability - b.probability);
+  for (let i = 0; i < small.length; i++) {
+    const ab = small[i];
+    if (defer.deferredMass + ab.probability <= defer.maxMass + EPS) {
+      defer.deferredMass += ab.probability;
+    } else {
+      kept.push(ab);
+    }
+  }
+  return kept;
+}
+
+function deferLowProbEntries<T extends {ab: ActiveBranch}>(
+  entries: T[],
+  defer?: DeferTracker
+): T[] {
+  if (!defer || defer.minProb <= 0 || entries.length < defer.minBranches) return entries;
+  if (defer.deferredMass >= defer.maxMass - EPS) return entries;
+  let hasSmall = false;
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i].ab.probability < defer.minProb) {
+      hasSmall = true;
+      break;
+    }
+  }
+  if (!hasSmall) return entries;
+  const small: T[] = [];
+  const kept: T[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e.ab.probability < defer.minProb) small.push(e);
+    else kept.push(e);
+  }
+  if (small.length > 1) small.sort((a, b) => a.ab.probability - b.ab.probability);
+  for (let i = 0; i < small.length; i++) {
+    const e = small[i];
+    if (defer.deferredMass + e.ab.probability <= defer.maxMass + EPS) {
+      defer.deferredMass += e.ab.probability;
+    } else {
+      kept.push(e);
+    }
+  }
+  return kept;
 }
 
 function pickChoices<T>(
@@ -1592,7 +1767,8 @@ function executeSingleHitOnTarget(
   hitOpts: HitExecutionOpts,
   damageCache: DamageBatchCache,
   policy: BranchPolicy,
-  stats: StepStats
+  stats: StepStats,
+  defer?: DeferTracker
 ): {branches: ActiveBranch[]; anyHitLanded: boolean} {
   const {isSpread, isFinalHit, bypassProtect, targetSlot} = hitOpts;
   let current = batch;
@@ -1772,10 +1948,11 @@ function executeSingleHitOnTarget(
   }
 
   // 4. Batched 16-roll damage lookup + Substitute / Focus Sash / Sturdy / Resist Berry / KO / Hit triggers
+  const activeCrit = deferLowProbEntries(afterCrit, defer);
   const hasJointCoupling = move.recoil !== null || move.drain !== null;
   const afterDamage: ActiveBranch[] = [];
 
-  for (const entry of afterCrit) {
+  for (const entry of activeCrit) {
     const {ab, pinchActive, multiscaleActive, teraShellActive, isCrit} = entry;
     const atk = ab.state.sides[atkSide].pokemon[atkIdx];
     const def = ab.state.sides[targetSide].pokemon[targetIdx];
@@ -1975,63 +2152,151 @@ function executeSingleHitOnTarget(
       const rockHead = atk.abilityActive && !!atkAb.rockHead;
 
       if (hasJointCoupling) {
+        const defReadsExactDamage = pokeReadsExactDamage(defStatic);
         const hpEntries = getHpEntries(targetPoke);
-        const grouped = new Map<string, {newDefHp: number; dealt: number; atkDelta: number; prob: number; sashUsed: boolean}>();
-        for (const he of hpEntries) {
-          for (const d of rolls) {
-            let dealt = Math.min(he.hp, d);
-            let newDefHp = he.hp - dealt;
-            let sashUsed = false;
-            if ((pre.atFullHp || targetPoke.enduring) && d >= he.hp && (targetPoke.enduring || he.hp === defStatic.maxhp)) {
-              dealt = he.hp - 1;
-              newDefHp = 1;
-              sashUsed = !targetPoke.enduring && !hasSturdy && hasSash;
-            }
-            let atkDelta = 0;
-            if (move.recoil && !rockHead) {
-              atkDelta = -Math.max(1, Math.round(dealt * move.recoil[0] / move.recoil[1]));
-            } else if (move.drain) {
-              let heal = Math.max(1, Math.round(dealt * move.drain[0] / move.drain[1]));
-              if (isItemEffectActive(pre.ab.state, atkStatic, atk) && atkStatic.itemSpec.archetype === 'big-root') {
-                heal = pokeRound(ctx, heal, 5324, 4096);
+        const atkPoke = pre.ab.state.sides[atkSide].pokemon[atkIdx];
+        const maxPossibleHeal = !atkPoke.fainted ? Math.max(0, atkStatic.maxhp - hpMin(atkPoke)) : 0;
+
+        if (!defReadsExactDamage && policy.mode !== 'compute') {
+          const grouped = new Map<string, {
+            atkDelta: number;
+            sashUsed: boolean;
+            isKo: boolean;
+            dealt: number;
+            prob: number;
+            defHpMap: Map<number, number>;
+          }>();
+          for (const he of hpEntries) {
+            for (const d of rolls) {
+              let dealt = Math.min(he.hp, d);
+              let newDefHp = he.hp - dealt;
+              let sashUsed = false;
+              if ((pre.atFullHp || targetPoke.enduring) && d >= he.hp && (targetPoke.enduring || he.hp === defStatic.maxhp)) {
+                dealt = he.hp - 1;
+                newDefHp = 1;
+                sashUsed = !targetPoke.enduring && !hasSturdy && hasSash;
               }
-              atkDelta = liquidOoze ? -heal : heal;
+              let atkDelta = 0;
+              if (move.recoil && !rockHead) {
+                atkDelta = -Math.max(1, Math.round(dealt * move.recoil[0] / move.recoil[1]));
+              } else if (move.drain) {
+                let heal = Math.max(1, Math.round(dealt * move.drain[0] / move.drain[1]));
+                if (isItemEffectActive(pre.ab.state, atkStatic, atk) && atkStatic.itemSpec.archetype === 'big-root') {
+                  heal = pokeRound(ctx, heal, 5324, 4096);
+                }
+                atkDelta = liquidOoze ? -heal : Math.min(maxPossibleHeal, heal);
+              }
+              const isKo = newDefHp <= 0;
+              const gKey = `${atkDelta}:${sashUsed ? 1 : 0}:${isKo ? 1 : 0}`;
+              const p = he.prob * rollProb;
+              let prev = grouped.get(gKey);
+              if (!prev) {
+                prev = {atkDelta, sashUsed, isKo, dealt, prob: p, defHpMap: new Map([[newDefHp, p]])};
+                grouped.set(gKey, prev);
+              } else {
+                prev.prob += p;
+                if (dealt > prev.dealt) prev.dealt = dealt;
+                prev.defHpMap.set(newDefHp, (prev.defHpMap.get(newDefHp) ?? 0) + p);
+              }
             }
-            const gKey = `${newDefHp}:${atkDelta}:${sashUsed ? 1 : 0}`;
-            const prev = grouped.get(gKey);
-            const p = he.prob * rollProb;
-            if (prev) prev.prob += p;
-            else grouped.set(gKey, {newDefHp, dealt, atkDelta, prob: p, sashUsed});
           }
-        }
-        const choices = pickChoices(
-          [...grouped.values()].map(g => ({item: g, prob: g.prob})),
-          policy,
-          stats
-        );
-        for (const c of choices) {
-          const st = cloneState(pre.ab.state);
-          const dp = st.sides[targetSide].pokemon[targetIdx];
-          dp.hp = c.item.newDefHp;
-          dp.hpDist = null;
-          dp.fainted = dp.hp <= 0;
-          dp.damagedThisTurn = c.item.dealt;
-          dp.damagedCategory = move.category === 'Physical' ? 'Physical' : 'Special';
-          dp.damagedBySide = atkSide;
-          dp.damagedBySlot = targetSlot;
-          dp.timesAttacked++;
-          if (c.item.sashUsed) consumeItem(ctx, st, targetSide, targetIdx);
-          let sub: ActiveBranch[] = [{
-            state: st,
-            probability: pre.ab.probability * c.prob,
-            remainingActions: pre.ab.remainingActions.map(a => ({...a, action: {...a.action}})),
-          }];
-          if (c.item.atkDelta < 0) {
-            sub = applyFixedDamageWithThresholds(ctx, sub[0], atkSide, atkIdx, -c.item.atkDelta, true, policy, stats, liquidOoze);
-          } else if (c.item.atkDelta > 0) {
-            applyHeal(ctx, st, atkSide, atkIdx, c.item.atkDelta);
+          const groups = [...grouped.values()];
+          const choices = pickChoices(
+            groups.map(g => ({item: g, prob: g.prob})),
+            policy,
+            stats
+          );
+          for (const c of choices) {
+            const st = choices.length === 1 ? pre.ab.state : cloneState(pre.ab.state);
+            const dp = st.sides[targetSide].pokemon[targetIdx];
+            if (c.item.isKo) {
+              dp.hp = 0;
+              dp.hpDist = null;
+              dp.fainted = true;
+            } else {
+              dp.fainted = false;
+              const entries: HpEntry[] = [];
+              for (const [hp, w] of c.item.defHpMap) {
+                entries.push({hp, prob: w / c.item.prob});
+              }
+              setNormalizedHpDist(dp, entries);
+            }
+            dp.damagedThisTurn = c.item.dealt;
+            dp.damagedCategory = move.category === 'Physical' ? 'Physical' : 'Special';
+            dp.damagedBySide = atkSide;
+            dp.damagedBySlot = targetSlot;
+            dp.timesAttacked++;
+            if (c.item.sashUsed) consumeItem(ctx, st, targetSide, targetIdx);
+            let sub: ActiveBranch[] = [{
+              state: st,
+              probability: pre.ab.probability * c.prob,
+              remainingActions: pre.ab.remainingActions.map(a => ({...a, action: {...a.action}})),
+            }];
+            if (c.item.atkDelta < 0) {
+              sub = applyFixedDamageWithThresholds(ctx, sub[0], atkSide, atkIdx, -c.item.atkDelta, true, policy, stats, liquidOoze);
+            } else if (c.item.atkDelta > 0) {
+              applyHeal(ctx, st, atkSide, atkIdx, c.item.atkDelta);
+            }
+            targetBranches.push(...sub);
           }
-          targetBranches.push(...sub);
+        } else {
+          const grouped = new Map<string, {newDefHp: number; dealt: number; atkDelta: number; prob: number; sashUsed: boolean}>();
+          for (const he of hpEntries) {
+            for (const d of rolls) {
+              let dealt = Math.min(he.hp, d);
+              let newDefHp = he.hp - dealt;
+              let sashUsed = false;
+              if ((pre.atFullHp || targetPoke.enduring) && d >= he.hp && (targetPoke.enduring || he.hp === defStatic.maxhp)) {
+                dealt = he.hp - 1;
+                newDefHp = 1;
+                sashUsed = !targetPoke.enduring && !hasSturdy && hasSash;
+              }
+              let atkDelta = 0;
+              if (move.recoil && !rockHead) {
+                atkDelta = -Math.max(1, Math.round(dealt * move.recoil[0] / move.recoil[1]));
+              } else if (move.drain) {
+                let heal = Math.max(1, Math.round(dealt * move.drain[0] / move.drain[1]));
+                if (isItemEffectActive(pre.ab.state, atkStatic, atk) && atkStatic.itemSpec.archetype === 'big-root') {
+                  heal = pokeRound(ctx, heal, 5324, 4096);
+                }
+                atkDelta = liquidOoze ? -heal : heal;
+              }
+              const gKey = `${newDefHp}:${atkDelta}:${sashUsed ? 1 : 0}`;
+              const prev = grouped.get(gKey);
+              const p = he.prob * rollProb;
+              if (prev) prev.prob += p;
+              else grouped.set(gKey, {newDefHp, dealt, atkDelta, prob: p, sashUsed});
+            }
+          }
+          const choices = pickChoices(
+            [...grouped.values()].map(g => ({item: g, prob: g.prob})),
+            policy,
+            stats
+          );
+          for (const c of choices) {
+            const st = cloneState(pre.ab.state);
+            const dp = st.sides[targetSide].pokemon[targetIdx];
+            dp.hp = c.item.newDefHp;
+            dp.hpDist = null;
+            dp.fainted = dp.hp <= 0;
+            dp.damagedThisTurn = c.item.dealt;
+            dp.damagedCategory = move.category === 'Physical' ? 'Physical' : 'Special';
+            dp.damagedBySide = atkSide;
+            dp.damagedBySlot = targetSlot;
+            dp.timesAttacked++;
+            if (c.item.sashUsed) consumeItem(ctx, st, targetSide, targetIdx);
+            let sub: ActiveBranch[] = [{
+              state: st,
+              probability: pre.ab.probability * c.prob,
+              remainingActions: pre.ab.remainingActions.map(a => ({...a, action: {...a.action}})),
+            }];
+            if (c.item.atkDelta < 0) {
+              sub = applyFixedDamageWithThresholds(ctx, sub[0], atkSide, atkIdx, -c.item.atkDelta, true, policy, stats, liquidOoze);
+            } else if (c.item.atkDelta > 0) {
+              applyHeal(ctx, st, atkSide, atkIdx, c.item.atkDelta);
+            }
+            targetBranches.push(...sub);
+          }
         }
       } else if (pre.atFullHp) {
         const normalEntries: HpEntry[] = [];
@@ -2537,7 +2802,7 @@ function executeSingleHitOnTarget(
   }
 
   return {
-    branches: mergeActiveBranches(ctx, [...afterDisguise, ...afterDamage], stats),
+    branches: deferLowProbBranches(mergeActiveBranches(ctx, [...afterDisguise, ...afterDamage], stats), defer),
     anyHitLanded,
   };
 }
@@ -2937,7 +3202,8 @@ function executeMoveAction(
   policy: BranchPolicy,
   stats: StepStats,
   overrideMove?: StaticMoveData,
-  skipPreChecks = false
+  skipPreChecks = false,
+  defer?: DeferTracker
 ): {active: ActiveBranch[]; paused: WeightedState[]; ended: WeightedState[]} {
   const paused: WeightedState[] = [];
   const ended: WeightedState[] = [];
@@ -5077,6 +5343,7 @@ function executeMoveAction(
               let landed = mb.hitAny;
               const totalHits = plan.item;
               for (let h = 1; h <= totalHits; h++) {
+                if (hitBatch.length === 0) break;
                 const res = executeSingleHitOnTarget(
                   ctx,
                   hitBatch,
@@ -5102,7 +5369,8 @@ function executeMoveAction(
                   },
                   damageCache,
                   policy,
-                  stats
+                  stats,
+                  defer
                 );
                 hitBatch = res.branches;
                 if (res.anyHitLanded) landed = true;
@@ -5416,9 +5684,22 @@ function runActionLoop(
   let remainingMass = 0;
   let complete = true;
   const damageCache = new DamageBatchCache();
+  const defer: DeferTracker | undefined =
+    policy.mode === 'certified' && (policy.deferMinProb ?? 0) > 0 && (policy.maxDeferredMass ?? 0) > 0
+      ? {
+          minProb: policy.deferMinProb!,
+          maxMass: policy.maxDeferredMass!,
+          minBranches: policy.deferMinBranches ?? 12,
+          deferredMass: 0,
+        }
+      : undefined;
 
   while (active.length > 0) {
     if (policy.mode === 'certified') {
+      if (defer) {
+        active = deferLowProbBranches(active, defer);
+        if (active.length === 0) break;
+      }
       if (
         (policy.deadline !== undefined && performance.now() >= policy.deadline) ||
         (policy.maxBranches !== undefined && active.length > policy.maxBranches)
@@ -5510,7 +5791,10 @@ function runActionLoop(
           pt.item.ra.action,
           damageCache,
           policy,
-          stats
+          stats,
+          undefined,
+          false,
+          defer
         );
         nextActive.push(...res.active);
         paused.push(...res.paused);
@@ -5523,7 +5807,8 @@ function runActionLoop(
 
   stats.damageBatchHits += damageCache.hits;
   stats.damageBatchMisses += damageCache.misses;
-  return {completed, paused, ended, remainingMass, complete};
+  const totalRemaining = remainingMass + (defer ? defer.deferredMass : 0);
+  return {completed, paused, ended, remainingMass: totalRemaining, complete: complete && totalRemaining <= EPS};
 }
 
 function runEndOfTurn(
@@ -6126,6 +6411,69 @@ function runEndOfTurn(
   return out;
 }
 
+function foldWeightedStatesByPokeHp(
+  ctx: StaticBattleContext,
+  list: WeightedState[],
+  side: 0 | 1,
+  idx: number,
+  stats: StepStats
+): WeightedState[] {
+  if (list.length <= 1) return list;
+  const maskPoke = {side, idx};
+  const groups = new Map<string, WeightedState[]>();
+  const passthrough: WeightedState[] = [];
+  for (let i = 0; i < list.length; i++) {
+    const ws = list[i];
+    if (ws.probability <= EPS) continue;
+    if (ws.state.phase.kind === 'ended') {
+      passthrough.push(ws);
+      continue;
+    }
+    const p = ws.state.sides[side].pokemon[idx];
+    if (!p || p.fainted || p.hp <= 0) {
+      passthrough.push(ws);
+      continue;
+    }
+    const key = canonicalStateKey(ctx, ws.state, undefined, false, maskPoke);
+    let g = groups.get(key);
+    if (!g) {
+      g = [ws];
+      groups.set(key, g);
+    } else {
+      g.push(ws);
+    }
+  }
+  if (groups.size + passthrough.length === list.length) return list;
+  const out: WeightedState[] = [...passthrough];
+  for (const g of groups.values()) {
+    if (g.length === 1) {
+      out.push(g[0]);
+      continue;
+    }
+    let totalProb = 0;
+    const hpMap = new Map<number, number>();
+    for (let i = 0; i < g.length; i++) {
+      const ws = g[i];
+      totalProb += ws.probability;
+      const entries = getHpEntries(ws.state.sides[side].pokemon[idx]);
+      for (let j = 0; j < entries.length; j++) {
+        const e = entries[j];
+        hpMap.set(e.hp, (hpMap.get(e.hp) ?? 0) + ws.probability * e.prob);
+      }
+    }
+    const target = g[0];
+    target.probability = totalProb;
+    const combined: HpEntry[] = [];
+    for (const [hp, w] of hpMap) {
+      combined.push({hp, prob: w / totalProb});
+    }
+    setNormalizedHpDist(target.state.sides[side].pokemon[idx], combined);
+    stats.merges += g.length - 1;
+    out.push(target);
+  }
+  return out;
+}
+
 function finalizeOutcomes(
   ctx: StaticBattleContext,
   raw: WeightedState[],
@@ -6158,6 +6506,22 @@ function finalizeOutcomes(
   }
 
   let outcomes = [...merged.values()];
+  if (hpOutputMode === 'distributional' && outcomes.length > 1) {
+    for (let s = 0; s < 2 && outcomes.length > 1; s++) {
+      const sideIdx: 0 | 1 = s === 0 ? 0 : 1;
+      const seenIdx = new Set<number>();
+      for (let i = 0; i < outcomes.length; i++) {
+        const act = outcomes[i].state.sides[sideIdx].active;
+        for (let sl = 0; sl < act.length; sl++) {
+          if (act[sl] >= 0) seenIdx.add(act[sl]);
+        }
+      }
+      for (const idx of seenIdx) {
+        if (outcomes.length <= 1) break;
+        outcomes = foldWeightedStatesByPokeHp(ctx, outcomes, sideIdx, idx, stats);
+      }
+    }
+  }
   let finalRemaining = remainingMass;
 
   if (policy.mode === 'pruned') {
@@ -6184,6 +6548,10 @@ function finalizeOutcomes(
       }
       finalRemaining = 0;
     }
+  }
+
+  if (finalRemaining > 1 && finalRemaining <= 1 + 1e-9) {
+    finalRemaining = 1;
   }
 
   return {

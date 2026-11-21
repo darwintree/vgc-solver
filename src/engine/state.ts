@@ -772,7 +772,8 @@ export function canonicalStateKey(
   ctx: StaticBattleContext,
   state: DynamicState,
   maskActiveHp?: readonly [boolean, boolean],
-  maskPp = false
+  maskPp = false,
+  maskPoke?: {side: 0 | 1; idx: number}
 ): string {
   const fm = ctx.featureMask;
   const trackFieldLastMove = (fm & FeatureBit.FIELD_LAST_MOVE) !== 0;
@@ -843,7 +844,7 @@ export function canonicalStateKey(
         out += `;X`;
         continue;
       }
-      const hpStr = maskSideHp && i === side.active[0]
+      const hpStr = (maskSideHp && i === side.active[0]) || (maskPoke && s === maskPoke.side && i === maskPoke.idx)
         ? '*'
         : (p.hpDist
           ? `D(${p.hpDist.map(e => `${e.hp}:${e.prob.toFixed(9)}`).join(',')})`

@@ -430,3 +430,69 @@ test('compact adapter PP-template cache matches fresh stepBattle bit-for-bit acr
   }
 });
 
+test('progressive compact cursor conserves probability mass and refines to exact completion', () => {
+  const f = championsCases('2026-09').find(c => c.id === 'garchomp-100-vs-hippowdon-50')!;
+  const battle = createChampionsBattle(f);
+  const adapter = createEngineBoundedAdapter(battle)!;
+  assert.ok(adapter.createTurnCursor);
+  const st = adapter.snapshotBattle!(battle);
+  const a1 = adapter.legalActions!(st, 0).find((a: any) => a.name === 'Scale Shot')!;
+  const a2 = adapter.legalActions!(st, 1).find((a: any) => a.name === 'Earthquake')!;
+
+  const cursor = adapter.createTurnCursor!(st, a1, a2, {tolerance: 0.02});
+  const first = cursor.advance({});
+  const sum1 = first.outcomes.reduce((acc, o) => acc + o.probability, 0) + first.remainingProbability;
+  assert.ok(Math.abs(sum1 - 1) < 1e-9, `Batch 1 total prob=${sum1}`);
+
+  const second = cursor.advance({});
+  assert.equal(second.complete, true);
+  assert.equal(second.remainingProbability, 0);
+  const sum2 = second.outcomes.reduce((acc, o) => acc + o.probability, 0);
+  assert.ok(Math.abs(sum2 - 1) < 1e-9, `Batch 2 total prob=${sum2}`);
+});
+
+test('mid-turn HpDist folding and drain joint-coupling grouping preserve exact @pkmn/sim parity', () => {
+  const {compareTurnWithShowdown, expandStateHpDists} = require('../src/engine');
+
+  // Drain move (Leech Life): verify exact @pkmn/sim parity at full HP (1-branch collapse) and injured HP (multi-delta conditional HpDist).
+  const fDrain = championsCases('2026-11').find(c => c.id === 'primarina-100-vs-golisopod-100')!;
+  const bFull = createChampionsBattle(fDrain);
+  const repFull = compareTurnWithShowdown(bFull, 'move 1', 'move 2');
+  assert.equal(repFull.exactMatch, true, `Leech Life (full HP) TVD=${repFull.totalVariationDistance}`);
+
+  const bInj = createChampionsBattle(fDrain);
+  bInj.p2.active[0].hp = 120;
+  const repInj = compareTurnWithShowdown(bInj, 'move 1', 'move 2');
+  assert.equal(repInj.exactMatch, true, `Leech Life (injured HP) TVD=${repInj.totalVariationDistance}`);
+
+  // Multi-hit move (Scale Shot): verify distributional folding expands bit-for-bit identically to discrete mode.
+  const fScale = championsCases('2026-09').find(c => c.id === 'garchomp-100-vs-hippowdon-50')!;
+  const bScale = createChampionsBattle(fScale);
+  const ctx = compileContextFromBattle(bScale);
+  const st = stateFromBattle(ctx, bScale);
+  const p1Act = [{kind: 'move' as const, slot: 0, moveIndex: 2}]; // Scale Shot
+  const p2Act = [{kind: 'move' as const, slot: 0, moveIndex: 0}]; // Earthquake
+  const disc = stepBattle(ctx, st, p1Act, p2Act, {mode: 'certified', hpOutputMode: 'discrete'});
+  const dist = stepBattle(ctx, st, p1Act, p2Act, {mode: 'certified', hpOutputMode: 'distributional'});
+  assert.equal(disc.complete, true);
+  assert.equal(dist.complete, true);
+  assert.ok(dist.outcomes.length < disc.outcomes.length, 'distributional mode should fold HP-only outcomes');
+  const mDisc = new Map<string, number>();
+  for (const o of disc.outcomes) {
+    const k = canonicalStateKey(ctx, o.state);
+    mDisc.set(k, (mDisc.get(k) ?? 0) + o.probability);
+  }
+  const mDist = new Map<string, number>();
+  for (const o of dist.outcomes) {
+    for (const ex of expandStateHpDists(o)) {
+      const k = canonicalStateKey(ctx, ex.state);
+      mDist.set(k, (mDist.get(k) ?? 0) + ex.probability);
+    }
+  }
+  assert.equal(mDist.size, mDisc.size);
+  for (const [k, p] of mDisc) {
+    assert.ok(Math.abs((mDist.get(k) ?? 0) - p) < 1e-11, `Scale Shot diff on ${k}`);
+  }
+});
+
+
