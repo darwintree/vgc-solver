@@ -15,8 +15,11 @@ export type MoveTargetType =
   | 'allAdjacent'
   | 'foeSide'
   | 'allySide'
+  | 'adjacentAlly'
   | 'adjacentAllyOrSelf'
+  | 'adjacentFoe'
   | 'randomNormal'
+  | 'scripted'
   | 'any';
 
 export type MoveSpecialKind =

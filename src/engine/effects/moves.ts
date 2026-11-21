@@ -380,12 +380,16 @@ function mapTargetType(raw: string): MoveTargetType {
     case 'allAdjacent':
     case 'foeSide':
     case 'allySide':
+    case 'adjacentAlly':
     case 'adjacentAllyOrSelf':
+    case 'adjacentFoe':
     case 'randomNormal':
+    case 'scripted':
     case 'any':
       return raw;
-    case 'adjacentAlly':
-      return 'adjacentAllyOrSelf';
+    case 'allies':
+    case 'allyTeam':
+      return 'allySide';
     case 'all':
       return 'self';
     default:

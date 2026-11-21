@@ -771,7 +771,7 @@ export function stateFromBattle(ctx: StaticBattleContext, battle: Battle): Dynam
 export function canonicalStateKey(
   ctx: StaticBattleContext,
   state: DynamicState,
-  maskActiveHp?: readonly [boolean, boolean],
+  maskActiveHp?: readonly [boolean | number, boolean | number],
   maskPp = false,
   maskPoke?: {side: 0 | 1; idx: number}
 ): string {
@@ -820,7 +820,8 @@ export function canonicalStateKey(
   for (let s = 0; s < 2; s++) {
     const side = state.sides[s];
     const trackSideLastMoveIdx = s === 0 ? trackSide0LastMove : trackSide1LastMove;
-    const maskSideHp = maskActiveHp ? maskActiveHp[s] : false;
+    const maskSideSpec = maskActiveHp ? maskActiveHp[s] : false;
+    const maskSideIdx = typeof maskSideSpec === 'number' ? maskSideSpec : (maskSideSpec ? side.active[0] : -1);
     out += `|S${s}:${side.active.join(',')}`;
     if (trackMega && side.megaUsed) out += `/M1`;
     const sr = trackHazards && side.stealthRock ? 1 : 0;
@@ -844,7 +845,7 @@ export function canonicalStateKey(
         out += `;X`;
         continue;
       }
-      const hpStr = (maskSideHp && i === side.active[0]) || (maskPoke && s === maskPoke.side && i === maskPoke.idx)
+      const hpStr = (maskSideIdx >= 0 && i === maskSideIdx) || (maskPoke && s === maskPoke.side && i === maskPoke.idx)
         ? '*'
         : (p.hpDist
           ? `D(${p.hpDist.map(e => `${e.hp}:${e.prob.toFixed(9)}`).join(',')})`
@@ -1149,6 +1150,19 @@ export function legalSlotActions(
   const canMega = canSlotMegaEvolve(ctx, state, sideIdx, slot);
   const megaOptions: (false | true)[] = canMega ? [false, true] : [false];
 
+  const aliveOppSlots: number[] = [];
+  if (ctx.activeCount > 1) {
+    for (let ts = 0; ts < ctx.activeCount; ts++) {
+      const oIdx = oppSide.active[ts];
+      if (oIdx >= 0 && !oppSide.pokemon[oIdx].fainted) {
+        aliveOppSlots.push(ts);
+      }
+    }
+    if (aliveOppSlots.length === 0) aliveOppSlots.push(0);
+  }
+  const allySlot = slot === 0 ? 1 : 0;
+  const allyAlive = ctx.activeCount > 1 && side.active[allySlot] >= 0 && !side.pokemon[side.active[allySlot]].fainted;
+
   let usableMoves = 0;
   for (let mi = 0; mi < moves.length; mi++) {
     if (poke.pp[mi] <= 0) continue;
@@ -1164,13 +1178,7 @@ export function legalSlotActions(
 
     for (const mega of megaOptions) {
       const megaFlag = mega ? true : undefined;
-      if (ctx.activeCount === 1 ||
-          move.target === 'self' ||
-          move.target === 'allAdjacentFoes' ||
-          move.target === 'allAdjacent' ||
-          move.target === 'foeSide' ||
-          move.target === 'allySide' ||
-          move.target === 'randomNormal') {
+      if (ctx.activeCount === 1) {
         actions.push({
           kind: 'move',
           slot,
@@ -1179,15 +1187,60 @@ export function legalSlotActions(
           targetSide: move.target === 'self' || move.target === 'allySide' ? sideIdx : oppSideIdx,
           targetSlot: 0,
         });
-      } else {
-        for (let ts = 0; ts < ctx.activeCount; ts++) {
+      } else if (
+        move.target === 'self' ||
+        move.target === 'allAdjacentFoes' ||
+        move.target === 'allAdjacent' ||
+        move.target === 'foeSide' ||
+        move.target === 'allySide' ||
+        move.target === 'randomNormal' ||
+        move.target === 'scripted'
+      ) {
+        actions.push({
+          kind: 'move',
+          slot,
+          moveIndex: mi,
+          mega: megaFlag,
+        });
+      } else if (move.target === 'adjacentAlly') {
+        actions.push({
+          kind: 'move',
+          slot,
+          moveIndex: mi,
+          mega: megaFlag,
+          targetSide: sideIdx,
+          targetSlot: allySlot,
+        });
+      } else if (move.target === 'adjacentAllyOrSelf') {
+        actions.push({
+          kind: 'move',
+          slot,
+          moveIndex: mi,
+          mega: megaFlag,
+          targetSide: sideIdx,
+          targetSlot: slot,
+        });
+        if (allyAlive) {
+          actions.push({
+            kind: 'move',
+            slot,
+            moveIndex: mi,
+            mega: megaFlag,
+            targetSide: sideIdx,
+            targetSlot: allySlot,
+          });
+        }
+      } else if (move.target === 'adjacentFoe') {
+        for (const ts of aliveOppSlots) {
           actions.push({kind: 'move', slot, moveIndex: mi, mega: megaFlag, targetSide: oppSideIdx, targetSlot: ts});
         }
-        if (move.target === 'normal' || move.target === 'any' || move.target === 'adjacentAllyOrSelf') {
-          const allySlot = slot === 0 ? 1 : 0;
-          if (side.active[allySlot] >= 0 && !side.pokemon[side.active[allySlot]].fainted) {
-            actions.push({kind: 'move', slot, moveIndex: mi, mega: megaFlag, targetSide: sideIdx, targetSlot: allySlot});
-          }
+      } else {
+        // 'normal' or 'any': alive opponent slots plus alive ally slot
+        for (const ts of aliveOppSlots) {
+          actions.push({kind: 'move', slot, moveIndex: mi, mega: megaFlag, targetSide: oppSideIdx, targetSlot: ts});
+        }
+        if (allyAlive) {
+          actions.push({kind: 'move', slot, moveIndex: mi, mega: megaFlag, targetSide: sideIdx, targetSlot: allySlot});
         }
       }
     }

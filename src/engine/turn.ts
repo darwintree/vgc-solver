@@ -6486,7 +6486,8 @@ function finalizeOutcomes(
   let expanded: WeightedState[] = [];
   if (hpOutputMode === 'discrete') {
     for (const ws of raw) {
-      expanded.push(...expandStateHpDists(ws));
+      const sub = expandStateHpDists(ws);
+      for (let i = 0; i < sub.length; i++) expanded.push(sub[i]);
     }
   } else {
     expanded = raw;

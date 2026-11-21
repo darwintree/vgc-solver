@@ -110,6 +110,7 @@ interface BoundedCell {
   upper: number;
   lowerDepth?: number;
   upperDepth?: number;
+  probes?: number;
 }
 interface MonotoneFrontier2D {
   h1: number;
@@ -134,6 +135,17 @@ export interface SearchNode {
   actions1: (Action | string | number)[] | null;
   actions2: (Action | string | number)[] | null;
   cells: BoundedCell[][] | null;
+  populatedCells?: {i: number; j: number; cell: BoundedCell}[];
+  rowFloor?: Float64Array;
+  rowOptFloor?: Float64Array;
+  rowLowerSum?: Float64Array;
+  colCeil?: Float64Array;
+  colOptCeil?: Float64Array;
+  colUpperSum?: Float64Array;
+  rowOpaqueProbes?: Int32Array;
+  colOpaqueProbes?: Int32Array;
+  bestPureRowFloor?: number;
+  bestPureColCeil?: number;
   lower: number;
   upper: number;
   lowerDepth: number;
@@ -169,10 +181,13 @@ function ppVectorsCompatible(a: number[], b: number[], threshold: number): boole
 }
 
 /**
- * Exact O(M*N) pure saddle-point check before invoking general LP/matrix reduction.
- * Returns identical value and pure strategies whenever max_i min_j M[i][j] === min_j max_i M[i][j].
+ * Exact zero-sum matrix solver with:
+ * 1) O(M*N) pure saddle-point fast path, and
+ * 2) Exact Double-Oracle (active-submatrix best-response LP) for large matrices
+ *    (M > 12 or N > 12), solving only tiny active submatrices while returning a
+ *    globally verified exact minimax equilibrium of the full M x N game.
  */
-function solveMatrixFast(matrix: number[][]): MatrixSolution {
+function solveMatrixFast(matrix: number[][], prevSolution?: MatrixSolution | null): MatrixSolution {
   const m = matrix.length;
   const n = matrix[0].length;
   let bestRow = 0;
@@ -207,6 +222,115 @@ function solveMatrixFast(matrix: number[][]): MatrixSolution {
     p2[bestCol] = 1;
     return {value: bestRowMin, p1, p2};
   }
+  if (m <= 12 && n <= 12) {
+    return solveZeroSumMatrix(matrix);
+  }
+
+  // Exact Double-Oracle on large matrices
+  const activeRows: number[] = [bestRow];
+  const activeCols: number[] = [bestCol];
+  const inRows = new Uint8Array(m);
+  const inCols = new Uint8Array(n);
+  inRows[bestRow] = 1;
+  inCols[bestCol] = 1;
+
+  if (prevSolution && prevSolution.p1.length === m && prevSolution.p2.length === n) {
+    let rAdded = 0;
+    for (let i = 0; i < m && rAdded < 8; i++) {
+      if (prevSolution.p1[i] > 1e-12 && !inRows[i]) {
+        inRows[i] = 1;
+        activeRows.push(i);
+        rAdded++;
+      }
+    }
+    let cAdded = 0;
+    for (let j = 0; j < n && cAdded < 8; j++) {
+      if (prevSolution.p2[j] > 1e-12 && !inCols[j]) {
+        inCols[j] = 1;
+        activeCols.push(j);
+        cAdded++;
+      }
+    }
+  }
+
+  const maxIter = Math.min(m + n, 64);
+  for (let iter = 0; iter < maxIter; iter++) {
+    const rm = activeRows.length;
+    const cn = activeCols.length;
+    const sub: number[][] = new Array(rm);
+    for (let r = 0; r < rm; r++) {
+      const srcRow = matrix[activeRows[r]];
+      const dstRow = new Array<number>(cn);
+      for (let c = 0; c < cn; c++) dstRow[c] = srcRow[activeCols[c]];
+      sub[r] = dstRow;
+    }
+    const sol = solveZeroSumMatrix(sub);
+
+    // Collect non-zero support indices for fast O(|supp| * M) best-response checks
+    const supR: number[] = [];
+    const supRw: number[] = [];
+    for (let r = 0; r < rm; r++) {
+      if (sol.p1[r] > 1e-15) {
+        supR.push(activeRows[r]);
+        supRw.push(sol.p1[r]);
+      }
+    }
+    const supC: number[] = [];
+    const supCw: number[] = [];
+    for (let c = 0; c < cn; c++) {
+      if (sol.p2[c] > 1e-15) {
+        supC.push(activeCols[c]);
+        supCw.push(sol.p2[c]);
+      }
+    }
+
+    // P1 best response over all m rows against sol.p2
+    let brRow = -1;
+    let brRowVal = -Infinity;
+    for (let i = 0; i < m; i++) {
+      const row = matrix[i];
+      let ev = 0;
+      for (let k = 0; k < supC.length; k++) ev += row[supC[k]] * supCw[k];
+      if (ev > brRowVal) {
+        brRowVal = ev;
+        brRow = i;
+      }
+    }
+
+    // P2 best response over all n columns against sol.p1
+    let brCol = -1;
+    let brColVal = Infinity;
+    for (let j = 0; j < n; j++) {
+      let ev = 0;
+      for (let k = 0; k < supR.length; k++) ev += supRw[k] * matrix[supR[k]][j];
+      if (ev < brColVal) {
+        brColVal = ev;
+        brCol = j;
+      }
+    }
+
+    if (brRowVal <= sol.value + 1e-11 && brColVal >= sol.value - 1e-11) {
+      const p1 = new Array<number>(m).fill(0);
+      const p2 = new Array<number>(n).fill(0);
+      for (let r = 0; r < rm; r++) p1[activeRows[r]] = sol.p1[r];
+      for (let c = 0; c < cn; c++) p2[activeCols[c]] = sol.p2[c];
+      return {value: sol.value, p1, p2};
+    }
+
+    let added = false;
+    if (brRow >= 0 && !inRows[brRow]) {
+      inRows[brRow] = 1;
+      activeRows.push(brRow);
+      added = true;
+    }
+    if (brCol >= 0 && !inCols[brCol]) {
+      inCols[brCol] = 1;
+      activeCols.push(brCol);
+      added = true;
+    }
+    if (!added) break;
+  }
+
   return solveZeroSumMatrix(matrix);
 }
 
@@ -652,6 +776,58 @@ class BoundedSearch {
     };
   }
 
+  _ensureAxisStats(node: SearchNode) {
+    if (node.rowFloor) return;
+    const cells = node.cells!;
+    const m = cells.length;
+    const n = cells[0].length;
+    const rowFloor = new Float64Array(m);
+    const rowOptFloor = new Float64Array(m);
+    const rowLowerSum = new Float64Array(m);
+    const colCeil = new Float64Array(n);
+    const colOptCeil = new Float64Array(n);
+    const colUpperSum = new Float64Array(n);
+    for (let j = 0; j < n; j++) {
+      colCeil[j] = -Infinity;
+      colOptCeil[j] = -Infinity;
+    }
+    let bestPureRowFloor = -Infinity;
+    for (let i = 0; i < m; i++) {
+      const row = cells[i];
+      let rf = Infinity;
+      let rof = Infinity;
+      let rls = 0;
+      for (let j = 0; j < n; j++) {
+        const lo = row[j].lower;
+        const hi = row[j].upper;
+        if (lo < rf) rf = lo;
+        if (hi < rof) rof = hi;
+        rls += lo;
+        if (hi > colCeil[j]) colCeil[j] = hi;
+        if (lo > colOptCeil[j]) colOptCeil[j] = lo;
+        colUpperSum[j] += hi;
+      }
+      rowFloor[i] = rf;
+      rowOptFloor[i] = rof;
+      rowLowerSum[i] = rls;
+      if (rf > bestPureRowFloor) bestPureRowFloor = rf;
+    }
+    let bestPureColCeil = Infinity;
+    for (let j = 0; j < n; j++) {
+      if (colCeil[j] < bestPureColCeil) bestPureColCeil = colCeil[j];
+    }
+    node.rowFloor = rowFloor;
+    node.rowOptFloor = rowOptFloor;
+    node.rowLowerSum = rowLowerSum;
+    node.colCeil = colCeil;
+    node.colOptCeil = colOptCeil;
+    node.colUpperSum = colUpperSum;
+    node.rowOpaqueProbes = new Int32Array(m);
+    node.colOpaqueProbes = new Int32Array(n);
+    node.bestPureRowFloor = bestPureRowFloor;
+    node.bestPureColCeil = bestPureColCeil;
+  }
+
   _selectionPolicyForRoot(root: SearchNode) {
     if (this.options.selectionPolicy !== 'auto') {
       return this.options.selectionPolicy;
@@ -660,10 +836,9 @@ class BoundedSearch {
       this.autoJoint = false;
       return 'security';
     }
-    const bestPureRowFloor = Math.max(...root.cells.map(row =>
-      Math.min(...row.map(cell => cell.lower))));
-    const bestPureColumnCeiling = Math.min(...root.cells[0].map((_, j) =>
-      Math.max(...root.cells.map(row => row[j].upper))));
+    if (!root.rowFloor) this._ensureAxisStats(root);
+    const bestPureRowFloor = root.bestPureRowFloor ?? DEFAULT_LOWER;
+    const bestPureColumnCeiling = root.bestPureColCeil ?? DEFAULT_UPPER;
     const isMixed =
       root.lowerSolution.value > bestPureRowFloor + 1e-9 ||
       root.upperSolution.value < bestPureColumnCeiling - 1e-9;
@@ -680,16 +855,70 @@ class BoundedSearch {
       throw new Error('BoundedSolver requires at least one legal action per player');
     }
     const terminalEnvelope = this.terminalEnvelope?.(node.snapshot, this.deadline);
-    node.cells = Array.from({length: node.actions1.length}, (_, i) =>
-      Array.from({length: node.actions2.length}, (_, j) => {
+    const m = node.actions1.length;
+    const n = node.actions2.length;
+    const cells: BoundedCell[][] = new Array(m);
+    const lowerMatrix: number[][] = new Array(m);
+    const upperMatrix: number[][] = new Array(m);
+    const rowFloor = new Float64Array(m);
+    const rowOptFloor = new Float64Array(m);
+    const rowLowerSum = new Float64Array(m);
+    const colCeil = new Float64Array(n);
+    const colOptCeil = new Float64Array(n);
+    const colUpperSum = new Float64Array(n);
+    for (let j = 0; j < n; j++) {
+      colCeil[j] = -Infinity;
+      colOptCeil[j] = -Infinity;
+    }
+    let bestPureRowFloor = -Infinity;
+    for (let i = 0; i < m; i++) {
+      const row = new Array<BoundedCell>(n);
+      const lRow = new Array<number>(n);
+      const uRow = new Array<number>(n);
+      let rf = Infinity;
+      let rof = Infinity;
+      let rls = 0;
+      for (let j = 0; j < n; j++) {
         const envelope = terminalEnvelope?.(node.actions1[i] as Action, node.actions2[j] as Action);
         if (envelope) this.stats.terminalEnvelopes++;
-        return {
-          outcomes: null,
-          lower: envelope?.lower ?? DEFAULT_LOWER,
-          upper: envelope?.upper ?? DEFAULT_UPPER,
-        };
-      }));
+        const lo = envelope?.lower ?? DEFAULT_LOWER;
+        const hi = envelope?.upper ?? DEFAULT_UPPER;
+        row[j] = {outcomes: null, lower: lo, upper: hi};
+        lRow[j] = lo;
+        uRow[j] = hi;
+        if (lo < rf) rf = lo;
+        if (hi < rof) rof = hi;
+        rls += lo;
+        if (hi > colCeil[j]) colCeil[j] = hi;
+        if (lo > colOptCeil[j]) colOptCeil[j] = lo;
+        colUpperSum[j] += hi;
+      }
+      cells[i] = row;
+      lowerMatrix[i] = lRow;
+      upperMatrix[i] = uRow;
+      rowFloor[i] = rf;
+      rowOptFloor[i] = rof;
+      rowLowerSum[i] = rls;
+      if (rf > bestPureRowFloor) bestPureRowFloor = rf;
+    }
+    let bestPureColCeil = Infinity;
+    for (let j = 0; j < n; j++) {
+      if (colCeil[j] < bestPureColCeil) bestPureColCeil = colCeil[j];
+    }
+    node.cells = cells;
+    node.populatedCells = [];
+    node.rowFloor = rowFloor;
+    node.rowOptFloor = rowOptFloor;
+    node.rowLowerSum = rowLowerSum;
+    node.colCeil = colCeil;
+    node.colOptCeil = colOptCeil;
+    node.colUpperSum = colUpperSum;
+    node.rowOpaqueProbes = new Int32Array(m);
+    node.colOpaqueProbes = new Int32Array(n);
+    node.bestPureRowFloor = bestPureRowFloor;
+    node.bestPureColCeil = bestPureColCeil;
+    node.lowerMatrix = lowerMatrix;
+    node.upperMatrix = upperMatrix;
     node.initialized = true;
     this.stats.expandedStates++;
   }
@@ -729,7 +958,10 @@ class BoundedSearch {
     const denominator = incomplete ? 1 + PROBABILITY_SUM_TOLERANCE : total;
     for (const outcome of outcomes) outcome.probability /= denominator;
     const cell = node.cells[i][j];
-    if (!cell.outcomes) this.stats.expandedCells++;
+    if (!cell.outcomes) {
+      this.stats.expandedCells++;
+      node.populatedCells?.push({i, j, cell});
+    }
     cell.outcomes = outcomes;
     cell.remainingProbability = incomplete ? Math.max(0, 1 - completed / denominator) : remaining / total;
     if (transition.complete) cell.cursor = null;
@@ -904,18 +1136,126 @@ class BoundedSearch {
     if (!node.initialized) return false;
     let changeMask = node.lowerSolution === null ? 3 : 0;
     const cells = node.cells;
-    for (let i = 0; i < cells.length; i++) {
-      const row = cells[i];
-      for (let j = 0; j < row.length; j++) {
-        changeMask |= this._cellBounds(row[j]);
+    const m = cells.length;
+    const n = cells[0].length;
+    const lowerMatrix = node.lowerMatrix!;
+    const upperMatrix = node.upperMatrix!;
+    const populated = node.populatedCells;
+    const rowFloor = node.rowFloor!;
+    const rowOptFloor = node.rowOptFloor!;
+    const rowLowerSum = node.rowLowerSum!;
+    const colCeil = node.colCeil!;
+    const colOptCeil = node.colOptCeil!;
+    const colUpperSum = node.colUpperSum!;
+    const rowOpaqueProbes = node.rowOpaqueProbes!;
+    const colOpaqueProbes = node.colOpaqueProbes!;
+    let dirtyRows: Set<number> | null = null;
+    let dirtyCols: Set<number> | null = null;
+
+    const recordChanged = (i: number, j: number, cell: BoundedCell, oldLo: number, oldHi: number, mask: number) => {
+      changeMask |= mask;
+      if ((mask & 1) !== 0) {
+        lowerMatrix[i][j] = cell.lower;
+        rowLowerSum[i] += cell.lower - oldLo;
+      }
+      if ((mask & 2) !== 0) {
+        upperMatrix[i][j] = cell.upper;
+        colUpperSum[j] += cell.upper - oldHi;
+      }
+      if (cell.probes && oldLo <= DEFAULT_LOWER + EPSILON && oldHi >= DEFAULT_UPPER - EPSILON &&
+          (cell.lower > DEFAULT_LOWER + EPSILON || cell.upper < DEFAULT_UPPER - EPSILON)) {
+        rowOpaqueProbes[i] -= cell.probes;
+        colOpaqueProbes[j] -= cell.probes;
+      }
+      if (!dirtyRows) dirtyRows = new Set();
+      if (!dirtyCols) dirtyCols = new Set();
+      dirtyRows.add(i);
+      dirtyCols.add(j);
+    };
+
+    if (populated) {
+      for (let p = 0; p < populated.length; p++) {
+        const entry = populated[p];
+        const cell = entry.cell;
+        const oldLo = cell.lower;
+        const oldHi = cell.upper;
+        const mask = this._cellBounds(cell);
+        if (mask !== 0) recordChanged(entry.i, entry.j, cell, oldLo, oldHi, mask);
+      }
+    } else {
+      for (let i = 0; i < m; i++) {
+        const row = cells[i];
+        for (let j = 0; j < n; j++) {
+          const cell = row[j];
+          const oldLo = cell.lower;
+          const oldHi = cell.upper;
+          const mask = this._cellBounds(cell);
+          if (mask !== 0) recordChanged(i, j, cell, oldLo, oldHi, mask);
+        }
       }
     }
+
+    if (dirtyRows) {
+      for (const i of dirtyRows) {
+        const row = cells[i];
+        let rf = row[0].lower;
+        let rof = row[0].upper;
+        for (let j = 1; j < n; j++) {
+          const lo = row[j].lower;
+          const hi = row[j].upper;
+          if (lo < rf) rf = lo;
+          if (hi < rof) rof = hi;
+        }
+        rowFloor[i] = rf;
+        rowOptFloor[i] = rof;
+      }
+      let bestRf = rowFloor[0];
+      for (let i = 1; i < m; i++) {
+        if (rowFloor[i] > bestRf) bestRf = rowFloor[i];
+      }
+      node.bestPureRowFloor = bestRf;
+    }
+    if (dirtyCols) {
+      for (const j of dirtyCols) {
+        let cc = cells[0][j].upper;
+        let coc = cells[0][j].lower;
+        for (let i = 1; i < m; i++) {
+          const c = cells[i][j];
+          if (c.upper > cc) cc = c.upper;
+          if (c.lower > coc) coc = c.lower;
+        }
+        colCeil[j] = cc;
+        colOptCeil[j] = coc;
+      }
+      let bestCc = colCeil[0];
+      for (let j = 1; j < n; j++) {
+        if (colCeil[j] < bestCc) bestCc = colCeil[j];
+      }
+      node.bestPureColCeil = bestCc;
+    }
+
+    const computeExactCertified = (): boolean => {
+      if (node.upper - node.lower > 1e-8) return false;
+      if (populated && populated.length < m * n) return false;
+      for (let i = 0; i < m; i++) {
+        const row = cells[i];
+        for (let j = 0; j < n; j++) {
+          const cell = row[j];
+          if (!cell.outcomes || cell.cursor || cell.remainingProbability) return false;
+          for (let k = 0; k < cell.outcomes.length; k++) {
+            const outcome = cell.outcomes[k];
+            if (outcome.utility === null && (outcome.split || !outcome.child || !outcome.child.exactCertified)) {
+              return false;
+            }
+          }
+        }
+      }
+      return true;
+    };
+
     const previousExact = node.exactCertified;
     if (changeMask === 0) {
-      const exactCertified = node.upper - node.lower <= 1e-8 &&
-        cells.every(row => row.every(cell => cell.outcomes && !cell.cursor && !cell.remainingProbability &&
-          cell.outcomes.every(outcome => outcome.utility !== null ||
-            (!outcome.split && outcome.child && outcome.child.exactCertified))));
+      const exactCertified = computeExactCertified();
       node.exactCertified = exactCertified;
       node.dirty = false;
       return previousExact !== exactCertified;
@@ -923,15 +1263,22 @@ class BoundedSearch {
     const oldLower = node.lower;
     const oldUpper = node.upper;
     this.stats.matrixSolves++;
-    if ((changeMask & 1) !== 0 || !node.lowerMatrix || !node.lowerSolution) {
-      const lowerMatrix = cells.map(row => row.map(cell => cell.lower));
-      const lowerSolution = solveMatrixFast(lowerMatrix);
+    if ((changeMask & 1) !== 0 || !node.lowerSolution) {
+      const lowerSolution = solveMatrixFast(lowerMatrix, node.lowerSolution);
+      const sup1: number[] = [];
+      const sup1W: number[] = [];
+      for (let i = 0; i < m; i++) {
+        const w = lowerSolution.p1[i];
+        if (w > 1e-15) {
+          sup1.push(i);
+          sup1W.push(w);
+        }
+      }
       let lowerSecurity = Infinity;
-      const nCols = lowerMatrix[0].length;
-      for (let j = 0; j < nCols; j++) {
+      for (let j = 0; j < n; j++) {
         let sum = 0;
-        for (let i = 0; i < lowerMatrix.length; i++) {
-          sum += lowerSolution.p1[i] * lowerMatrix[i][j];
+        for (let k = 0; k < sup1.length; k++) {
+          sum += sup1W[k] * lowerMatrix[sup1[k]][j];
         }
         if (sum < lowerSecurity) lowerSecurity = sum;
       }
@@ -939,12 +1286,11 @@ class BoundedSearch {
       const boundedLower = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, lowerValue));
       if (boundedLower > node.lower + EPSILON) {
         let nextLowerDepth = 0;
-        for (let i = 0; i < cells.length; i++) {
-          if ((lowerSolution.p1[i] || 0) <= 1e-12) continue;
-          const row = cells[i];
-          for (let j = 0; j < row.length; j++) {
+        for (let k = 0; k < sup1.length; k++) {
+          const row = cells[sup1[k]];
+          for (let j = 0; j < n; j++) {
             if (row[j].lower > DEFAULT_LOWER + EPSILON) {
-              const d = row[j].lowerDepth || (row[j].outcomes ? 1 : 1);
+              const d = row[j].lowerDepth || 1;
               if (d > nextLowerDepth) nextLowerDepth = d;
             }
           }
@@ -959,18 +1305,25 @@ class BoundedSearch {
       } else if (boundedLower > node.lower) {
         node.lower = Math.min(node.upper, boundedLower);
       }
-      node.lowerMatrix = lowerMatrix;
       node.lowerSolution = lowerSolution;
     }
-    if ((changeMask & 2) !== 0 || !node.upperMatrix || !node.upperSolution) {
-      const upperMatrix = cells.map(row => row.map(cell => cell.upper));
-      const upperSolution = solveMatrixFast(upperMatrix);
+    if ((changeMask & 2) !== 0 || !node.upperSolution) {
+      const upperSolution = solveMatrixFast(upperMatrix, node.upperSolution);
+      const sup2: number[] = [];
+      const sup2W: number[] = [];
+      for (let j = 0; j < n; j++) {
+        const w = upperSolution.p2[j];
+        if (w > 1e-15) {
+          sup2.push(j);
+          sup2W.push(w);
+        }
+      }
       let upperSecurity = -Infinity;
-      for (let i = 0; i < upperMatrix.length; i++) {
+      for (let i = 0; i < m; i++) {
         const row = upperMatrix[i];
         let sum = 0;
-        for (let j = 0; j < row.length; j++) {
-          sum += row[j] * upperSolution.p2[j];
+        for (let k = 0; k < sup2.length; k++) {
+          sum += row[sup2[k]] * sup2W[k];
         }
         if (sum > upperSecurity) upperSecurity = sum;
       }
@@ -978,12 +1331,12 @@ class BoundedSearch {
       const boundedUpper = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, upperValue));
       if (boundedUpper < node.upper - EPSILON) {
         let nextUpperDepth = 0;
-        for (let j = 0; j < cells[0].length; j++) {
-          if ((upperSolution.p2[j] || 0) <= 1e-12) continue;
-          for (let i = 0; i < cells.length; i++) {
+        for (let k = 0; k < sup2.length; k++) {
+          const j = sup2[k];
+          for (let i = 0; i < m; i++) {
             const c = cells[i][j];
             if (c.upper < DEFAULT_UPPER - EPSILON) {
-              const d = c.upperDepth || (c.outcomes ? 1 : 1);
+              const d = c.upperDepth || 1;
               if (d > nextUpperDepth) nextUpperDepth = d;
             }
           }
@@ -998,13 +1351,9 @@ class BoundedSearch {
       } else if (boundedUpper < node.upper) {
         node.upper = Math.max(node.lower, boundedUpper);
       }
-      node.upperMatrix = upperMatrix;
       node.upperSolution = upperSolution;
     }
-    const exactCertified = node.upper - node.lower <= 1e-8 &&
-      cells.every(row => row.every(cell => cell.outcomes && !cell.cursor && !cell.remainingProbability &&
-        cell.outcomes.every(outcome => outcome.utility !== null ||
-          (!outcome.split && outcome.child && outcome.child.exactCertified))));
+    const exactCertified = computeExactCertified();
     node.exactCertified = exactCertified;
     node.dirty = false;
     // Parents only consume this node's interval endpoints and exactness. A
@@ -1236,97 +1585,146 @@ class BoundedSearch {
       if (path.has(node)) return null;
       path.add(node);
       if (node.dirty !== false) this._refresh(node);
+      if (!node.rowFloor) this._ensureAxisStats(node);
+      const cells = node.cells;
+      const m = cells.length;
+      const n = cells[0].length;
+      const isLargeMatrix = m * n > 25;
+
       if (!directionChosen) {
         const atUpperCeiling = root.upper >= DEFAULT_UPPER - EPSILON;
         const atLowerFloor = root.lower <= DEFAULT_LOWER + EPSILON;
+        const rFloor = node.rowFloor!;
+        const rOptFloor = node.rowOptFloor!;
+        const rLowerSum = node.rowLowerSum!;
+        const cCeil = node.colCeil!;
+        const cOptCeil = node.colOptCeil!;
+        const cUpperSum = node.colUpperSum!;
         if (atUpperCeiling && !atLowerFloor) {
-          // P1 has raised the lower bound while the upper bound is still at +1.
-          // Focus on lower proof while the incumbent row can still reach +1;
-          // probe upper proof periodically (1 in 4 after initial expansion) so
-          // a 90%-accuracy incumbent whose true value is < 1 still gets refuted.
-          let incumbent: {i: number; floor: number; mean: number} | null = null;
-          for (let i = 0; i < root.cells.length; i++) {
-            const row = root.cells[i];
-            const floor = Math.min(...row.map(cell => cell.lower));
-            const mean = row.reduce((sum, cell) => sum + cell.lower, 0) / row.length;
-            if (!incumbent || floor > incumbent.floor + FRONTIER_TIE_EPSILON ||
-                (Math.abs(floor - incumbent.floor) <= FRONTIER_TIE_EPSILON &&
-                 mean > incumbent.mean + FRONTIER_TIE_EPSILON)) {
-              incumbent = {i, floor, mean};
+          let incI = 0;
+          for (let i = 1; i < m; i++) {
+            if (rFloor[i] > rFloor[incI] + FRONTIER_TIE_EPSILON ||
+                (Math.abs(rFloor[i] - rFloor[incI]) <= FRONTIER_TIE_EPSILON &&
+                 rLowerSum[i] > rLowerSum[incI] + n * FRONTIER_TIE_EPSILON)) {
+              incI = i;
             }
           }
-          const optimisticFloor = Math.min(...root.cells[incumbent.i].map(cell => cell.upper));
+          const optimisticFloor = rOptFloor[incI];
           if (optimisticFloor < root.upper - EPSILON) {
-            lowerProof = false;
-          } else if (this.proofTurn > 16 && root.cells[incumbent.i].every(cell => !!cell.outcomes)) {
-            lowerProof = (this.proofTurn & 3) !== 0;
+            if (isLargeMatrix) {
+              let anotherCanClose = false;
+              const target = root.upper - Math.max(this.options.tolerance, FRONTIER_TIE_EPSILON);
+              for (let i = 0; i < m; i++) {
+                if (i !== incI && rOptFloor[i] >= target) {
+                  anotherCanClose = true;
+                  break;
+                }
+              }
+              lowerProof = anotherCanClose ? (this.proofTurn & 1) === 1 : false;
+            } else {
+              lowerProof = false;
+            }
+          } else if (this.proofTurn > 16) {
+            let allExpanded = isLargeMatrix;
+            if (!allExpanded) {
+              allExpanded = true;
+              const incRow = cells[incI];
+              for (let j = 0; j < n; j++) {
+                if (!incRow[j].outcomes) { allExpanded = false; break; }
+              }
+            }
+            lowerProof = allExpanded ? (this.proofTurn & 3) !== 0 : true;
           } else {
             lowerProof = true;
           }
         } else if (atLowerFloor && !atUpperCeiling) {
-          // Symmetric case: P2 has lowered the upper bound while the lower bound
-          // is still at -1. Focus on upper proof while the incumbent column can
-          // still reach -1; probe lower proof periodically (1 in 4) if stalled.
-          let incumbent: {j: number; ceiling: number; mean: number} | null = null;
-          for (let j = 0; j < root.cells[0].length; j++) {
-            const ceiling = Math.max(...root.cells.map(row => row[j].upper));
-            const mean = root.cells.reduce((sum, row) => sum + row[j].upper, 0) / root.cells.length;
-            if (!incumbent || ceiling < incumbent.ceiling - FRONTIER_TIE_EPSILON ||
-                (Math.abs(ceiling - incumbent.ceiling) <= FRONTIER_TIE_EPSILON &&
-                 mean < incumbent.mean - FRONTIER_TIE_EPSILON)) {
-              incumbent = {j, ceiling, mean};
+          let incJ = 0;
+          for (let j = 1; j < n; j++) {
+            if (cCeil[j] < cCeil[incJ] - FRONTIER_TIE_EPSILON ||
+                (Math.abs(cCeil[j] - cCeil[incJ]) <= FRONTIER_TIE_EPSILON &&
+                 cUpperSum[j] < cUpperSum[incJ] - m * FRONTIER_TIE_EPSILON)) {
+              incJ = j;
             }
           }
-          const optimisticCeiling = Math.max(...root.cells.map(row => row[incumbent.j].lower));
+          const optimisticCeiling = cOptCeil[incJ];
           if (optimisticCeiling > root.lower + EPSILON) {
-            lowerProof = true;
-          } else if (this.proofTurn > 16 && root.cells.every(row => !!row[incumbent.j].outcomes)) {
-            lowerProof = (this.proofTurn & 3) === 0;
+            if (isLargeMatrix) {
+              let anotherCanClose = false;
+              const target = root.lower + Math.max(this.options.tolerance, FRONTIER_TIE_EPSILON);
+              for (let j = 0; j < n; j++) {
+                if (j !== incJ && cOptCeil[j] <= target) {
+                  anotherCanClose = true;
+                  break;
+                }
+              }
+              lowerProof = anotherCanClose ? (this.proofTurn & 1) === 1 : true;
+            } else {
+              lowerProof = true;
+            }
+          } else if (this.proofTurn > 16) {
+            let allExpanded = isLargeMatrix;
+            if (!allExpanded) {
+              allExpanded = true;
+              for (let i = 0; i < m; i++) {
+                if (!cells[i][incJ].outcomes) { allExpanded = false; break; }
+              }
+            }
+            lowerProof = allExpanded ? (this.proofTurn & 3) === 0 : false;
           } else {
             lowerProof = false;
           }
         } else if (atUpperCeiling && atLowerFloor) {
-          // Both bounds are still at [-1, +1]: start with lower proof for the
-          // incumbent row, then alternate evenly once its row is expanded.
-          let incumbent: {i: number; floor: number; mean: number} | null = null;
-          for (let i = 0; i < root.cells.length; i++) {
-            const row = root.cells[i];
-            const floor = Math.min(...row.map(cell => cell.lower));
-            const mean = row.reduce((sum, cell) => sum + cell.lower, 0) / row.length;
-            if (!incumbent || floor > incumbent.floor + FRONTIER_TIE_EPSILON ||
-                (Math.abs(floor - incumbent.floor) <= FRONTIER_TIE_EPSILON &&
-                 mean > incumbent.mean + FRONTIER_TIE_EPSILON)) {
-              incumbent = {i, floor, mean};
-            }
-          }
-          const optimisticFloor = Math.min(...root.cells[incumbent.i].map(cell => cell.upper));
-          if (optimisticFloor < root.upper - EPSILON) {
-            lowerProof = false;
-          } else if (this.proofTurn > 16 && root.cells[incumbent.i].every(cell => !!cell.outcomes)) {
-            lowerProof = (this.proofTurn & 1) === 1;
+          if (isLargeMatrix) {
+            lowerProof = m >= n ? (this.proofTurn & 1) === 0 : (this.proofTurn & 1) === 1;
           } else {
-            lowerProof = true;
+            let incI = 0;
+            for (let i = 1; i < m; i++) {
+              if (rFloor[i] > rFloor[incI] + FRONTIER_TIE_EPSILON ||
+                  (Math.abs(rFloor[i] - rFloor[incI]) <= FRONTIER_TIE_EPSILON &&
+                   rLowerSum[i] > rLowerSum[incI] + n * FRONTIER_TIE_EPSILON)) {
+                incI = i;
+              }
+            }
+            const optimisticFloor = rOptFloor[incI];
+            if (optimisticFloor < root.upper - EPSILON) {
+              lowerProof = false;
+            } else if (this.proofTurn > 16) {
+              let allExpanded = true;
+              const incRow = cells[incI];
+              for (let j = 0; j < n; j++) {
+                if (!incRow[j].outcomes) { allExpanded = false; break; }
+              }
+              lowerProof = allExpanded ? (this.proofTurn & 1) === 1 : true;
+            } else {
+              lowerProof = true;
+            }
           }
         } else {
           lowerProof = (this.proofTurn & 1) === 1;
         }
         directionChosen = true;
       }
-      // When upperSolution.value is flat at +1 (or lowerSolution.value at -1),
-      // only substitute the opposite matrix's optimal strategy if it ALREADY
-      // achieves that optimal value in the flat matrix. This preserves exact
-      // witnesses (e.g. a single row holding upper=+1) while resolving
-      // degeneracy when multiple actions tie at the global bound.
+
+      // Exact dual-optimality witness check for flat bounds
       const flatUpper = (node.upperSolution?.value ?? DEFAULT_UPPER) >= DEFAULT_UPPER - EPSILON;
       const flatLower = (node.lowerSolution?.value ?? DEFAULT_LOWER) <= DEFAULT_LOWER + EPSILON;
       let useLowerP1 = false;
       if (flatUpper && !flatLower && node.lowerSolution?.p1) {
         const lp1 = node.lowerSolution.p1;
+        const supI: number[] = [];
+        const supW: number[] = [];
+        for (let i = 0; i < m; i++) {
+          if (lp1[i] > 1e-15) {
+            supI.push(i);
+            supW.push(lp1[i]);
+          }
+        }
         useLowerP1 = true;
-        for (let j = 0; j < node.cells[0].length; j++) {
+        const target = (node.upperSolution?.value ?? DEFAULT_UPPER) - EPSILON;
+        for (let j = 0; j < n; j++) {
           let ev = 0;
-          for (let i = 0; i < node.cells.length; i++) ev += (lp1[i] || 0) * node.cells[i][j].upper;
-          if (ev < (node.upperSolution?.value ?? DEFAULT_UPPER) - EPSILON) {
+          for (let k = 0; k < supI.length; k++) ev += supW[k] * cells[supI[k]][j].upper;
+          if (ev < target) {
             useLowerP1 = false;
             break;
           }
@@ -1335,11 +1733,21 @@ class BoundedSearch {
       let useUpperP2 = false;
       if (flatLower && !flatUpper && node.upperSolution?.p2) {
         const up2 = node.upperSolution.p2;
+        const supJ: number[] = [];
+        const supW: number[] = [];
+        for (let j = 0; j < n; j++) {
+          if (up2[j] > 1e-15) {
+            supJ.push(j);
+            supW.push(up2[j]);
+          }
+        }
         useUpperP2 = true;
-        for (let i = 0; i < node.cells.length; i++) {
+        const target = (node.lowerSolution?.value ?? DEFAULT_LOWER) + EPSILON;
+        for (let i = 0; i < m; i++) {
+          const row = cells[i];
           let ev = 0;
-          for (let j = 0; j < node.cells[i].length; j++) ev += node.cells[i][j].lower * (up2[j] || 0);
-          if (ev > (node.lowerSolution?.value ?? DEFAULT_LOWER) + EPSILON) {
+          for (let k = 0; k < supJ.length; k++) ev += row[supJ[k]].lower * supW[k];
+          if (ev > target) {
             useUpperP2 = false;
             break;
           }
@@ -1347,265 +1755,381 @@ class BoundedSearch {
       }
       const rowStrategy = (useLowerP1 ? node.lowerSolution?.p1 : node.upperSolution?.p1) || [];
       const colStrategy = (useUpperP2 ? node.upperSolution?.p2 : node.lowerSolution?.p2) || [];
-      const canExpandCell = cell => {
+
+      const canExpandCell = (cell: BoundedCell) => {
         if (cell.upper - cell.lower <= 1e-9) return false;
         if (!cell.outcomes || cell.cursor) return true;
-        return cell.outcomes.some(outcome => {
-          if (outcome.utility !== null) return false;
+        const outs = cell.outcomes;
+        for (let k = 0; k < outs.length; k++) {
+          const outcome = outs[k];
+          if (outcome.utility !== null) continue;
           if (outcome.split) {
             const lo = outcome.child ? outcome.child.lower : DEFAULT_LOWER;
             const hi = outcome.upperChild ? outcome.upperChild.upper : DEFAULT_UPPER;
-            return hi - lo > 1e-9;
+            if (hi - lo > 1e-9) return true;
+          } else if (outcome.child && outcome.child.upper - outcome.child.lower > 1e-9) {
+            return true;
           }
-          return !!(outcome.child && outcome.child.upper - outcome.child.lower > 1e-9);
-        });
+        }
+        return false;
       };
+
       const chooseJoint = () => {
-        let selected = null;
-        for (let i = 0; i < node.cells.length; i++) {
-          for (let j = 0; j < node.cells[i].length; j++) {
-            const cell = node.cells[i][j];
+        let selected: {i: number; j: number; cell: BoundedCell; score: number; gap: number} | null = null;
+        // Fast path: scan only positive-support pairs O(|supp1| * |supp2|)
+        const supR: number[] = [];
+        const supC: number[] = [];
+        for (let i = 0; i < m; i++) if ((rowStrategy[i] || 0) > 1e-15) supR.push(i);
+        for (let j = 0; j < n; j++) if ((colStrategy[j] || 0) > 1e-15) supC.push(j);
+        for (let ri = 0; ri < supR.length; ri++) {
+          const i = supR[ri];
+          const row = cells[i];
+          const rw = rowStrategy[i];
+          for (let cj = 0; cj < supC.length; cj++) {
+            const j = supC[cj];
+            const cell = row[j];
             if (!canExpandCell(cell)) continue;
             const gap = cell.upper - cell.lower;
-            const score = (rowStrategy[i] || 0) * (colStrategy[j] || 0) * gap;
+            const score = rw * colStrategy[j] * gap;
             if (!selected || score > selected.score + EPSILON ||
                 (Math.abs(score - selected.score) <= EPSILON && gap > selected.gap)) {
               selected = {i, j, cell, score, gap};
             }
           }
         }
+        if (selected && selected.score > EPSILON) return selected;
+        for (let i = 0; i < m; i++) {
+          const row = cells[i];
+          for (let j = 0; j < n; j++) {
+            const cell = row[j];
+            if (!canExpandCell(cell)) continue;
+            const gap = cell.upper - cell.lower;
+            if (!selected || gap > selected.gap) {
+              selected = {i, j, cell, score: 0, gap};
+            }
+          }
+        }
         return selected;
       };
-      const chooseJointUnexpanded = () => {
-        let selected = null;
-        for (let i = 0; i < node.cells.length; i++) {
-          for (let j = 0; j < node.cells[i].length; j++) {
-            const cell = node.cells[i][j];
+
+      const chooseJointUnexpanded = (requirePositiveSupport = false) => {
+        let selected: {i: number; j: number; cell: BoundedCell; score: number; gap: number} | null = null;
+        const supR: number[] = [];
+        const supC: number[] = [];
+        for (let i = 0; i < m; i++) if ((rowStrategy[i] || 0) > 1e-15) supR.push(i);
+        for (let j = 0; j < n; j++) if ((colStrategy[j] || 0) > 1e-15) supC.push(j);
+        for (let ri = 0; ri < supR.length; ri++) {
+          const i = supR[ri];
+          const row = cells[i];
+          const rw = rowStrategy[i];
+          for (let cj = 0; cj < supC.length; cj++) {
+            const j = supC[cj];
+            const cell = row[j];
             if (cell.outcomes || cell.upper - cell.lower <= 1e-9) continue;
             const gap = cell.upper - cell.lower;
-            const score = (rowStrategy[i] || 0) * (colStrategy[j] || 0) * gap;
+            const score = rw * colStrategy[j] * gap;
             if (!selected || score > selected.score + EPSILON ||
                 (Math.abs(score - selected.score) <= EPSILON && gap > selected.gap)) {
               selected = {i, j, cell, score, gap};
             }
           }
         }
-        if (!selected || selected.score > EPSILON) return selected;
-        for (let i = 0; i < node.cells.length; i++) {
-          for (let j = 0; j < node.cells[i].length; j++) {
-            const cell = node.cells[i][j];
-            if (!cell.outcomes && cell.upper - cell.lower > selected.gap + EPSILON) {
-              selected = {i, j, cell, score: 0, gap: cell.upper - cell.lower};
+        if (requirePositiveSupport || (selected && selected.score > EPSILON)) return selected;
+        for (let i = 0; i < m; i++) {
+          const row = cells[i];
+          for (let j = 0; j < n; j++) {
+            const cell = row[j];
+            if (!cell.outcomes && cell.upper - cell.lower > 1e-9) {
+              const gap = cell.upper - cell.lower;
+              if (!selected || gap > selected.gap + EPSILON) {
+                selected = {i, j, cell, score: 0, gap};
+              }
             }
           }
         }
         return selected;
       };
-      const chooseSecurityCell = (cells, lowerProof, danger?: number[]) => {
-        let selected = null;
-        for (let j = 0; j < cells.length; j++) {
-          const cell = cells[j];
-          if (!canExpandCell(cell)) continue;
-          const gap = cell.upper - cell.lower;
-          const bound = lowerProof ? cell.lower : cell.upper;
-          const d = danger ? danger[j] : 0;
-          if (!selected) {
-            selected = {j, cell, gap, bound, danger: d, score: gap};
-            continue;
-          }
-          const improvesBound = lowerProof
-            ? bound < selected.bound - EPSILON
-            : bound > selected.bound + EPSILON;
-          const tiesBound = Math.abs(bound - selected.bound) <= EPSILON;
-          const tiesGap = Math.abs(gap - selected.gap) <= EPSILON;
-          if (improvesBound ||
-              (tiesBound && gap > selected.gap + EPSILON) ||
-              (tiesBound && tiesGap && d > selected.danger + FRONTIER_TIE_EPSILON)) {
-            selected = {j, cell, gap, bound, danger: d, score: gap};
-          }
-        }
-        return selected;
-      };
-      const lowerPotential = cells =>
-        Math.min(...cells.map(cell => cell.upper)) - Math.min(...cells.map(cell => cell.lower));
-      const upperPotential = cells =>
-        Math.max(...cells.map(cell => cell.upper)) - Math.max(...cells.map(cell => cell.lower));
-      let chosen = null;
+
+      let chosen: {i: number; j: number; cell: BoundedCell; score: number; gap: number} | null = null;
       let preferUnexpanded = false;
       if (selectionPolicy === 'security') {
-        const bestPureRowFloor = Math.max(...node.cells.map(row =>
-          Math.min(...row.map(cell => cell.lower))));
-        const bestPureColumnCeiling = Math.min(...node.cells[0].map((_, j) =>
-          Math.max(...node.cells.map(row => row[j].upper))));
+        const rowFloor = node.rowFloor!;
+        const rowOptFloor = node.rowOptFloor!;
+        const rowLowerSum = node.rowLowerSum!;
+        const rowOpaqueProbes = node.rowOpaqueProbes!;
+        const colCeil = node.colCeil!;
+        const colOptCeil = node.colOptCeil!;
+        const colUpperSum = node.colUpperSum!;
+        const colOpaqueProbes = node.colOpaqueProbes!;
+        const bestPureRowFloor = node.bestPureRowFloor ?? DEFAULT_LOWER;
+        const bestPureColumnCeiling = node.bestPureColCeil ?? DEFAULT_UPPER;
         const lowerMatrixIsMixed = node.lowerSolution.value > bestPureRowFloor + 1e-9;
         const upperMatrixIsMixed = node.upperSolution.value < bestPureColumnCeiling - 1e-9;
         const mixedImprovement = (lowerProof && lowerMatrixIsMixed) ||
           (!lowerProof && upperMatrixIsMixed);
         preferUnexpanded = mixedImprovement;
+
         if (!mixedImprovement && lowerProof) {
-          const rowStats = node.cells.map(row => ({
-            floor: Math.min(...row.map(cell => cell.lower)),
-            optFloor: Math.min(...row.map(cell => cell.upper)),
-            mean: row.reduce((sum, cell) => sum + cell.lower, 0) / row.length,
-          }));
           let row = -1;
-          for (let i = 0; i < rowStats.length; i++) {
-            const s = rowStats[i];
-            if (s.optFloor <= node.lower + FRONTIER_TIE_EPSILON) continue;
-            if (row < 0 || s.floor > rowStats[row].floor + FRONTIER_TIE_EPSILON ||
-                (Math.abs(s.floor - rowStats[row].floor) <= FRONTIER_TIE_EPSILON &&
-                 s.mean > rowStats[row].mean + FRONTIER_TIE_EPSILON)) row = i;
+          let bestCanClose = -1;
+          let bestRound = Infinity;
+          const closeTarget = node.upper - Math.max(this.options.tolerance, FRONTIER_TIE_EPSILON);
+          for (let i = 0; i < m; i++) {
+            if (rowOptFloor[i] <= node.lower + FRONTIER_TIE_EPSILON) continue;
+            const canClose = isLargeMatrix ? (rowOptFloor[i] >= closeTarget ? 1 : 0) : 0;
+            const round = isLargeMatrix && rowFloor[i] <= DEFAULT_LOWER + EPSILON && rowLowerSum[i] <= -n + EPSILON
+              ? (rowOpaqueProbes![i] >>> 4)
+              : 0;
+            if (row < 0 ||
+                canClose > bestCanClose ||
+                (canClose === bestCanClose && round < bestRound) ||
+                (canClose === bestCanClose && round === bestRound &&
+                 (rowFloor[i] > rowFloor[row] + FRONTIER_TIE_EPSILON ||
+                  (Math.abs(rowFloor[i] - rowFloor[row]) <= FRONTIER_TIE_EPSILON &&
+                   rowLowerSum[i] > rowLowerSum[row] + n * FRONTIER_TIE_EPSILON)))) {
+              row = i;
+              bestCanClose = canClose;
+              bestRound = round;
+            }
           }
           if (row < 0) {
             row = 0;
-            for (let i = 1; i < rowStats.length; i++) {
-              if (rowStats[i].floor > rowStats[row].floor + FRONTIER_TIE_EPSILON ||
-                  (Math.abs(rowStats[i].floor - rowStats[row].floor) <= FRONTIER_TIE_EPSILON &&
-                   rowStats[i].mean > rowStats[row].mean + FRONTIER_TIE_EPSILON)) row = i;
+            for (let i = 1; i < m; i++) {
+              if (rowFloor[i] > rowFloor[row] + FRONTIER_TIE_EPSILON ||
+                  (Math.abs(rowFloor[i] - rowFloor[row]) <= FRONTIER_TIE_EPSILON &&
+                   rowLowerSum[i] > rowLowerSum[row] + n * FRONTIER_TIE_EPSILON)) {
+                row = i;
+              }
             }
           }
-          // Periodically probe the strongest non-incumbent contender row at root
-          // that already beats node.lower on at least half the opponent responses
-          // and still has optFloor >= incumbent.optFloor. This breaks lock-in on
-          // a suboptimal high-floor move (e.g. a 90%-acc move) without diverting
-          // budget into unpromising junk rows.
           if (node === root && this.proofTurn > 16 && (this.proofTurn & 3) === 3) {
-            const minBeating = Math.ceil(node.cells[0].length / 2);
+            const minBeating = Math.ceil(n / 2);
             let alt = -1;
-            for (let i = 0; i < rowStats.length; i++) {
+            for (let i = 0; i < m; i++) {
               if (i === row) continue;
-              const s = rowStats[i];
-              if (s.optFloor <= node.lower + this.options.tolerance) continue;
-              if (s.optFloor < rowStats[row].optFloor - EPSILON) continue;
-              if (lowerPotential(node.cells[i]) <= FRONTIER_TIE_EPSILON) continue;
+              if (rowOptFloor[i] <= node.lower + this.options.tolerance) continue;
+              if (rowOptFloor[i] < rowOptFloor[row] - EPSILON) continue;
+              if (rowOptFloor[i] - rowFloor[i] <= FRONTIER_TIE_EPSILON) continue;
               let beating = 0;
-              for (const cell of node.cells[i]) {
-                if (cell.lower > node.lower + FRONTIER_TIE_EPSILON) beating++;
+              const rCells = cells[i];
+              for (let j = 0; j < n; j++) {
+                if (rCells[j].lower > node.lower + FRONTIER_TIE_EPSILON) beating++;
               }
               if (beating < minBeating) continue;
-              if (alt < 0 || s.mean > rowStats[alt].mean + FRONTIER_TIE_EPSILON) alt = i;
+              if (alt < 0 || rowLowerSum[i] > rowLowerSum[alt] + n * FRONTIER_TIE_EPSILON) alt = i;
             }
             if (alt >= 0) row = alt;
           }
-          if (rowStats[row].optFloor < DEFAULT_UPPER - EPSILON) {
+          if (rowOptFloor[row] < DEFAULT_UPPER - EPSILON) {
             preferUnexpanded = true;
           }
-          if (lowerPotential(node.cells[row]) > FRONTIER_TIE_EPSILON) {
-            const colDanger = node.cells[0].map((_, j) =>
-              -node.cells.reduce((sum, r) => sum + r[j].upper, 0) / node.cells.length);
-            const selected = chooseSecurityCell(node.cells[row], true, colDanger);
-            if (selected) chosen = {...selected, i: row};
+          if (rowOptFloor[row] - rowFloor[row] > FRONTIER_TIE_EPSILON) {
+            const rCells = cells[row];
+            let bestJ = -1;
+            let bestBound = Infinity;
+            let bestCellRound = Infinity;
+            let bestGap = -1;
+            let bestDanger = -Infinity;
+            for (let j = 0; j < n; j++) {
+              const cell = rCells[j];
+              if (!canExpandCell(cell)) continue;
+              const gap = cell.upper - cell.lower;
+              const bound = cell.lower;
+              const cellRound = isLargeMatrix && cell.outcomes &&
+                bound <= DEFAULT_LOWER + EPSILON && cell.upper >= DEFAULT_UPPER - EPSILON
+                ? ((cell.probes || 0) >>> 3)
+                : 0;
+              const danger = -colUpperSum[j] / m;
+              if (bestJ < 0 ||
+                  bound < bestBound - EPSILON ||
+                  (Math.abs(bound - bestBound) <= EPSILON &&
+                   (cellRound < bestCellRound ||
+                    (cellRound === bestCellRound &&
+                     (gap > bestGap + EPSILON ||
+                      (Math.abs(gap - bestGap) <= EPSILON && danger > bestDanger + FRONTIER_TIE_EPSILON)))))) {
+                bestJ = j;
+                bestBound = bound;
+                bestCellRound = cellRound;
+                bestGap = gap;
+                bestDanger = danger;
+              }
+            }
+            if (bestJ >= 0) {
+              chosen = {i: row, j: bestJ, cell: rCells[bestJ], gap: bestGap, score: bestGap};
+            }
           }
         } else if (!mixedImprovement) {
-          const columnStats = node.cells[0].map((_, j) => {
-            const uppers = node.cells.map(row => row[j].upper);
-            const lowers = node.cells.map(row => row[j].lower);
-            return {
-              ceiling: Math.max(...uppers),
-              optCeiling: Math.max(...lowers),
-              mean: uppers.reduce((sum, value) => sum + value, 0) / uppers.length,
-            };
-          });
           let column = -1;
-          for (let j = 0; j < columnStats.length; j++) {
-            const s = columnStats[j];
-            if (s.optCeiling >= node.upper - FRONTIER_TIE_EPSILON) continue;
-            if (column < 0 || s.ceiling < columnStats[column].ceiling - FRONTIER_TIE_EPSILON ||
-                (Math.abs(s.ceiling - columnStats[column].ceiling) <= FRONTIER_TIE_EPSILON &&
-                 s.mean < columnStats[column].mean - FRONTIER_TIE_EPSILON)) column = j;
+          let bestCanClose = -1;
+          let bestRound = Infinity;
+          const closeTarget = node.lower + Math.max(this.options.tolerance, FRONTIER_TIE_EPSILON);
+          for (let j = 0; j < n; j++) {
+            if (colOptCeil[j] >= node.upper - FRONTIER_TIE_EPSILON) continue;
+            const canClose = isLargeMatrix ? (colOptCeil[j] <= closeTarget ? 1 : 0) : 0;
+            const round = isLargeMatrix && colCeil[j] >= DEFAULT_UPPER - EPSILON && colUpperSum[j] >= m - EPSILON
+              ? (colOpaqueProbes![j] >>> 4)
+              : 0;
+            if (column < 0 ||
+                canClose > bestCanClose ||
+                (canClose === bestCanClose && round < bestRound) ||
+                (canClose === bestCanClose && round === bestRound &&
+                 (colCeil[j] < colCeil[column] - FRONTIER_TIE_EPSILON ||
+                  (Math.abs(colCeil[j] - colCeil[column]) <= FRONTIER_TIE_EPSILON &&
+                   colUpperSum[j] < colUpperSum[column] - m * FRONTIER_TIE_EPSILON)))) {
+              column = j;
+              bestCanClose = canClose;
+              bestRound = round;
+            }
           }
           if (column < 0) {
             column = 0;
-            for (let j = 1; j < columnStats.length; j++) {
-              if (columnStats[j].ceiling < columnStats[column].ceiling - FRONTIER_TIE_EPSILON ||
-                  (Math.abs(columnStats[j].ceiling - columnStats[column].ceiling) <= FRONTIER_TIE_EPSILON &&
-                   columnStats[j].mean < columnStats[column].mean - FRONTIER_TIE_EPSILON)) column = j;
+            for (let j = 1; j < n; j++) {
+              if (colCeil[j] < colCeil[column] - FRONTIER_TIE_EPSILON ||
+                  (Math.abs(colCeil[j] - colCeil[column]) <= FRONTIER_TIE_EPSILON &&
+                   colUpperSum[j] < colUpperSum[column] - m * FRONTIER_TIE_EPSILON)) {
+                column = j;
+              }
             }
           }
           if (node === root && this.proofTurn > 16 && (this.proofTurn & 3) === 2) {
-            const minBeating = Math.ceil(node.cells.length / 2);
+            const minBeating = Math.ceil(m / 2);
             let alt = -1;
-            for (let j = 0; j < columnStats.length; j++) {
+            for (let j = 0; j < n; j++) {
               if (j === column) continue;
-              const s = columnStats[j];
-              if (s.optCeiling >= node.upper - this.options.tolerance) continue;
-              if (s.optCeiling > columnStats[column].optCeiling + EPSILON) continue;
-              if (upperPotential(node.cells.map(r => r[j])) <= FRONTIER_TIE_EPSILON) continue;
+              if (colOptCeil[j] >= node.upper - this.options.tolerance) continue;
+              if (colOptCeil[j] > colOptCeil[column] + EPSILON) continue;
+              if (colCeil[j] - colOptCeil[j] <= FRONTIER_TIE_EPSILON) continue;
               let beating = 0;
-              for (const r of node.cells) {
-                if (r[j].upper < node.upper - FRONTIER_TIE_EPSILON) beating++;
+              for (let i = 0; i < m; i++) {
+                if (cells[i][j].upper < node.upper - FRONTIER_TIE_EPSILON) beating++;
               }
               if (beating < minBeating) continue;
-              if (alt < 0 || s.mean < columnStats[alt].mean - FRONTIER_TIE_EPSILON) alt = j;
+              if (alt < 0 || colUpperSum[j] < colUpperSum[alt] - m * FRONTIER_TIE_EPSILON) alt = j;
             }
             if (alt >= 0) column = alt;
           }
-          const selectedColumn = node.cells.map(row => row[column]);
-          if (columnStats[column].optCeiling > DEFAULT_LOWER + EPSILON) {
+          if (colOptCeil[column] > DEFAULT_LOWER + EPSILON) {
             preferUnexpanded = true;
           }
-          if (upperPotential(selectedColumn) > FRONTIER_TIE_EPSILON) {
-            const rowDanger = node.cells.map(r =>
-              r.reduce((sum, cell) => sum + cell.lower, 0) / r.length);
-            const selected = chooseSecurityCell(selectedColumn, false, rowDanger);
-            if (selected) chosen = {...selected, i: selected.j, j: column};
+          if (colCeil[column] - colOptCeil[column] > FRONTIER_TIE_EPSILON) {
+            let bestI = -1;
+            let bestBound = -Infinity;
+            let bestCellRound = Infinity;
+            let bestGap = -1;
+            let bestDanger = -Infinity;
+            for (let i = 0; i < m; i++) {
+              const cell = cells[i][column];
+              if (!canExpandCell(cell)) continue;
+              const gap = cell.upper - cell.lower;
+              const bound = cell.upper;
+              const cellRound = isLargeMatrix && cell.outcomes &&
+                cell.lower <= DEFAULT_LOWER + EPSILON && bound >= DEFAULT_UPPER - EPSILON
+                ? ((cell.probes || 0) >>> 3)
+                : 0;
+              const danger = rowLowerSum[i] / n;
+              if (bestI < 0 ||
+                  bound > bestBound + EPSILON ||
+                  (Math.abs(bound - bestBound) <= EPSILON &&
+                   (cellRound < bestCellRound ||
+                    (cellRound === bestCellRound &&
+                     (gap > bestGap + EPSILON ||
+                      (Math.abs(gap - bestGap) <= EPSILON && danger > bestDanger + FRONTIER_TIE_EPSILON)))))) {
+                bestI = i;
+                bestBound = bound;
+                bestCellRound = cellRound;
+                bestGap = gap;
+                bestDanger = danger;
+              }
+            }
+            if (bestI >= 0) {
+              chosen = {i: bestI, j: column, cell: cells[bestI][column], gap: bestGap, score: bestGap};
+            }
           }
         }
-        // If the selected security row/column is already resolved, retain
-        // the joint optimistic/pessimistic frontier as a progress fallback.
+        // If the selected security row/column is already resolved (or on small
+        // matrices, when preferUnexpanded requests filling the matrix), fall
+        // back to joint unexpanded/expanded frontier. On large matrices, only
+        // override an expanded security choice with an unexpanded cell that has
+        // strictly positive equilibrium support, avoiding full-matrix depth-1 scans.
         if (preferUnexpanded && (!chosen || chosen.cell.outcomes)) {
-          const unexpanded = chooseJointUnexpanded();
+          const unexpanded = chooseJointUnexpanded(isLargeMatrix && !!chosen);
           if (unexpanded) chosen = unexpanded;
         }
         if (!chosen || chosen.gap <= 1e-9) chosen = chooseJoint();
       } else {
-        chosen = chooseJointUnexpanded() || chooseJoint();
+        chosen = chooseJointUnexpanded(isLargeMatrix) || chooseJoint();
+        if (!chosen) chosen = chooseJointUnexpanded(false);
       }
       if (!chosen || chosen.gap <= 1e-9) return null;
       // If equilibrium support gives a zero score, the largest gap remains a
       // valid best-first fallback and preserves progress for degenerate games.
       if (chosen.score <= EPSILON) {
-        for (let i = 0; i < node.cells.length; i++) {
-          for (let j = 0; j < node.cells[i].length; j++) {
-            const cell = node.cells[i][j];
-            if (cell.upper - cell.lower > chosen.gap) chosen = {i, j, cell, gap: cell.upper - cell.lower, score: 0};
+        for (let i = 0; i < m; i++) {
+          const row = cells[i];
+          for (let j = 0; j < n; j++) {
+            const cell = row[j];
+            if (cell.upper - cell.lower > chosen.gap) {
+              chosen = {i, j, cell, gap: cell.upper - cell.lower, score: 0};
+            }
           }
         }
       }
-      // Keep this guard after the zero-support fallback: a defensive
-      // synthetic or future selector may replace a generated choice with an
-      // ungenerated cell while preserving conservative bounds.
       if (!chosen.cell.outcomes) return {node, i: chosen.i, j: chosen.j};
       // An outcome that still leaves the complete [-1, 1] interval carries
-      // no directional information. Before descending into that opaque child,
-      // spend one transition on another cell at this node so a useful row or
-      // column certificate can emerge. The preference follows the active
-      // proof direction; joint selection uses the existing support score.
+      // no directional information. On small matrices (<= 25 cells), spend one
+      // transition on a sibling before descending; on large matrices (> 25 cells),
+      // descend immediately so multi-turn KOs back up and refute bad rows/cols
+      // without expanding thousands of Turn-1 siblings, tracking opaque probes
+      // so progressive widening rotates away from stalled deep subtrees.
       const fullyUnknown = chosen.cell.outcomes &&
         chosen.cell.lower <= DEFAULT_LOWER + EPSILON &&
         chosen.cell.upper >= DEFAULT_UPPER - EPSILON;
       if (fullyUnknown) {
-        let sibling = null;
-        const considerCandidate = (i, j) => {
-          const cell = node.cells[i][j];
-          if (cell.outcomes || cell.upper - cell.lower <= 1e-9) return;
+        if (!isLargeMatrix) {
+          let sibling: {i: number; j: number; priority: number; score: number; gap: number} | null = null;
           const preferredAxis = selectionPolicy === 'security' && lowerProof ? 'row' : 'column';
-          const priority = preferredAxis === 'row'
-            ? (i === chosen.i ? 0 : j === chosen.j ? 1 : 2)
-            : (j === chosen.j ? 0 : i === chosen.i ? 1 : 2);
-          const score = (rowStrategy[i] || 0) * (colStrategy[j] || 0);
-          const gap = cell.upper - cell.lower;
-          if (!sibling || priority < sibling.priority ||
-              (priority === sibling.priority &&
-               (score > sibling.score + EPSILON ||
-                (Math.abs(score - sibling.score) <= EPSILON && gap > sibling.gap + EPSILON)))) {
-            sibling = {i, j, priority, score, gap};
+          for (let i = 0; i < m; i++) {
+            const row = cells[i];
+            const rw = rowStrategy[i] || 0;
+            for (let j = 0; j < n; j++) {
+              const cell = row[j];
+              if (cell.outcomes || cell.upper - cell.lower <= 1e-9) continue;
+              const priority = preferredAxis === 'row'
+                ? (i === chosen.i ? 0 : j === chosen.j ? 1 : 2)
+                : (j === chosen.j ? 0 : i === chosen.i ? 1 : 2);
+              const score = rw * (colStrategy[j] || 0);
+              const gap = cell.upper - cell.lower;
+              if (!sibling || priority < sibling.priority ||
+                  (priority === sibling.priority &&
+                   (score > sibling.score + EPSILON ||
+                    (Math.abs(score - sibling.score) <= EPSILON && gap > sibling.gap + EPSILON)))) {
+                sibling = {i, j, priority, score, gap};
+              }
+            }
           }
-        };
-        for (let i = 0; i < node.cells.length; i++) {
-          for (let j = 0; j < node.cells[i].length; j++) considerCandidate(i, j);
+          if (sibling) return {node, i: sibling.i, j: sibling.j};
+        } else {
+          chosen.cell.probes = (chosen.cell.probes || 0) + 1;
+          node.rowOpaqueProbes![chosen.i]++;
+          node.colOpaqueProbes![chosen.j]++;
+          if (path.size >= 4) {
+            if (selectionPolicy === 'security' && lowerProof) {
+              const row = cells[chosen.i];
+              for (let j = 0; j < n; j++) {
+                if (!row[j].outcomes && row[j].upper - row[j].lower > 1e-9) {
+                  return {node, i: chosen.i, j};
+                }
+              }
+            } else {
+              for (let i = 0; i < m; i++) {
+                const c = cells[i][chosen.j];
+                if (!c.outcomes && c.upper - c.lower > 1e-9) {
+                  return {node, i, j: chosen.j};
+                }
+              }
+            }
+          }
         }
-        if (sibling) return {node, i: sibling.i, j: sibling.j};
       }
       const preferLowerCorner = selectionPolicy === 'security'
         ? lowerProof
