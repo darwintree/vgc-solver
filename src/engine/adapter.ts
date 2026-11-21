@@ -96,6 +96,7 @@ export function createMonotoneAnalyzer(ctx: StaticBattleContext): MonotoneAnalyz
     const self = sp[s];
     const foe = sp[1 - s];
 
+    let selfDamagesAttackerOnHit = self.itemSpec.optTraits.damagesAttackerOnHit;
     for (const m of self.moves) {
       if (m.optTraits.hpMonotone === 'unsafe-self') staticAxisAllowed[s] = false;
       if (m.optTraits.canHealSelf) canHealWithoutBerry[s] = true;
@@ -103,10 +104,19 @@ export function createMonotoneAnalyzer(ctx: StaticBattleContext): MonotoneAnalyz
     if (self.itemSpec.optTraits.canHealWithoutBerry) canHealWithoutBerry[s] = true;
     for (const ab of allStaticAbilities(self)) {
       if (ab.optTraits.canHealSelf) canHealWithoutBerry[s] = true;
+      if (ab.optTraits.damagesAttackerOnHit) selfDamagesAttackerOnHit = true;
+      if (ab.optTraits.hpThreshold === 'unsafe-self') staticAxisAllowed[s] = false;
     }
 
+    const foeHasSelfRecoilItem = foe.itemSpec.optTraits.selfRecoilOnAttack;
     for (const m of foe.moves) {
       if (m.optTraits.hpMonotone === 'unsafe-target') staticAxisAllowed[s] = false;
+      // In 1v1 singles (team.length === 1), a drain move only heals less when it KOs
+      // the target, which immediately gives target minimum utility (-1) unless target
+      // can counter-KO the attacker on contact/faint or attacker takes self-recoil.
+      if (m.optTraits.hasDrain && (selfDamagesAttackerOnHit || foeHasSelfRecoilItem)) {
+        staticAxisAllowed[s] = false;
+      }
       if (m.optTraits.canHealFoe) canHealWithoutBerry[s] = true;
     }
     if (foe.itemSpec.optTraits.breaksFoeHpMonotonicity) staticAxisAllowed[s] = false;
@@ -140,6 +150,8 @@ export function createMonotoneAnalyzer(ctx: StaticBattleContext): MonotoneAnalyz
     const checkAbility = (ab: CompiledAbilitySpec): boolean => {
       switch (ab.optTraits.hpThreshold) {
         case 'none':
+        case 'half-maxhp-pivot':
+          // Emergency Exit / Wimp Out never trigger in 1v1 singles (team.length === 1).
           return true;
         case 'pinch-third':
           return !ab.pinchType || !sideHasMoveOfTypeOrDynamic(mon, ab.pinchType, ab) ||
@@ -148,6 +160,8 @@ export function createMonotoneAnalyzer(ctx: StaticBattleContext): MonotoneAnalyz
           return hp <= Math.floor(mon.maxhp / 2) && !canHealNow;
         case 'below-maxhp':
           return hp < mon.maxhp && !canHealNow;
+        case 'unsafe-self':
+          return false;
       }
     };
 
@@ -345,6 +359,71 @@ export function createEngineBoundedAdapter(
   const isDynamicState = (value: any): value is DynamicState =>
     !!value && typeof value === 'object' && 'field' in value && 'sides' in value && 'phase' in value;
 
+  // Exact PP-template transition cache for 1v1 singles:
+  // When no non-linear PP mechanic is present (Leppa Berry, Spite, Transform/Imposter,
+  // Instruct, Copycat, Sleep Talk) and PP >= 3 is bucketed as '+', every single-turn
+  // PP deduction (0, -1, or -2 with Pressure) keeps PP >= 1 and never clamps or ends
+  // Encore/Disable early, so outcomes are bit-for-bit identical up to constant PP deltas.
+  const canUsePpTemplateCache =
+    ctx.activeCount === 1 &&
+    ctx.sides[0].team.length === 1 &&
+    ctx.sides[1].team.length === 1 &&
+    ([0, 1] as const).every(s => {
+      const mon = ctx.sides[s].team[0];
+      if (mon.itemSpec.archetype === 'leppa-berry') return false;
+      for (const ab of allStaticAbilities(mon)) {
+        if (ab.imposter) return false;
+      }
+      for (const m of mon.moves) {
+        if (
+          m.specialKind === 'spite' ||
+          m.specialKind === 'transform' ||
+          m.specialKind === 'instruct' ||
+          m.specialKind === 'copycat' ||
+          m.specialKind === 'sleep-talk' ||
+          m.id === 'eeriespell' ||
+          m.id === 'grudge' ||
+          m.id === 'trumpcard' ||
+          m.id === 'lunardance'
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+  interface PpTemplateOutcome {
+    state: DynamicState;
+    probability: number;
+    dpp0: number[] | null;
+    dpp1: number[] | null;
+  }
+  const ppTemplateCache = canUsePpTemplateCache ? new Map<string, PpTemplateOutcome[]>() : null;
+  const PP_TEMPLATE_CACHE_LIMIT = 16384;
+
+  const instantiatePpState = (
+    tpl: DynamicState,
+    inPp0: number[],
+    inPp1: number[],
+    dpp0: number[] | null,
+    dpp1: number[] | null
+  ): DynamicState => {
+    if (tpl.phase.kind === 'ended') return tpl;
+    const s0 = tpl.sides[0];
+    const s1 = tpl.sides[1];
+    const p0 = s0.pokemon[0];
+    const p1 = s1.pokemon[0];
+    const nextP0 = dpp0 ? {...p0, pp: inPp0.map((v, i) => v + dpp0[i])} : p0;
+    const nextP1 = dpp1 ? {...p1, pp: inPp1.map((v, i) => v + dpp1[i])} : p1;
+    return {
+      ...tpl,
+      sides: [
+        {...s0, pokemon: [nextP0]},
+        {...s1, pokemon: [nextP1]},
+      ],
+    };
+  };
+
   return {
     snapshotBattle(battleOrState: Battle | DynamicState): DynamicState {
       return isDynamicState(battleOrState) ? battleOrState : stateFromBattle(ctx, battleOrState);
@@ -370,20 +449,60 @@ export function createEngineBoundedAdapter(
       p2Action: EngineActionEntry,
       turnOptions: {deadline?: number} = {}
     ) {
-      const res = stepBattle(ctx, state, p1Action.sideAction, p2Action.sideAction, {
-        mode: 'certified',
-        hpOutputMode,
-        deadline: turnOptions?.deadline,
-      });
-      if (!res.complete) {
-        return {
-          outcomes: [],
-          simulatorRuns: res.stats.forks + 1,
-          complete: false,
-        };
+      let stepOutcomes: Array<{state: DynamicState; probability: number}>;
+      let simulatorRuns = 1;
+      const useCache = ppTemplateCache !== null && state.phase.kind === 'turn';
+      const tplKey = useCache
+        ? `${canonicalStateKey(ctx, state, undefined, true)}|${p1Action.id}|${p2Action.id}`
+        : '';
+      const cached = useCache ? ppTemplateCache.get(tplKey) : undefined;
+      if (cached) {
+        const inPp0 = state.sides[0].pokemon[0].pp;
+        const inPp1 = state.sides[1].pokemon[0].pp;
+        stepOutcomes = cached.map(c => ({
+          state: instantiatePpState(c.state, inPp0, inPp1, c.dpp0, c.dpp1),
+          probability: c.probability,
+        }));
+      } else {
+        const res = stepBattle(ctx, state, p1Action.sideAction, p2Action.sideAction, {
+          mode: 'certified',
+          hpOutputMode,
+          deadline: turnOptions?.deadline,
+        });
+        if (!res.complete) {
+          return {
+            outcomes: [],
+            simulatorRuns: res.stats.forks + 1,
+            complete: false,
+          };
+        }
+        simulatorRuns = res.stats.forks + 1;
+        stepOutcomes = res.outcomes;
+        if (useCache) {
+          if (ppTemplateCache.size >= PP_TEMPLATE_CACHE_LIMIT) {
+            ppTemplateCache.clear();
+          }
+          const inPp0 = state.sides[0].pokemon[0].pp;
+          const inPp1 = state.sides[1].pokemon[0].pp;
+          const tplEntries: PpTemplateOutcome[] = stepOutcomes.map(o => {
+            if (o.state.phase.kind === 'ended') {
+              return {state: o.state, probability: o.probability, dpp0: null, dpp1: null};
+            }
+            const outP0 = o.state.sides[0].pokemon[0];
+            const outP1 = o.state.sides[1].pokemon[0];
+            return {
+              state: o.state,
+              probability: o.probability,
+              dpp0: outP0.fainted ? null : outP0.pp.map((v, i) => v - inPp0[i]),
+              dpp1: outP1.fainted ? null : outP1.pp.map((v, i) => v - inPp1[i]),
+            };
+          });
+          ppTemplateCache.set(tplKey, tplEntries);
+        }
       }
+
       if (!useMonotoneBoxes) {
-        const outcomes = res.outcomes.map(o => {
+        const outcomes = stepOutcomes.map(o => {
           const utility = terminalUtilityFromState(o.state);
           if (utility !== null) {
             return {utility, probability: o.probability} as const;
@@ -391,14 +510,14 @@ export function createEngineBoundedAdapter(
           return {snapshot: o.state as any, probability: o.probability} as const;
         }) as Outcome[];
         return {
-          outcomes,
-          simulatorRuns: res.stats.forks + 1,
+          outcomes: bucketSmallTail(outcomes),
+          simulatorRuns,
           complete: true,
         };
       }
 
       const outcomes: (Outcome | MonotoneBoxOutcome)[] = [];
-      for (const o of res.outcomes) {
+      for (const o of stepOutcomes) {
         const utility = terminalUtilityFromState(o.state);
         if (utility !== null) {
           outcomes.push({utility, probability: o.probability});
@@ -427,10 +546,61 @@ export function createEngineBoundedAdapter(
         }
       }
       return {
-        outcomes,
-        simulatorRuns: res.stats.forks + 1,
+        outcomes: bucketSmallTail(outcomes),
+        simulatorRuns,
         complete: true,
       };
     },
   };
+}
+
+function makeLazyTailBucket(
+  tail: (Outcome | MonotoneBoxOutcome)[],
+  probability: number
+): MonotoneBoxOutcome {
+  return {
+    probability,
+    lowerSnapshot: null,
+    upperSnapshot: null,
+    split() {
+      if (tail.length <= 4) return tail;
+      const head = tail.slice(0, 4);
+      const rest = tail.slice(4);
+      let restProb = 0;
+      for (let i = 0; i < rest.length; i++) restProb += rest[i].probability;
+      return [...head, makeLazyTailBucket(rest, restProb)];
+    },
+  };
+}
+
+function bucketSmallTail(
+  outcomes: (Outcome | MonotoneBoxOutcome)[]
+): (Outcome | MonotoneBoxOutcome)[] {
+  if (outcomes.length <= 8) return outcomes;
+  const kept: (Outcome | MonotoneBoxOutcome)[] = [];
+  const nonTerm: (Outcome | MonotoneBoxOutcome)[] = [];
+  for (let i = 0; i < outcomes.length; i++) {
+    const o = outcomes[i];
+    if ('utility' in o && o.utility !== null && o.utility !== undefined) {
+      kept.push(o);
+    } else {
+      nonTerm.push(o);
+    }
+  }
+  if (nonTerm.length <= 8) return outcomes;
+  nonTerm.sort((a, b) => b.probability - a.probability);
+  let splitAt = nonTerm.length;
+  for (let i = 4; i < nonTerm.length; i++) {
+    if (nonTerm[i].probability < 0.005) {
+      splitAt = i;
+      break;
+    }
+  }
+  if (nonTerm.length - splitAt < 4) return outcomes;
+  for (let i = 0; i < splitAt; i++) kept.push(nonTerm[i]);
+  const tail = nonTerm.slice(splitAt);
+  let tailProb = 0;
+  for (let i = 0; i < tail.length; i++) tailProb += tail[i].probability;
+  kept.push(makeLazyTailBucket(tail, tailProb));
+  return kept;
 }

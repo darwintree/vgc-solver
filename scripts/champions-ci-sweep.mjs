@@ -1,5 +1,5 @@
 import {fork} from 'node:child_process';
-import {appendFileSync, writeFileSync} from 'node:fs';
+import {appendFileSync, existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {createRequire} from 'node:module';
 
@@ -16,14 +16,29 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 
 const scope = args.get('scope') ?? 'historical-54';
+const snapshotId = args.get('snapshot') === '2026-11' ? '2026-11' : '2026-09';
 const strictGate = args.get('strict') === 'true';
+const resume = args.get('resume') === 'true';
+const failedFrom = args.get('failed-from') ?? null;
+const searchMsArg = args.get('search-ms') ? Number(args.get('search-ms')) : 10000;
+const searchBudgetMs = Number.isFinite(searchMsArg) && searchMsArg > 0 ? searchMsArg : 10000;
+const shardSpec = args.get('shard') ?? null;
 const outputPath = args.get('output') ?? 'champions-ci-results.jsonl';
 const benchFile = resolve('dist/src/champions-benchmark.js');
 
 const HISTORICAL_4 = new Set(['garchomp', 'primarina', 'archaludon', 'mimikyu']);
-const all = championsCases();
+const all = championsCases(snapshotId);
 let selected;
-if (scope === 'historical-54') {
+if (failedFrom) {
+  const failedIds = new Set();
+  for (const line of readFileSync(failedFrom, 'utf8').trim().split('\n')) {
+    if (!line.trim()) continue;
+    const obj = JSON.parse(line);
+    if (obj.type === 'metadata') continue;
+    if (obj.id && obj.status !== 'within-budget') failedIds.add(obj.id);
+  }
+  selected = all.filter(c => c.skipReasons.length === 0 && failedIds.has(c.id));
+} else if (scope === 'historical-54') {
   selected = all.filter(c => c.skipReasons.length === 0 && HISTORICAL_4.has(c.p1.id) && HISTORICAL_4.has(c.p2.id));
 } else if (scope === 'all-playable') {
   selected = all.filter(c => c.skipReasons.length === 0);
@@ -31,18 +46,43 @@ if (scope === 'historical-54') {
   selected = all.filter(c => c.id === scope && c.skipReasons.length === 0);
 }
 
+if (shardSpec) {
+  const [idxStr, totalStr] = shardSpec.split('/');
+  const shardIdx = Number(idxStr);
+  const shardTotal = Number(totalStr);
+  if (!Number.isInteger(shardIdx) || !Number.isInteger(shardTotal) || shardIdx < 1 || shardIdx > shardTotal) {
+    console.error(`Invalid --shard=${shardSpec}; expected <1..N>/<N>.`);
+    process.exit(2);
+  }
+  selected = selected.filter((_, idx) => (idx % shardTotal) === (shardIdx - 1));
+}
+
 if (selected.length === 0) {
-  console.error(`No playable fixtures matched scope="${scope}".`);
+  console.error(`No playable fixtures matched scope="${scope}" snapshot="${snapshotId}".`);
   process.exit(2);
 }
 
-writeFileSync(outputPath, JSON.stringify({
-  type: 'metadata',
-  scope,
-  total: selected.length,
-  startedAt: new Date().toISOString(),
-  node: process.version,
-}) + '\n');
+const existingById = new Map();
+if (resume && existsSync(outputPath)) {
+  const lines = readFileSync(outputPath, 'utf8').trim().split('\n');
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const obj = JSON.parse(line);
+    if (obj.type === 'metadata') continue;
+    if (obj.id) existingById.set(obj.id, obj);
+  }
+} else {
+  writeFileSync(outputPath, JSON.stringify({
+    type: 'metadata',
+    scope: failedFrom ? `failed-from:${failedFrom}` : scope,
+    snapshotId,
+    searchBudgetMs,
+    shard: shardSpec,
+    total: selected.length,
+    startedAt: new Date().toISOString(),
+    node: process.version,
+  }) + '\n');
+}
 
 let within = 0;
 let notWithin = 0;
@@ -52,49 +92,57 @@ let sumPrepare = 0;
 let sumSearch = 0;
 let sumTotal = 0;
 const rows = [];
+const watchdogMs = Math.max(15000, searchBudgetMs * 3);
 
 for (let i = 0; i < selected.length; i++) {
   const fixture = selected[i];
-  const res = await new Promise(resolvePromise => {
-    const child = fork(benchFile, ['--child', fixture.id], {stdio: ['ignore', 'ignore', 'pipe', 'ipc']});
-    let stderr = '';
-    let msg = null;
-    child.stderr.on('data', d => { stderr = (stderr + d).slice(-2000); });
-    const timer = setTimeout(() => child.kill('SIGKILL'), 30000);
-    child.on('message', m => { msg = m; });
-    child.on('exit', (code, sig) => {
-      clearTimeout(timer);
-      resolvePromise(msg ?? {status: sig === 'SIGKILL' ? 'watchdog' : 'error', code, signal: sig, error: stderr});
+  let entry = existingById.get(fixture.id);
+  if (!entry) {
+    const res = await new Promise(resolvePromise => {
+      const child = fork(
+        benchFile,
+        ['--child', fixture.id, 'auto', snapshotId, String(searchBudgetMs)],
+        {stdio: ['ignore', 'ignore', 'pipe', 'ipc']}
+      );
+      let stderr = '';
+      let msg = null;
+      child.stderr.on('data', d => { stderr = (stderr + d).slice(-2000); });
+      const timer = setTimeout(() => child.kill('SIGKILL'), watchdogMs);
+      child.on('message', m => { msg = m; });
+      child.on('exit', (code, sig) => {
+        clearTimeout(timer);
+        resolvePromise(msg ?? {status: sig === 'SIGKILL' ? 'watchdog' : 'error', code, signal: sig, error: stderr});
+      });
     });
-  });
 
-  const entry = {
-    id: fixture.id,
-    status: res.status,
-    engine: res.engine ?? null,
-    prepareMs: res.prepareMs ?? null,
-    searchMs: res.searchMs ?? null,
-    totalMs: res.totalMs ?? null,
-    lowerBound: res.lowerBound ?? null,
-    upperBound: res.upperBound ?? null,
-    error: res.error ? String(res.error).split('\n')[0] : undefined,
-  };
-  appendFileSync(outputPath, JSON.stringify(entry) + '\n');
+    entry = {
+      id: fixture.id,
+      status: res.status,
+      engine: res.engine ?? null,
+      prepareMs: res.prepareMs ?? null,
+      searchMs: res.searchMs ?? null,
+      totalMs: res.totalMs ?? null,
+      lowerBound: res.lowerBound ?? null,
+      upperBound: res.upperBound ?? null,
+      error: res.error ? String(res.error).split('\n')[0] : undefined,
+    };
+    appendFileSync(outputPath, JSON.stringify(entry) + '\n');
+    console.log(`[${i + 1}/${selected.length}] ${fixture.id}: ${entry.status} (search=${entry.searchMs != null ? entry.searchMs.toFixed(1) + 'ms' : 'n/a'})`);
+  }
   rows.push(entry);
 
-  if (res.status === 'within-budget') {
+  if (entry.status === 'within-budget') {
     within++;
-    sumPrepare += res.prepareMs ?? 0;
-    sumSearch += res.searchMs ?? 0;
-    sumTotal += res.totalMs ?? 0;
-  } else if (res.status === 'not-within-budget') {
+    sumPrepare += entry.prepareMs ?? 0;
+    sumSearch += entry.searchMs ?? 0;
+    sumTotal += entry.totalMs ?? 0;
+  } else if (entry.status === 'not-within-budget') {
     notWithin++;
-  } else if (res.status === 'watchdog') {
+  } else if (entry.status === 'watchdog') {
     watchdogs++;
   } else {
     errors++;
   }
-  console.log(`[${i + 1}/${selected.length}] ${fixture.id}: ${res.status} (search=${res.searchMs != null ? res.searchMs.toFixed(1) + 'ms' : 'n/a'})`);
 }
 
 const slowest = rows
@@ -103,9 +151,9 @@ const slowest = rows
   .slice(0, 10);
 
 const summaryLines = [
-  `## Champions Singles Sweep (\`${scope}\`)`,
+  `## Champions Singles Sweep (\`${failedFrom ? `failed-from:${failedFrom}` : scope}\`, snapshot \`${snapshotId}\`, budget \`${searchBudgetMs}ms\`)`,
   '',
-  `- **Total**: ${selected.length} | **Within budget (10s, tol=0.02)**: ${within} | **Not within budget**: ${notWithin} | **Errors**: ${errors} | **Watchdogs**: ${watchdogs}`,
+  `- **Total**: ${selected.length} | **Within budget (${searchBudgetMs}ms, tol=0.02)**: ${within} | **Not within budget**: ${notWithin} | **Errors**: ${errors} | **Watchdogs**: ${watchdogs}`,
   `- **Converged Totals**: prepare \`${sumPrepare.toFixed(1)} ms\`, search \`${sumSearch.toFixed(1)} ms\`, total \`${sumTotal.toFixed(1)} ms\``,
   '',
   '### Top 10 Slowest',

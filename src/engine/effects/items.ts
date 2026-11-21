@@ -196,6 +196,8 @@ const SAFE_ITEM_TRAITS: ItemOptimizationTraits = {
   breaksFoeHpMonotonicity: false,
   canHealWithoutBerry: false,
   readsGlobalBoosts: false,
+  damagesAttackerOnHit: false,
+  selfRecoilOnAttack: false,
 };
 
 const UNSAFE_ITEM_TRAITS: ItemOptimizationTraits = {
@@ -203,6 +205,8 @@ const UNSAFE_ITEM_TRAITS: ItemOptimizationTraits = {
   breaksFoeHpMonotonicity: true,
   canHealWithoutBerry: true,
   readsGlobalBoosts: true,
+  damagesAttackerOnHit: true,
+  selfRecoilOnAttack: true,
 };
 
 /**
@@ -219,14 +223,14 @@ const ITEM_ARCHETYPE_TRAITS: Record<ItemArchetype, ItemOptimizationTraits> = {
   'weather-rock': SAFE_ITEM_TRAITS,
   'terrain-extender': SAFE_ITEM_TRAITS,
   'light-clay': SAFE_ITEM_TRAITS,
-  'life-orb': SAFE_ITEM_TRAITS,
+  'life-orb': {...SAFE_ITEM_TRAITS, selfRecoilOnAttack: true},
   'focus-sash': SAFE_ITEM_TRAITS,
   'focus-band': SAFE_ITEM_TRAITS,
   'sitrus-berry': {...SAFE_ITEM_TRAITS, hpThresholdBerry: true},
   'oran-berry': {...SAFE_ITEM_TRAITS, hpThresholdBerry: true},
   leftovers: {...SAFE_ITEM_TRAITS, canHealWithoutBerry: true},
   'choice-scarf': SAFE_ITEM_TRAITS,
-  'rocky-helmet': SAFE_ITEM_TRAITS,
+  'rocky-helmet': {...SAFE_ITEM_TRAITS, damagesAttackerOnHit: true},
   'air-balloon': SAFE_ITEM_TRAITS,
   'scope-lens': SAFE_ITEM_TRAITS,
   'expert-belt': SAFE_ITEM_TRAITS,

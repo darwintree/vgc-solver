@@ -235,6 +235,9 @@ export function clonePokemon(p: PokemonState): PokemonState {
     timesAttacked: p.timesAttacked,
     lastMoveFailed: p.lastMoveFailed,
     chargingMoveIdx: p.chargingMoveIdx,
+    lockedMoveIdx: p.lockedMoveIdx,
+    lockedMoveDuration: p.lockedMoveDuration,
+    lockedMoveTrueDuration: p.lockedMoveTrueDuration,
     invulnerable: p.invulnerable,
     lastMoveIdx: p.lastMoveIdx,
     lastMoveId: p.lastMoveId,
@@ -605,6 +608,11 @@ export function stateFromBattle(ctx: StaticBattleContext, battle: Battle): Dynam
         timesAttacked: (p as any).timesAttacked || 0,
         lastMoveFailed: !!(p as any).moveLastTurnResult === false && (p as any).moveLastTurnResult !== undefined,
         chargingMoveIdx: -1,
+        lockedMoveIdx: p.volatiles?.lockedmove?.move
+          ? sp.moves.findIndex(m => m.id === toID(p.volatiles.lockedmove.move))
+          : -1,
+        lockedMoveDuration: p.volatiles?.lockedmove?.duration ?? 0,
+        lockedMoveTrueDuration: p.volatiles?.lockedmove?.trueDuration ?? 0,
         invulnerable: '',
         lastMoveIdx,
         lastMoveId: p.lastMove?.id ? toID(p.lastMove.id) : '',
@@ -763,7 +771,8 @@ export function stateFromBattle(ctx: StaticBattleContext, battle: Battle): Dynam
 export function canonicalStateKey(
   ctx: StaticBattleContext,
   state: DynamicState,
-  maskActiveHp?: readonly [boolean, boolean]
+  maskActiveHp?: readonly [boolean, boolean],
+  maskPp = false
 ): string {
   const fm = ctx.featureMask;
   const trackFieldLastMove = (fm & FeatureBit.FIELD_LAST_MOVE) !== 0;
@@ -782,6 +791,7 @@ export function canonicalStateKey(
   const trackSub = (fm & FeatureBit.SUBSTITUTE) !== 0;
   const trackTaunt = (fm & FeatureBit.TAUNT) !== 0;
   const trackChoice = (fm & FeatureBit.CHOICE_LOCK) !== 0;
+  const trackHazards = (fm & FeatureBit.HAZARDS) !== 0;
 
   if (state.phase.kind === 'ended') {
     return `E:${state.phase.winner}`;
@@ -812,9 +822,13 @@ export function canonicalStateKey(
     const maskSideHp = maskActiveHp ? maskActiveHp[s] : false;
     out += `|S${s}:${side.active.join(',')}`;
     if (trackMega && side.megaUsed) out += `/M1`;
-    if (side.stealthRock || side.spikes || side.toxicSpikes || side.stickyWeb ||
+    const sr = trackHazards && side.stealthRock ? 1 : 0;
+    const spk = trackHazards ? side.spikes : 0;
+    const tspk = trackHazards ? side.toxicSpikes : 0;
+    const sw = trackHazards && side.stickyWeb ? 1 : 0;
+    if (sr || spk || tspk || sw ||
         side.tailwindTurns || side.reflectTurns || side.lightScreenTurns || side.auroraVeilTurns || side.safeguardTurns) {
-      out += `/${side.stealthRock ? 1 : 0},${side.spikes},${side.toxicSpikes},${side.stickyWeb ? 1 : 0},${side.tailwindTurns},${side.reflectTurns},${side.lightScreenTurns},${side.auroraVeilTurns}`;
+      out += `/${sr},${spk},${tspk},${sw},${side.tailwindTurns},${side.reflectTurns},${side.lightScreenTurns},${side.auroraVeilTurns}`;
       if (side.safeguardTurns) out += `,${side.safeguardTurns}`;
     }
     for (let sl = 0; sl < side.wishTurns.length; sl++) {
@@ -834,7 +848,10 @@ export function canonicalStateKey(
         : (p.hpDist
           ? `D(${p.hpDist.map(e => `${e.hp}:${e.prob.toFixed(9)}`).join(',')})`
           : `${p.hp}`);
-      out += `;${hpStr}/${p.pp.join(',')}`;
+      const ppStr = maskPp
+        ? p.pp.map(v => (v >= 3 ? '+' : v)).join(',')
+        : p.pp.join(',');
+      out += `;${hpStr}/${ppStr}`;
       if (p.status) out += `/${p.status}${p.statusTurns || ''}`;
       else out += `/`;
       const b = p.boosts;
@@ -894,6 +911,7 @@ export function canonicalStateKey(
       if (p.syrupBombTurns > 0) out += `/SY${p.syrupBombTurns}`;
       if (p.destinyBond) out += `/DBN`;
       if (p.chargingMoveIdx >= 0) out += `/CH${p.chargingMoveIdx}${p.invulnerable}`;
+      if (p.lockedMoveIdx >= 0) out += `/LK${p.lockedMoveIdx}:${p.lockedMoveDuration}:${p.lockedMoveTrueDuration}`;
       if (p.flashFireActive) out += `/FF`;
       if (p.unburdenActive) out += `/UB`;
       if (p.proteanUsed) out += `/PR`;
@@ -1099,6 +1117,10 @@ export function legalSlotActions(
   }
   if (poke.chargingMoveIdx >= 0) {
     actions.push({kind: 'move', slot, moveIndex: poke.chargingMoveIdx, targetSide: oppSideIdx, targetSlot: 0});
+    return actions;
+  }
+  if (poke.lockedMoveIdx >= 0) {
+    actions.push({kind: 'move', slot, moveIndex: poke.lockedMoveIdx, targetSide: oppSideIdx, targetSlot: 0});
     return actions;
   }
   if (poke.uproarTurns > 0) {

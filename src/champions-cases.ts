@@ -5,10 +5,13 @@ import {createBattle, refreshMoveRequest, setHP} from './showdown-adapter';
 import {createChampionsModBattle, getChampionsDex} from './engine/ruleset';
 
 const snapshot = JSON.parse(readFileSync(resolve('fixtures/champions/singles-top10.json'), 'utf8'));
+const latestSnapshot = JSON.parse(readFileSync(resolve('fixtures/champions/singles-top10-20261120.json'), 'utf8'));
 const statFields = {hp: 'hp_points', atk: 'attack_points', def: 'defense_points',
   spa: 'sp_atk_points', spd: 'sp_def_points', spe: 'speed_points'};
 const hpPercentages = [25, 50, 100];
 const championsDex = getChampionsDex();
+
+export type ChampionsSnapshotId = '2026-09' | '2026-11';
 
 function configuration(entry) {
   const reasons: string[] = [];
@@ -78,14 +81,23 @@ function configuration(entry) {
 }
 
 const championsConfigurations = snapshot.pokemon.map(configuration);
-function championsCases() {
+const latestChampionsConfigurations = latestSnapshot.pokemon.map(configuration);
+
+const championsSnapshots = {
+  '2026-09': {snapshot, configurations: championsConfigurations},
+  '2026-11': {snapshot: latestSnapshot, configurations: latestChampionsConfigurations},
+} as const;
+
+function championsCases(snapshotId: ChampionsSnapshotId = '2026-09') {
+  const configs = championsSnapshots[snapshotId].configurations;
   const cases = [];
-  for (let i = 0; i < championsConfigurations.length; i++) {
-    for (let j = i + 1; j < championsConfigurations.length; j++) {
-      const p1 = championsConfigurations[i];
-      const p2 = championsConfigurations[j];
+  for (let i = 0; i < configs.length; i++) {
+    for (let j = i + 1; j < configs.length; j++) {
+      const p1 = configs[i];
+      const p2 = configs[j];
       for (const hp1 of hpPercentages) for (const hp2 of hpPercentages) {
         cases.push({id: `${p1.id}-${hp1}-vs-${p2.id}-${hp2}`, p1, p2, hp1, hp2,
+          snapshotId,
           skipReasons: [...p1.reasons.map(r => `${p1.species}: ${r}`),
             ...p2.reasons.map(r => `${p2.species}: ${r}`)]});
       }
@@ -108,4 +120,12 @@ function createChampionsBattle(fixture, options: {mod?: 'champions' | 'base'} = 
   return battle;
 }
 
-export {snapshot, championsConfigurations, championsCases, createChampionsBattle};
+export {
+  snapshot,
+  latestSnapshot,
+  championsSnapshots,
+  championsConfigurations,
+  latestChampionsConfigurations,
+  championsCases,
+  createChampionsBattle,
+};

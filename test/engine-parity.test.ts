@@ -64,13 +64,15 @@ test('standard 1v1 fixtures match @pkmn/sim exact distributions', () => {
   assertParity(suckerPunchGame().battle, 'move 2', 'move 2', 'suckerPunch: Knock Off x Tackle');
 });
 
-test('all 252 supported Champions fixtures (including Mega Evolution) pass engine admission', () => {
-  const supported = championsCases().filter(c => c.skipReasons.length === 0);
-  assert.equal(supported.length, 252);
-  for (const c of supported) {
-    const battle = createChampionsBattle(c);
-    const report = canRunInEngine(battle);
-    assert.equal(report.supported, true, `${c.id} rejected: ${report.reasons.join('; ')}`);
+test('all 810 Champions fixtures across 2026-09 and 2026-11 snapshots pass engine admission', () => {
+  for (const snapshotId of ['2026-09', '2026-11'] as const) {
+    const supported = championsCases(snapshotId).filter(c => c.skipReasons.length === 0);
+    assert.equal(supported.length, 405, `${snapshotId} playable count`);
+    for (const c of supported) {
+      const battle = createChampionsBattle(c);
+      const report = canRunInEngine(battle);
+      assert.equal(report.supported, true, `${snapshotId}/${c.id} rejected: ${report.reasons.join('; ')}`);
+    }
   }
 });
 
@@ -372,3 +374,164 @@ test('BoundedSolver backed by compact engine adapter matches exact reference val
     assert.ok(res.upperBound >= exactValue - 1e-9, `upper ${res.upperBound} < exact ${exactValue}`);
   }
 });
+
+test('Champions parity: Flower Trick (willCrit), Meowscarada, Hippowdon, and 2026-11 Mega Z sets match Showdown', () => {
+  const cases09 = championsCases('2026-09');
+  const cases11 = championsCases('2026-11');
+  const find09 = (id: string) => {
+    const c = cases09.find(x => x.id === id);
+    assert.ok(c, `Missing 2026-09 case ${id}`);
+    return c;
+  };
+  const find11 = (id: string) => {
+    const c = cases11.find(x => x.id === id);
+    assert.ok(c, `Missing 2026-11 case ${id}`);
+    return c;
+  };
+
+  const probes: Array<{label: string; battle: Battle; p1: string; p2: string}> = [
+    {
+      label: 'Meowscarada Flower Trick (willCrit) vs Hippowdon Yawn',
+      battle: createChampionsBattle(find09('meowscarada-100-vs-hippowdon-100')),
+      p1: 'move 2',
+      p2: 'move 2',
+    },
+    {
+      label: 'Meowscarada Triple Axel vs Hippowdon Slack Off',
+      battle: createChampionsBattle(find09('meowscarada-100-vs-hippowdon-100')),
+      p1: 'move 1',
+      p2: 'move 4',
+    },
+    {
+      label: 'Garchomp-MZ Mega Outrage vs Hippowdon Slack Off',
+      battle: createChampionsBattle(find11('garchomp-100-vs-hippowdon-100')),
+      p1: 'move 3 mega',
+      p2: 'move 4',
+    },
+    {
+      label: 'Lucario-MZ Mega Close Combat vs Golisopod-M Mega First Impression',
+      battle: createChampionsBattle(find11('lucario-100-vs-golisopod-100')),
+      p1: 'move 1 mega',
+      p2: 'move 1 mega',
+    },
+    {
+      label: 'Charizard-MY Mega Solar Beam vs Basculegion Wave Crash',
+      battle: createChampionsBattle(find11('charizard-100-vs-basculegion-100')),
+      p1: 'move 2 mega',
+      p2: 'move 1',
+    },
+    {
+      label: 'Basculegion Aqua Jet vs Salamence-M Mega Double-Edge',
+      battle: createChampionsBattle(find11('basculegion-100-vs-salamence-100')),
+      p1: 'move 3',
+      p2: 'move 1 mega',
+    },
+  ];
+
+  for (const probe of probes) {
+    const res = compareTurnWithShowdown(probe.battle, probe.p1, probe.p2);
+    assert.equal(res.missingFromEngine.length, 0, `${probe.label}: missing ${res.missingFromEngine.slice(0, 3).join(', ')}`);
+    assert.equal(res.extraInEngine.length, 0, `${probe.label}: extra ${res.extraInEngine.slice(0, 3).join(', ')}`);
+    assert.ok(res.totalVariationDistance < 1e-8, `${probe.label}: TVD=${res.totalVariationDistance}`);
+  }
+});
+
+test('Outrage lockedmove multi-turn lifecycle matches Showdown exactly (T1, T2 2/3-turn, T3 confusion, Fairy immunity, Protect disruption)', () => {
+  function makeOutrageBattle(seed: [number, number, number, number], p2Moves = ['Protect', 'Slack Off']) {
+    const b = new Battle({
+      formatid: toID('gen9customgame'),
+      seed: `${seed[0]},${seed[1]},${seed[2]},${seed[3]}`,
+      p1: {
+        name: 'P1',
+        team: [{
+          name: 'Garchomp',
+          species: 'Garchomp',
+          item: '',
+          ability: 'Rough Skin',
+          moves: ['Outrage', 'Earthquake'],
+          nature: 'Jolly',
+          gender: '',
+          evs: {hp: 0, atk: 252, def: 0, spa: 0, spd: 0, spe: 252},
+          ivs: IVS,
+          level: 50,
+        }],
+      },
+      p2: {
+        name: 'P2',
+        team: [{
+          name: 'Hippowdon',
+          species: 'Hippowdon',
+          item: '',
+          ability: 'Sand Force',
+          moves: p2Moves,
+          nature: 'Impish',
+          gender: '',
+          evs: {hp: 252, atk: 0, def: 252, spa: 0, spd: 0, spe: 0},
+          ivs: IVS,
+          level: 50,
+        }],
+      },
+    });
+    b.makeChoices('default', 'default');
+    return b;
+  }
+
+  // Turn 1 vs Slack Off and Turn 1 vs Protect
+  for (const [label, p2Choice] of [['T1 vs Slack Off', 'move 2'], ['T1 vs Protect', 'move 1']] as const) {
+    const res = compareTurnWithShowdown(makeOutrageBattle([1, 2, 3, 4]), 'move 1', p2Choice);
+    assert.equal(res.missingFromEngine.length, 0, `${label}: missing`);
+    assert.equal(res.extraInEngine.length, 0, `${label}: extra`);
+    assert.ok(res.totalVariationDistance < 1e-8, `${label}: TVD=${res.totalVariationDistance}`);
+  }
+
+  // Turn 2 (both trueDuration=1 2-turn end & trueDuration=2 3-turn continuation), Turn 3 end, and Protect disruption
+  const seenSlackOff = new Set<number>();
+  const seenProtect = new Set<number>();
+  let checkedT3 = false;
+  for (let seed = 1; seed <= 60 && (seenSlackOff.size < 2 || seenProtect.size < 2 || !checkedT3); seed++) {
+    const b1 = makeOutrageBattle([seed, seed + 1, seed + 2, seed + 3]);
+    b1.makeChoices('move 1', 'move 2');
+    const lm = b1.sides[0].active[0].volatiles.lockedmove as {duration?: number; trueDuration?: number} | undefined;
+    if (!lm?.trueDuration) continue;
+
+    if (!seenSlackOff.has(lm.trueDuration)) {
+      seenSlackOff.add(lm.trueDuration);
+      const res2 = compareTurnWithShowdown(b1, 'move 1', 'move 2');
+      assert.equal(res2.missingFromEngine.length, 0, `T2 trueDur=${lm.trueDuration} vs Slack Off: missing`);
+      assert.equal(res2.extraInEngine.length, 0, `T2 trueDur=${lm.trueDuration} vs Slack Off: extra`);
+      assert.ok(res2.totalVariationDistance < 1e-8, `T2 trueDur=${lm.trueDuration} vs Slack Off: TVD=${res2.totalVariationDistance}`);
+
+      if (lm.trueDuration === 2 && !checkedT3) {
+        b1.makeChoices('move 1', 'move 2');
+        const res3 = compareTurnWithShowdown(b1, 'move 1', 'move 2');
+        assert.equal(res3.missingFromEngine.length, 0, 'T3 final turn vs Slack Off: missing');
+        assert.equal(res3.extraInEngine.length, 0, 'T3 final turn vs Slack Off: extra');
+        assert.ok(res3.totalVariationDistance < 1e-8, `T3 final turn vs Slack Off: TVD=${res3.totalVariationDistance}`);
+        checkedT3 = true;
+      }
+    }
+
+    if (!seenProtect.has(lm.trueDuration)) {
+      seenProtect.add(lm.trueDuration);
+      const b2 = makeOutrageBattle([seed, seed + 1, seed + 2, seed + 3]);
+      b2.makeChoices('move 1', 'move 2');
+      const resP = compareTurnWithShowdown(b2, 'move 1', 'move 1');
+      assert.equal(resP.missingFromEngine.length, 0, `T2 trueDur=${lm.trueDuration} vs Protect: missing`);
+      assert.equal(resP.extraInEngine.length, 0, `T2 trueDur=${lm.trueDuration} vs Protect: extra`);
+      assert.ok(resP.totalVariationDistance < 1e-8, `T2 trueDur=${lm.trueDuration} vs Protect: TVD=${resP.totalVariationDistance}`);
+    }
+  }
+  assert.equal(seenSlackOff.size, 2, 'Expected to test both 2-turn and 3-turn Outrage locks vs Slack Off');
+  assert.equal(seenProtect.size, 2, 'Expected to test both 2-turn and 3-turn Outrage locks vs Protect');
+  assert.equal(checkedT3, true, 'Expected to test Turn 3 Outrage ending + confusion');
+
+  // Fairy immunity does not lock or confuse
+  const cases11 = championsCases('2026-11');
+  const fairyCase = cases11.find(x => x.id === 'garchomp-100-vs-mimikyu-100');
+  assert.ok(fairyCase);
+  const resFairy = compareTurnWithShowdown(createChampionsBattle(fairyCase), 'move 3', 'move 1');
+  assert.equal(resFairy.missingFromEngine.length, 0);
+  assert.equal(resFairy.extraInEngine.length, 0);
+  assert.ok(resFairy.totalVariationDistance < 1e-8);
+});
+

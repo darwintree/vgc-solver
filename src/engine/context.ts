@@ -21,7 +21,7 @@ const SUPPORTED_VOLATILES = new Set([
   'aquaring', 'ingrain', 'smackdown', 'focusenergy', 'dragoncheer', 'charge', 'glaiverush',
   'syrupbomb', 'destinybond', 'noretreat', 'flashfire', 'unburden', 'twoTurnMove',
   'confusion', 'attract', 'magnetrise', 'lockon', 'stockpile', 'powertrick', 'powershift',
-  'imprison', 'octolock', 'uproar', 'gastroacid', 'focuspunch', 'beakblast', 'electrify', 'fling',
+  'imprison', 'octolock', 'uproar', 'gastroacid', 'focuspunch', 'beakblast', 'electrify', 'fling', 'lockedmove',
 ]);
 
 const ALT_FORMES_BY_BASE: Record<string, readonly string[]> = {
@@ -298,6 +298,20 @@ export function compileContextFromBattle(battle: Battle): StaticBattleContext {
         featureMask |= s === 0 ? FeatureBit.SIDE0_LAST_MOVE_IDX : FeatureBit.SIDE1_LAST_MOVE_IDX;
       }
     }
+  }
+  const hasBench = sides[0].team.length > activeCount || sides[1].team.length > activeCount;
+  const hasHazardReader = ([0, 1] as const).some(s =>
+    allTeamMoves(s).some(m =>
+      m.specialKind === 'hazard-clear-self' ||
+      m.specialKind === 'defog' ||
+      m.specialKind === 'court-change' ||
+      m.specialKind === 'tidy-up' ||
+      m.specialKind === 'copycat'
+    ) ||
+    allTeamAbilities(s).some(a => a.magicBounce)
+  );
+  if (hasBench || hasHazardReader || (featureMask & FeatureBit.LAST_MOVE_FAILED) !== 0) {
+    featureMask |= FeatureBit.HAZARDS;
   }
 
   // Determine whether SpA (boosts[2]) and SpD (boosts[3]) can ever be observed

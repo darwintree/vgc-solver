@@ -547,7 +547,7 @@ export function compileMoveSpec(
     priority: raw.priority || 0,
     pp: raw.pp || 1,
     maxpp,
-    critRatio: raw.critRatio ?? 1,
+    critRatio: raw.willCrit === true ? 4 : raw.willCrit === false ? 0 : (raw.critRatio ?? 1),
     target: mapTargetType(raw.target),
     contact: !!flags.contact,
     protectable: !!flags.protect,
@@ -585,6 +585,7 @@ export function compileMoveSpec(
     protect: specialKind === 'protect' || specialKind === 'spiky-shield' || specialKind === 'kings-shield' || specialKind === 'baneful-bunker',
     encore: specialKind === 'encore',
     stealthRock: specialKind === 'stealth-rock',
+    selfLockedMove: raw.self?.volatileStatus === 'lockedmove',
     optTraits,
   };
 
@@ -696,7 +697,7 @@ const MOVE_KIND_TRAITS: Record<MoveSpecialKind, MoveKindTraitDecl> = {
   disable: SAFE_MOVE_KIND,
   torment: SAFE_MOVE_KIND,
   'perish-song': SAFE_MOVE_KIND,
-  'destiny-bond': SAFE_MOVE_KIND,
+  'destiny-bond': {hpMonotone: 'unsafe-self'},
   'court-change': SAFE_MOVE_KIND,
   'corrosive-gas': SAFE_MOVE_KIND,
   soak: SAFE_MOVE_KIND,
@@ -807,6 +808,7 @@ const MOVE_KIND_TRAITS: Record<MoveSpecialKind, MoveKindTraitDecl> = {
 
 const UNSAFE_MOVE_TRAITS: MoveOptimizationTraits = {
   hpMonotone: 'unsafe-both',
+  hasDrain: true,
   canHealSelf: true,
   canHealFoe: true,
   canMutateBerry: true,
@@ -814,16 +816,6 @@ const UNSAFE_MOVE_TRAITS: MoveOptimizationTraits = {
   dynamicMoveType: true,
   canBeSpecial: true,
 };
-
-function mergeHpMonotone(
-  a: MoveOptimizationTraits['hpMonotone'],
-  b: MoveOptimizationTraits['hpMonotone']
-): MoveOptimizationTraits['hpMonotone'] {
-  if (a === 'unsafe-both' || b === 'unsafe-both') return 'unsafe-both';
-  if (a === 'safe') return b;
-  if (b === 'safe') return a;
-  return a === b ? a : 'unsafe-both';
-}
 
 function deriveMoveOptTraits(
   specialKind: MoveSpecialKind,
@@ -836,7 +828,8 @@ function deriveMoveOptTraits(
   const hasDrain = drain !== null;
   const setsGrassy = setsTerrain === 'grassy';
   return {
-    hpMonotone: hasDrain ? mergeHpMonotone(decl.hpMonotone, 'unsafe-target') : decl.hpMonotone,
+    hpMonotone: decl.hpMonotone,
+    hasDrain,
     canHealSelf: !!decl.canHealSelf || hasDrain || setsGrassy,
     canHealFoe: !!decl.canHealFoe || setsGrassy,
     canMutateBerry: !!decl.canMutateBerry,

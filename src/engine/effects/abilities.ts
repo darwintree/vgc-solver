@@ -472,7 +472,10 @@ type AbilityFlagRole =
   | 'reads-boosts'
   | 'hp-pinch'
   | 'hp-half'
-  | 'hp-below-max';
+  | 'hp-half-pivot'
+  | 'hp-below-max'
+  | 'damages-attacker'
+  | 'hp-unsafe-self';
 
 /**
  * Exhaustive optimization classification of every effect field on CompiledAbilitySpec.
@@ -558,9 +561,9 @@ const ABILITY_FLAG_CLASS: Record<keyof AbilityEffectFields, AbilityFlagRole> = {
   disguise: 'safe',
   sturdy: 'safe',
   stamina: 'safe',
-  roughSkin: 'safe',
-  aftermath: 'safe',
-  innardsOut: 'safe',
+  roughSkin: 'damages-attacker',
+  aftermath: 'hp-unsafe-self',
+  innardsOut: 'hp-unsafe-self',
   contactStatus: 'safe',
   effectSpore: 'safe',
   gooey: 'safe',
@@ -646,7 +649,7 @@ const ABILITY_FLAG_CLASS: Record<keyof AbilityEffectFields, AbilityFlagRole> = {
   cuteCharm: 'safe',
   moody: 'reads-boosts',
   cudChew: 'safe',
-  emergencyExit: 'hp-half',
+  emergencyExit: 'hp-half-pivot',
   mimicry: 'safe',
   battleBond: 'safe',
   mummy: 'mutates-abilities',
@@ -674,6 +677,7 @@ const SAFE_ABILITY_TRAITS: AbilityOptimizationTraits = {
   canHealSelf: false,
   canHealFoe: false,
   readsGlobalBoosts: false,
+  damagesAttackerOnHit: false,
   hpThreshold: 'none',
 };
 
@@ -683,7 +687,8 @@ const UNSAFE_ABILITY_TRAITS: AbilityOptimizationTraits = {
   canHealSelf: true,
   canHealFoe: true,
   readsGlobalBoosts: true,
-  hpThreshold: 'below-maxhp',
+  damagesAttackerOnHit: true,
+  hpThreshold: 'unsafe-self',
 };
 
 function deriveAbilityOptTraits(spec: AbilityEffectFields): AbilityOptimizationTraits {
@@ -692,6 +697,7 @@ function deriveAbilityOptTraits(spec: AbilityEffectFields): AbilityOptimizationT
   let canHealSelf = false;
   let canHealFoe = false;
   let readsGlobalBoosts = false;
+  let damagesAttackerOnHit = false;
   let hpThreshold: AbilityOptimizationTraits['hpThreshold'] = 'none';
 
   for (const key of Object.keys(spec) as (keyof AbilityEffectFields | 'featureBits')[]) {
@@ -732,19 +738,29 @@ function deriveAbilityOptTraits(spec: AbilityEffectFields): AbilityOptimizationT
       case 'reads-boosts':
         readsGlobalBoosts = true;
         break;
+      case 'damages-attacker':
+        damagesAttackerOnHit = true;
+        break;
       case 'hp-pinch':
-        hpThreshold = 'pinch-third';
+        if (hpThreshold !== 'unsafe-self') hpThreshold = 'pinch-third';
         break;
       case 'hp-half':
-        hpThreshold = 'half-maxhp';
+        if (hpThreshold !== 'unsafe-self') hpThreshold = 'half-maxhp';
+        break;
+      case 'hp-half-pivot':
+        if (hpThreshold === 'none') hpThreshold = 'half-maxhp-pivot';
         break;
       case 'hp-below-max':
-        hpThreshold = 'below-maxhp';
+        if (hpThreshold !== 'unsafe-self') hpThreshold = 'below-maxhp';
+        break;
+      case 'hp-unsafe-self':
+        damagesAttackerOnHit = true;
+        hpThreshold = 'unsafe-self';
         break;
     }
   }
 
-  return {mutatesAbilities, mutatesBerry, canHealSelf, canHealFoe, readsGlobalBoosts, hpThreshold};
+  return {mutatesAbilities, mutatesBerry, canHealSelf, canHealFoe, readsGlobalBoosts, damagesAttackerOnHit, hpThreshold};
 }
 
 export function compileAbilitySpec(abilityIdRaw: string): CompiledAbilitySpec {

@@ -258,6 +258,7 @@ export const FeatureBit = {
   ATE_BERRY: 1 << 27,
   SIDE0_LAST_MOVE_IDX: 1 << 28,
   SIDE1_LAST_MOVE_IDX: 1 << 29,
+  HAZARDS: 1 << 30,
 } as const;
 
 export type BoostStat = 'atk' | 'def' | 'spa' | 'spd' | 'spe' | 'acc' | 'eva';
@@ -273,6 +274,7 @@ export interface MoveSecondarySpec {
 
 export interface MoveOptimizationTraits {
   hpMonotone: 'safe' | 'unsafe-self' | 'unsafe-target' | 'unsafe-both';
+  hasDrain: boolean;
   canHealSelf: boolean;
   canHealFoe: boolean;
   canMutateBerry: boolean;
@@ -286,6 +288,8 @@ export interface ItemOptimizationTraits {
   breaksFoeHpMonotonicity: boolean;
   canHealWithoutBerry: boolean;
   readsGlobalBoosts: boolean;
+  damagesAttackerOnHit: boolean;
+  selfRecoilOnAttack: boolean;
 }
 
 export interface AbilityOptimizationTraits {
@@ -294,8 +298,9 @@ export interface AbilityOptimizationTraits {
   canHealSelf: boolean;
   canHealFoe: boolean;
   readsGlobalBoosts: boolean;
+  damagesAttackerOnHit: boolean;
   /** Non-monotone HP threshold requirement on self active HP, if any. */
-  hpThreshold: 'none' | 'pinch-third' | 'half-maxhp' | 'below-maxhp';
+  hpThreshold: 'none' | 'pinch-third' | 'half-maxhp' | 'half-maxhp-pivot' | 'below-maxhp' | 'unsafe-self';
 }
 
 export interface StaticMoveData {
@@ -346,6 +351,7 @@ export interface StaticMoveData {
   protect: boolean;
   encore: boolean;
   stealthRock: boolean;
+  selfLockedMove?: boolean;
   optTraits: MoveOptimizationTraits;
 }
 
@@ -526,6 +532,9 @@ export interface PokemonState {
   timesAttacked: number;           // Rage Fist counter (FeatureBit.TIMES_ATTACKED)
   lastMoveFailed: boolean;         // Stomping Tantrum / Temper Flare
   chargingMoveIdx: number;         // -1 if not charging a two-turn move
+  lockedMoveIdx: number;           // -1 if not locked into Outrage/Thrash/Petal Dance/Raging Fury
+  lockedMoveDuration: number;      // volatile duration (2 -> 1 -> ends onAfterMove or residual)
+  lockedMoveTrueDuration: number;  // remaining total lock turns (starts at 2 or 3; confuses onEnd if <= 1)
   invulnerable: '' | 'fly' | 'dig' | 'dive' | 'shadow';
   lastMoveIdx: number;             // -1 if none, -2 if struggle
   lastMoveId: string;              // ID of last executed move (for Instruct / Copycat)

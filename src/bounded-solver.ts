@@ -25,8 +25,8 @@ export interface MonotoneSignature {
 }
 export interface MonotoneBoxOutcome {
   probability: number;
-  lowerSnapshot: Snapshot;
-  upperSnapshot: Snapshot;
+  lowerSnapshot: Snapshot | null;
+  upperSnapshot: Snapshot | null;
   split: () => (import('./types').Outcome | MonotoneBoxOutcome)[];
 }
 export interface BoundedAdapter {
@@ -116,6 +116,7 @@ export interface SearchNode {
   upperSolution: MatrixSolution | null;
   parents: Set<SearchNode>;
   exactCertified: boolean;
+  dirty?: boolean;
   monoGroup?: MonotoneGroup | null;
   monoH1?: number | null;
   monoH2?: number | null;
@@ -125,6 +126,48 @@ const DEFAULT_LOWER = -1;
 const DEFAULT_UPPER = 1;
 const EPSILON = 1e-12;
 const FRONTIER_TIE_EPSILON = 1e-9;
+
+/**
+ * Exact O(M*N) pure saddle-point check before invoking general LP/matrix reduction.
+ * Returns identical value and pure strategies whenever max_i min_j M[i][j] === min_j max_i M[i][j].
+ */
+function solveMatrixFast(matrix: number[][]): MatrixSolution {
+  const m = matrix.length;
+  const n = matrix[0].length;
+  let bestRow = 0;
+  let bestRowMin = -Infinity;
+  for (let i = 0; i < m; i++) {
+    const row = matrix[i];
+    let rowMin = row[0];
+    for (let j = 1; j < n; j++) {
+      if (row[j] < rowMin) rowMin = row[j];
+    }
+    if (rowMin > bestRowMin) {
+      bestRowMin = rowMin;
+      bestRow = i;
+    }
+  }
+  let bestCol = 0;
+  let bestColMax = Infinity;
+  for (let j = 0; j < n; j++) {
+    let colMax = matrix[0][j];
+    for (let i = 1; i < m; i++) {
+      if (matrix[i][j] > colMax) colMax = matrix[i][j];
+    }
+    if (colMax < bestColMax) {
+      bestColMax = colMax;
+      bestCol = j;
+    }
+  }
+  if (bestRowMin >= bestColMax - 1e-12) {
+    const p1 = new Array<number>(m).fill(0);
+    const p2 = new Array<number>(n).fill(0);
+    p1[bestRow] = 1;
+    p2[bestCol] = 1;
+    return {value: bestRowMin, p1, p2};
+  }
+  return solveZeroSumMatrix(matrix);
+}
 
 const nativeAdapter = Object.freeze({
   createTurnCursor,
@@ -325,7 +368,7 @@ class BoundedSearch {
 
     let converged = false;
     while (true) {
-      this._backupFrom([root]);
+      if (root.dirty !== false) this._backupFrom([root]);
       const width = root.upper - root.lower;
       if (width <= this.options.tolerance + EPSILON) {
         converged = true;
@@ -497,20 +540,22 @@ class BoundedSearch {
   }
 
   _selectionPolicyForRoot(root: SearchNode) {
-    if (this.options.selectionPolicy !== 'auto' || this.autoJoint) {
-      return this.autoJoint ? 'joint' : this.options.selectionPolicy;
+    if (this.options.selectionPolicy !== 'auto') {
+      return this.options.selectionPolicy;
     }
-    if (!root.initialized || !root.lowerSolution || !root.upperSolution) return 'security';
+    if (!root.initialized || !root.lowerSolution || !root.upperSolution) {
+      this.autoJoint = false;
+      return 'security';
+    }
     const bestPureRowFloor = Math.max(...root.cells.map(row =>
       Math.min(...row.map(cell => cell.lower))));
     const bestPureColumnCeiling = Math.min(...root.cells[0].map((_, j) =>
       Math.max(...root.cells.map(row => row[j].upper))));
-    if (root.lowerSolution.value > bestPureRowFloor + 1e-9 ||
-        root.upperSolution.value < bestPureColumnCeiling - 1e-9) {
-      this.autoJoint = true;
-      return 'joint';
-    }
-    return 'security';
+    const isMixed =
+      root.lowerSolution.value > bestPureRowFloor + 1e-9 ||
+      root.upperSolution.value < bestPureColumnCeiling - 1e-9;
+    this.autoJoint = isMixed;
+    return isMixed ? 'joint' : 'security';
   }
 
   _initializeNode(node: SearchNode) {
@@ -575,6 +620,7 @@ class BoundedSearch {
     cell.outcomes = outcomes;
     cell.remainingProbability = incomplete ? Math.max(0, 1 - completed / denominator) : remaining / total;
     if (transition.complete) cell.cursor = null;
+    node.dirty = true;
   }
 
   _internOutcome(node: SearchNode, outcome: any, skipTerminal: boolean): BoundedOutcome {
@@ -583,8 +629,8 @@ class BoundedSearch {
       throw new Error(`Invalid transition probability: ${outcome.probability}`);
     }
     if (outcome.lowerSnapshot !== undefined && outcome.upperSnapshot !== undefined && typeof outcome.split === 'function') {
-      const lowerChild = this._intern(outcome.lowerSnapshot, skipTerminal);
-      const upperChild = this._intern(outcome.upperSnapshot, skipTerminal);
+      const lowerChild = outcome.lowerSnapshot !== null ? this._intern(outcome.lowerSnapshot, skipTerminal) : null;
+      const upperChild = outcome.upperSnapshot !== null ? this._intern(outcome.upperSnapshot, skipTerminal) : null;
       if (lowerChild) lowerChild.parents.add(node);
       if (upperChild) upperChild.parents.add(node);
       if (lowerChild && upperChild && lowerChild === upperChild) {
@@ -623,6 +669,7 @@ class BoundedSearch {
       throw new Error(`Split sub-outcome probabilities sum to ${sum}, expected ${outcome.probability}`);
     }
     cell.outcomes.splice(outcomeIndex, 1, ...subs);
+    node.dirty = true;
     this.stats.boxSplits++;
   }
 
@@ -633,6 +680,7 @@ class BoundedSearch {
       return;
     }
     this._initializeNode(node);
+    node.dirty = true;
     // Cell generation is scheduled by `_selectFrontier`, which lets the
     // search descend through a promising generated outcome before paying for
     // unrelated action pairs. Unknown cells remain [-1, 1], so delaying them
@@ -664,16 +712,18 @@ class BoundedSearch {
     this._acceptTransition(node, i, j, transition);
   }
 
-  _cellBounds(cell: BoundedCell) {
-    if (!cell.outcomes) return;
+  _cellBounds(cell: BoundedCell): number {
+    if (!cell.outcomes) return 0;
     const oldLower = cell.lower;
     const oldUpper = cell.upper;
     let lower = -(cell.remainingProbability || 0);
     let upper = cell.remainingProbability || 0;
-    for (const outcome of cell.outcomes) {
+    const outcomes = cell.outcomes;
+    for (let k = 0; k < outcomes.length; k++) {
+      const outcome = outcomes[k];
       let childLower = outcome.utility;
       let childUpper = outcome.utility;
-      if (outcome.utility === null) {
+      if (childLower === null) {
         if (outcome.split) {
           childLower = outcome.child ? outcome.child.lower : DEFAULT_LOWER;
           childUpper = outcome.upperChild ? outcome.upperChild.upper : DEFAULT_UPPER;
@@ -682,59 +732,91 @@ class BoundedSearch {
           childUpper = outcome.child ? outcome.child.upper : DEFAULT_UPPER;
         }
       }
-      lower += outcome.probability * childLower;
-      upper += outcome.probability * childUpper;
+      const p = outcome.probability;
+      lower += p * childLower;
+      upper += p * childUpper;
     }
-    const nextLower = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, lower));
-    const nextUpper = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, upper));
+    const nextLower = lower < DEFAULT_LOWER ? DEFAULT_LOWER : (lower > DEFAULT_UPPER ? DEFAULT_UPPER : lower);
+    const nextUpper = upper < DEFAULT_LOWER ? DEFAULT_LOWER : (upper > DEFAULT_UPPER ? DEFAULT_UPPER : upper);
     // Bellman interval updates are monotone. Retaining the previous endpoint
     // also protects a certificate from a tiny floating-point reversal.
     cell.lower = Math.min(cell.upper, Math.max(cell.lower, nextLower));
     cell.upper = Math.max(cell.lower, Math.min(cell.upper, nextUpper));
-    return cell.lower !== oldLower || cell.upper !== oldUpper;
+    let mask = 0;
+    if (cell.lower !== oldLower) mask |= 1;
+    if (cell.upper !== oldUpper) mask |= 2;
+    return mask;
   }
 
   _refresh(node: SearchNode) {
-    if (node.terminal !== null) return false;
+    if (node.terminal !== null) {
+      node.dirty = false;
+      return false;
+    }
     if (!node.initialized) return false;
-    let matrixChanged = node.lowerSolution === null;
-    for (const row of node.cells) {
-      for (const cell of row) matrixChanged = this._cellBounds(cell) || matrixChanged;
+    let changeMask = node.lowerSolution === null ? 3 : 0;
+    const cells = node.cells;
+    for (let i = 0; i < cells.length; i++) {
+      const row = cells[i];
+      for (let j = 0; j < row.length; j++) {
+        changeMask |= this._cellBounds(row[j]);
+      }
     }
     const previousExact = node.exactCertified;
-    const exactCertified = node.cells.every(row => row.every(cell => cell.outcomes && !cell.cursor && !cell.remainingProbability &&
-      cell.outcomes.every(outcome => outcome.utility !== null ||
-        (!outcome.split && outcome.child && outcome.child.exactCertified))));
-    if (!matrixChanged) {
+    if (changeMask === 0) {
+      const exactCertified = node.upper - node.lower <= 1e-8 &&
+        cells.every(row => row.every(cell => cell.outcomes && !cell.cursor && !cell.remainingProbability &&
+          cell.outcomes.every(outcome => outcome.utility !== null ||
+            (!outcome.split && outcome.child && outcome.child.exactCertified))));
       node.exactCertified = exactCertified;
+      node.dirty = false;
       return previousExact !== exactCertified;
     }
-    const lowerMatrix = node.cells.map(row => row.map(cell => cell.lower));
-    const upperMatrix = node.cells.map(row => row.map(cell => cell.upper));
-    const lowerSolution = solveZeroSumMatrix(lowerMatrix);
-    const upperSolution = solveZeroSumMatrix(upperMatrix);
-    this.stats.matrixSolves++;
     const oldLower = node.lower;
     const oldUpper = node.upper;
-    // Re-evaluate the two security certificates from the strategies returned
-    // by the matrix solver. This makes floating-point roundoff widen an
-    // interval conservatively instead of turning a numerical equality into a
-    // false certificate.
-    const lowerSecurity = Math.min(...lowerMatrix[0].map((_, j) =>
-      lowerMatrix.reduce((sum, row, i) => sum + lowerSolution.p1[i] * row[j], 0)));
-    const upperSecurity = Math.max(...upperMatrix.map((row, i) =>
-      row.reduce((sum, entry, j) => sum + entry * upperSolution.p2[j], 0)));
-    const lowerValue = lowerSecurity - 1e-10;
-    const upperValue = upperSecurity + 1e-10;
-    const boundedLower = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, lowerValue));
-    const boundedUpper = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, upperValue));
-    node.lower = Math.min(node.upper, Math.max(node.lower, boundedLower));
-    node.upper = Math.max(node.lower, Math.min(node.upper, boundedUpper));
+    this.stats.matrixSolves++;
+    if ((changeMask & 1) !== 0 || !node.lowerMatrix || !node.lowerSolution) {
+      const lowerMatrix = cells.map(row => row.map(cell => cell.lower));
+      const lowerSolution = solveMatrixFast(lowerMatrix);
+      let lowerSecurity = Infinity;
+      const nCols = lowerMatrix[0].length;
+      for (let j = 0; j < nCols; j++) {
+        let sum = 0;
+        for (let i = 0; i < lowerMatrix.length; i++) {
+          sum += lowerSolution.p1[i] * lowerMatrix[i][j];
+        }
+        if (sum < lowerSecurity) lowerSecurity = sum;
+      }
+      const lowerValue = lowerSecurity - 1e-10;
+      const boundedLower = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, lowerValue));
+      node.lower = Math.min(node.upper, Math.max(node.lower, boundedLower));
+      node.lowerMatrix = lowerMatrix;
+      node.lowerSolution = lowerSolution;
+    }
+    if ((changeMask & 2) !== 0 || !node.upperMatrix || !node.upperSolution) {
+      const upperMatrix = cells.map(row => row.map(cell => cell.upper));
+      const upperSolution = solveMatrixFast(upperMatrix);
+      let upperSecurity = -Infinity;
+      for (let i = 0; i < upperMatrix.length; i++) {
+        const row = upperMatrix[i];
+        let sum = 0;
+        for (let j = 0; j < row.length; j++) {
+          sum += row[j] * upperSolution.p2[j];
+        }
+        if (sum > upperSecurity) upperSecurity = sum;
+      }
+      const upperValue = upperSecurity + 1e-10;
+      const boundedUpper = Math.max(DEFAULT_LOWER, Math.min(DEFAULT_UPPER, upperValue));
+      node.upper = Math.max(node.lower, Math.min(node.upper, boundedUpper));
+      node.upperMatrix = upperMatrix;
+      node.upperSolution = upperSolution;
+    }
+    const exactCertified = node.upper - node.lower <= 1e-8 &&
+      cells.every(row => row.every(cell => cell.outcomes && !cell.cursor && !cell.remainingProbability &&
+        cell.outcomes.every(outcome => outcome.utility !== null ||
+          (!outcome.split && outcome.child && outcome.child.exactCertified))));
     node.exactCertified = exactCertified;
-    node.lowerMatrix = lowerMatrix;
-    node.upperMatrix = upperMatrix;
-    node.lowerSolution = lowerSolution;
-    node.upperSolution = upperSolution;
+    node.dirty = false;
     // Parents only consume this node's interval endpoints and exactness. A
     // changed internal matrix with identical exported bounds cannot affect a
     // parent, so do not enqueue needless ancestor refreshes for it.
@@ -745,19 +827,21 @@ class BoundedSearch {
   _backupFrom(startNodes: SearchNode[]) {
     const queue = [...startNodes];
     const queued = new Set(queue);
+    let head = 0;
     let updates = 0;
-    while (queue.length) {
+    while (head < queue.length) {
       if (updates > 0 && (updates & 63) === 0 && this._timedOut()) {
         this.stopReason = 'time';
         break;
       }
-      const node = queue.shift();
+      const node = queue[head++];
       queued.delete(node);
       const prevLower = node.lower;
       const prevUpper = node.upper;
       if (this._refresh(node)) {
         updates++;
         for (const parent of node.parents) {
+          parent.dirty = true;
           if (!queued.has(parent)) {
             queued.add(parent);
             queue.push(parent);
@@ -791,6 +875,7 @@ class BoundedSearch {
     if (!group) return;
     const enqueueParents = (peer: SearchNode) => {
       for (const parent of peer.parents) {
+        parent.dirty = true;
         if (!queued.has(parent)) {
           queued.add(parent);
           queue.push(parent);
@@ -896,13 +981,15 @@ class BoundedSearch {
       if (!node.initialized) return {node, initialize: true};
       if (path.has(node)) return null;
       path.add(node);
-      this._refresh(node);
+      if (node.dirty !== false) this._refresh(node);
       if (!directionChosen) {
         if (root.upper >= DEFAULT_UPPER - EPSILON) {
-          // At the global upper ceiling, keep lower proof only when the
-          // pessimistic incumbent row could still reach that ceiling. If its
-          // optimistic floor is already below the root ceiling, prefer upper
-          // proof to test the opponent column that may invalidate it.
+          // At the global upper ceiling, keep lower proof while the pessimistic
+          // incumbent row could still reach that ceiling and is actively making
+          // lower-bound progress. If its optimistic floor drops below the ceiling,
+          // or lower progress stalls at the ceiling (e.g. a 90%-accuracy move whose
+          // true value is < 1), alternate upper proof so opponent refutations and
+          // alternative rows can be explored.
           let incumbent: {i: number; floor: number; mean: number} | null = null;
           for (let i = 0; i < root.cells.length; i++) {
             const row = root.cells[i];
@@ -915,14 +1002,22 @@ class BoundedSearch {
             }
           }
           const optimisticFloor = Math.min(...root.cells[incumbent.i].map(cell => cell.upper));
-          lowerProof = optimisticFloor >= root.upper - EPSILON;
+          if (optimisticFloor < root.upper - EPSILON) {
+            lowerProof = false;
+          } else if (this.proofTurn > 16 && root.cells[incumbent.i].every(cell => !!cell.outcomes)) {
+            lowerProof = (this.proofTurn & 1) === 1;
+          } else {
+            lowerProof = true;
+          }
         } else {
           lowerProof = (this.proofTurn & 1) === 1;
         }
         directionChosen = true;
       }
-      const rowStrategy = node.upperSolution?.p1 || [];
-      const colStrategy = node.lowerSolution?.p2 || [];
+      const flatUpper = (node.upperSolution?.value ?? DEFAULT_UPPER) >= DEFAULT_UPPER - EPSILON;
+      const flatLower = (node.lowerSolution?.value ?? DEFAULT_LOWER) <= DEFAULT_LOWER + EPSILON;
+      const rowStrategy = (flatUpper && !flatLower ? node.lowerSolution?.p1 : node.upperSolution?.p1) || [];
+      const colStrategy = (flatLower && !flatUpper ? node.upperSolution?.p2 : node.lowerSolution?.p2) || [];
       const canExpandCell = cell => {
         if (cell.upper - cell.lower <= 1e-9) return false;
         if (!cell.outcomes || cell.cursor) return true;
@@ -977,23 +1072,27 @@ class BoundedSearch {
         }
         return selected;
       };
-      const chooseSecurityCell = (cells, lowerProof) => {
+      const chooseSecurityCell = (cells, lowerProof, danger?: number[]) => {
         let selected = null;
         for (let j = 0; j < cells.length; j++) {
           const cell = cells[j];
           if (!canExpandCell(cell)) continue;
           const gap = cell.upper - cell.lower;
           const bound = lowerProof ? cell.lower : cell.upper;
+          const d = danger ? danger[j] : 0;
           if (!selected) {
-            selected = {j, cell, gap, bound, score: gap};
+            selected = {j, cell, gap, bound, danger: d, score: gap};
             continue;
           }
           const improvesBound = lowerProof
             ? bound < selected.bound - EPSILON
             : bound > selected.bound + EPSILON;
           const tiesBound = Math.abs(bound - selected.bound) <= EPSILON;
-          if (improvesBound || (tiesBound && gap > selected.gap + EPSILON)) {
-            selected = {j, cell, gap, bound, score: gap};
+          const tiesGap = Math.abs(gap - selected.gap) <= EPSILON;
+          if (improvesBound ||
+              (tiesBound && gap > selected.gap + EPSILON) ||
+              (tiesBound && tiesGap && d > selected.danger + FRONTIER_TIE_EPSILON)) {
+            selected = {j, cell, gap, bound, danger: d, score: gap};
           }
         }
         return selected;
@@ -1017,41 +1116,68 @@ class BoundedSearch {
         if (!mixedImprovement && lowerProof) {
           const rowStats = node.cells.map(row => ({
             floor: Math.min(...row.map(cell => cell.lower)),
+            optFloor: Math.min(...row.map(cell => cell.upper)),
             mean: row.reduce((sum, cell) => sum + cell.lower, 0) / row.length,
           }));
-          let row = 0;
-          for (let i = 1; i < rowStats.length; i++) {
-            if (rowStats[i].floor > rowStats[row].floor + FRONTIER_TIE_EPSILON ||
-                (Math.abs(rowStats[i].floor - rowStats[row].floor) <= FRONTIER_TIE_EPSILON &&
-                 rowStats[i].mean > rowStats[row].mean + FRONTIER_TIE_EPSILON)) row = i;
+          let row = -1;
+          for (let i = 0; i < rowStats.length; i++) {
+            const s = rowStats[i];
+            if (s.optFloor <= node.lower + FRONTIER_TIE_EPSILON) continue;
+            if (row < 0 || s.floor > rowStats[row].floor + FRONTIER_TIE_EPSILON ||
+                (Math.abs(s.floor - rowStats[row].floor) <= FRONTIER_TIE_EPSILON &&
+                 s.mean > rowStats[row].mean + FRONTIER_TIE_EPSILON)) row = i;
           }
-          if (Math.min(...node.cells[row].map(cell => cell.upper)) < DEFAULT_UPPER - EPSILON) {
+          if (row < 0) {
+            row = 0;
+            for (let i = 1; i < rowStats.length; i++) {
+              if (rowStats[i].floor > rowStats[row].floor + FRONTIER_TIE_EPSILON ||
+                  (Math.abs(rowStats[i].floor - rowStats[row].floor) <= FRONTIER_TIE_EPSILON &&
+                   rowStats[i].mean > rowStats[row].mean + FRONTIER_TIE_EPSILON)) row = i;
+            }
+          }
+          if (rowStats[row].optFloor < DEFAULT_UPPER - EPSILON) {
             preferUnexpanded = true;
           }
           if (lowerPotential(node.cells[row]) > FRONTIER_TIE_EPSILON) {
-            const selected = chooseSecurityCell(node.cells[row], true);
+            const colDanger = node.cells[0].map((_, j) =>
+              -node.cells.reduce((sum, r) => sum + r[j].upper, 0) / node.cells.length);
+            const selected = chooseSecurityCell(node.cells[row], true, colDanger);
             if (selected) chosen = {...selected, i: row};
           }
         } else if (!mixedImprovement) {
           const columnStats = node.cells[0].map((_, j) => {
-            const values = node.cells.map(row => row[j].upper);
+            const uppers = node.cells.map(row => row[j].upper);
+            const lowers = node.cells.map(row => row[j].lower);
             return {
-              ceiling: Math.max(...values),
-              mean: values.reduce((sum, value) => sum + value, 0) / values.length,
+              ceiling: Math.max(...uppers),
+              optCeiling: Math.max(...lowers),
+              mean: uppers.reduce((sum, value) => sum + value, 0) / uppers.length,
             };
           });
-          let column = 0;
-          for (let j = 1; j < columnStats.length; j++) {
-            if (columnStats[j].ceiling < columnStats[column].ceiling - FRONTIER_TIE_EPSILON ||
-                (Math.abs(columnStats[j].ceiling - columnStats[column].ceiling) <= FRONTIER_TIE_EPSILON &&
-                 columnStats[j].mean < columnStats[column].mean - FRONTIER_TIE_EPSILON)) column = j;
+          let column = -1;
+          for (let j = 0; j < columnStats.length; j++) {
+            const s = columnStats[j];
+            if (s.optCeiling >= node.upper - FRONTIER_TIE_EPSILON) continue;
+            if (column < 0 || s.ceiling < columnStats[column].ceiling - FRONTIER_TIE_EPSILON ||
+                (Math.abs(s.ceiling - columnStats[column].ceiling) <= FRONTIER_TIE_EPSILON &&
+                 s.mean < columnStats[column].mean - FRONTIER_TIE_EPSILON)) column = j;
+          }
+          if (column < 0) {
+            column = 0;
+            for (let j = 1; j < columnStats.length; j++) {
+              if (columnStats[j].ceiling < columnStats[column].ceiling - FRONTIER_TIE_EPSILON ||
+                  (Math.abs(columnStats[j].ceiling - columnStats[column].ceiling) <= FRONTIER_TIE_EPSILON &&
+                   columnStats[j].mean < columnStats[column].mean - FRONTIER_TIE_EPSILON)) column = j;
+            }
           }
           const selectedColumn = node.cells.map(row => row[column]);
-          if (Math.max(...selectedColumn.map(cell => cell.lower)) > DEFAULT_LOWER + EPSILON) {
+          if (columnStats[column].optCeiling > DEFAULT_LOWER + EPSILON) {
             preferUnexpanded = true;
           }
           if (upperPotential(selectedColumn) > FRONTIER_TIE_EPSILON) {
-            const selected = chooseSecurityCell(selectedColumn, false);
+            const rowDanger = node.cells.map(r =>
+              r.reduce((sum, cell) => sum + cell.lower, 0) / r.length);
+            const selected = chooseSecurityCell(selectedColumn, false, rowDanger);
             if (selected) chosen = {...selected, i: selected.j, j: column};
           }
         }

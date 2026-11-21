@@ -1,8 +1,7 @@
 # 项目协作约定
 
-## 权限与迭代
+## 迭代约定
 
-- 默认在沙箱中执行；遇到沙箱权限问题，优先申请提权解决。
 - 除非用户要求，迭代时禁止在测试中断言旧逻辑已被移除。测试应验证当前行为，让代码库干净得像旧代码从来不存在一样。
 
 ## 按任务读取
@@ -22,7 +21,7 @@
 
 ## 验证与交付
 
-- 使用 Node.js 24+。代码改动先运行 `npm run typecheck` 和 `npm run build`，再运行相关 `node --test dist/test/<文件>.test.js`，交付前运行 `node --test --test-concurrency=4 dist/test/*.test.js`；无法完成时报告具体未验证项。
+- 使用 Node.js 24+。代码改动先运行 `npm run typecheck`、`npm run build` 与 `npm run engine:coverage:strict`，再运行相关单测；交付前按 `package.json` 分片脚本运行全量测试（`npm run test:engine`、`npm run test:native`、`npm run test:async`）；无法完成时报告具体未验证项。
 - 转移优化用原生与优化分布对照验证；求解器改动验证价值或区间证书。沿用 Node.js 内置测试工具。
 - 性能测量与测试分开运行，避免资源争抢。报告版本、命令、PP、workers、预热与样本数、backend、收敛状态，并分开列出 prepare、search、total；功能测试通过不等于限时收敛达标。
 - 仅文档改动时检查相对链接、命令与实现的一致性，无需重复运行完整求解测试。README 保持快速开始与文档导航，详细说明和实验结果放在 `docs/`。

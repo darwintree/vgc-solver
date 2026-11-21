@@ -10,6 +10,13 @@ on:
         options:
           - historical-54
           - all-playable
+      snapshot:
+        description: 'Champions Top-10 usage snapshot'
+        type: choice
+        default: '2026-09'
+        options:
+          - '2026-09'
+          - '2026-11'
       strict:
         description: 'Fail if any case misses the 10s search budget'
         type: boolean
@@ -25,7 +32,7 @@ jobs:
   sweep:
     name: Champions Singles Fresh-Process Sweep
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,12 +45,13 @@ jobs:
         run: >-
           node scripts/champions-ci-sweep.mjs
           --scope=${{ github.event.inputs.scope || 'historical-54' }}
+          --snapshot=${{ github.event.inputs.snapshot || '2026-09' }}
           --strict=${{ github.event.inputs.strict || 'false' }}
           --output=champions-ci-results.jsonl
       - name: Upload raw JSONL results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: champions-sweep-${{ github.event.inputs.scope || 'historical-54' }}
+          name: champions-sweep-${{ github.event.inputs.snapshot || '2026-09' }}-${{ github.event.inputs.scope || 'historical-54' }}
           path: champions-ci-results.jsonl
           retention-days: 14

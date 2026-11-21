@@ -980,6 +980,9 @@ function resetOnSwitchOut(ctx: StaticBattleContext, state: DynamicState, sideIdx
   p.destinyBond = false;
   p.noRetreatUsed = false;
   p.chargingMoveIdx = -1;
+  p.lockedMoveIdx = -1;
+  p.lockedMoveDuration = 0;
+  p.lockedMoveTrueDuration = 0;
   p.invulnerable = '';
   p.substituteHp = 0;
   p.proteanUsed = false;
@@ -2972,9 +2975,11 @@ function executeMoveAction(
     }
   }
 
-  let moveIndex = poke.chargingMoveIdx >= 0 ? poke.chargingMoveIdx : action.moveIndex;
-  if (!overrideMove && poke.encoreMoveIdx >= 0 && poke.chargingMoveIdx < 0) moveIndex = poke.encoreMoveIdx;
-  if (!overrideMove && moveIndex >= 0 && poke.chargingMoveIdx < 0 && poke.pp[moveIndex] <= 0) moveIndex = -1;
+  let moveIndex = poke.chargingMoveIdx >= 0
+    ? poke.chargingMoveIdx
+    : (poke.lockedMoveIdx >= 0 ? poke.lockedMoveIdx : action.moveIndex);
+  if (!overrideMove && poke.encoreMoveIdx >= 0 && poke.chargingMoveIdx < 0 && poke.lockedMoveIdx < 0) moveIndex = poke.encoreMoveIdx;
+  if (!overrideMove && moveIndex >= 0 && poke.chargingMoveIdx < 0 && poke.lockedMoveIdx < 0 && poke.pp[moveIndex] <= 0) moveIndex = -1;
   const move = overrideMove ?? getMoveForAction(ctx, actorSide, pokeIdx, moveIndex, ab.state);
 
   // --- BeforeMove checks: Sleep (Early Bird, Snore, Sleep Talk), Freeze, Paralysis, Attract, Confusion ---
@@ -3179,10 +3184,11 @@ function executeMoveAction(
     }
 
     const wasCharging = p.chargingMoveIdx >= 0;
+    const wasLocked = p.lockedMoveIdx >= 0 && moveIndex === p.lockedMoveIdx;
     const targetsPre = resolveTargets(ctx, cur.state, actorSide, action.slot, action, move);
 
-    // Deduct PP (not deducted again on second turn of a two-turn charge move or meta-called move)
-    if (!overrideMove && moveIndex >= 0 && !wasCharging && p.uproarTurns === 0) {
+    // Deduct PP (not deducted again on second turn of a two-turn charge move, lockedmove, or meta-called move)
+    if (!overrideMove && moveIndex >= 0 && !wasCharging && !wasLocked && p.uproarTurns === 0) {
       let ppCost = 1;
       for (const t of targetsPre) {
         if (t.side !== actorSide) {
@@ -3199,6 +3205,10 @@ function executeMoveAction(
       if (isItemEffectActive(cur.state, atkStatic, p) && activeItemSpec(ctx, atkStatic, p).archetype === 'choice-scarf' && p.choiceLockedMoveIdx < 0) {
         p.choiceLockedMoveIdx = moveIndex;
       }
+    } else if (!overrideMove && moveIndex >= 0 && wasLocked) {
+      p.lastMoveIdx = moveIndex;
+      p.lastMoveId = move.id;
+      p.usedMovesMask |= 1 << moveIndex;
     } else if (!overrideMove && moveIndex < 0) {
       p.lastMoveIdx = -2;
       p.lastMoveId = 'struggle';
@@ -5229,6 +5239,41 @@ function executeMoveAction(
             if (!ap.fainted) ap.mustRecharge = true;
           }
         }
+        if (move.selfLockedMove && !overrideMove && moveIndex >= 0) {
+          const nextLock: ActiveBranch[] = [];
+          for (const b of postBranches) {
+            const ap = b.state.sides[actorSide].pokemon[pokeIdx];
+            if (ap.fainted) {
+              nextLock.push(b);
+              continue;
+            }
+            if (ap.lockedMoveIdx < 0) {
+              // onStart: trueDuration = random(2, 4) -> 50% 2 turns, 50% 3 turns; duration = 2
+              const choices = pickChoices(
+                [{item: 2, prob: 0.5}, {item: 3, prob: 0.5}],
+                policy,
+                stats
+              );
+              for (const c of choices) {
+                const st = choices.length === 1 ? b.state : cloneState(b.state);
+                const lp = st.sides[actorSide].pokemon[pokeIdx];
+                lp.lockedMoveIdx = moveIndex;
+                lp.lockedMoveDuration = 2;
+                lp.lockedMoveTrueDuration = c.item;
+                nextLock.push({
+                  state: st,
+                  probability: b.probability * c.prob,
+                  remainingActions: b.remainingActions.map(a => ({...a, action: {...a.action}})),
+                });
+              }
+            } else {
+              // onRestart: extend duration to 2 while trueDuration >= 2
+              if (ap.lockedMoveTrueDuration >= 2) ap.lockedMoveDuration = 2;
+              nextLock.push(b);
+            }
+          }
+          postBranches = nextLock;
+        }
         if (move.id === 'struggle') {
           const struggleDmg = Math.max(1, Math.round(atkStatic.maxhp / 4));
           const nextRec: ActiveBranch[] = [];
@@ -5262,6 +5307,27 @@ function executeMoveAction(
           }
           postBranches = nextLo;
         }
+      }
+
+      // lockedmove onAfterMove: when duration === 1 (final turn or disrupted), remove volatile;
+      // onEnd confuses the user if trueDuration <= 1.
+      {
+        const nextAfterLock: ActiveBranch[] = [];
+        for (const b of postBranches) {
+          const ap = b.state.sides[actorSide].pokemon[pokeIdx];
+          if (!ap.fainted && ap.lockedMoveIdx >= 0 && ap.lockedMoveDuration === 1) {
+            const td = ap.lockedMoveTrueDuration;
+            ap.lockedMoveIdx = -1;
+            ap.lockedMoveDuration = 0;
+            ap.lockedMoveTrueDuration = 0;
+            if (td <= 1) {
+              nextAfterLock.push(...inflictConfusionWithBranching(ctx, b, actorSide, pokeIdx, policy, stats, false));
+              continue;
+            }
+          }
+          nextAfterLock.push(b);
+        }
+        postBranches = nextAfterLock;
       }
 
       if (move.specialKind === 'round') {
@@ -5965,6 +6031,16 @@ function runEndOfTurn(
                 p.uproarTurns--;
               }
             }
+            if (p.lockedMoveIdx >= 0) {
+              if (p.status === 'slp') {
+                p.lockedMoveIdx = -1;
+                p.lockedMoveDuration = 0;
+                p.lockedMoveTrueDuration = 0;
+              } else {
+                p.lockedMoveTrueDuration--;
+                p.lockedMoveDuration--;
+              }
+            }
           }
         }
       }
@@ -5994,30 +6070,56 @@ function runEndOfTurn(
         continue;
       }
 
-      const pendingSlots: {side: 0 | 1; slot: number}[] = [];
+      // If lockedmove expired during residual (e.g. user was immobilized on Turn 2), remove it and confuse if trueDuration <= 1
+      let finalBranches: ActiveBranch[] = [b];
       for (const s of [0, 1] as const) {
-        const side = b.state.sides[s];
-        const bench = legalBenchSwitches(side);
-        let avail = bench.length;
-        for (let slot = 0; slot < ctx.activeCount; slot++) {
-          const idx = side.active[slot];
-          if ((idx < 0 || side.pokemon[idx].fainted) && avail > 0) {
-            pendingSlots.push({side: s, slot});
-            avail--;
+        for (const idx of b.state.sides[s].active) {
+          if (idx < 0) continue;
+          const nextFb: ActiveBranch[] = [];
+          for (const fb of finalBranches) {
+            const p = fb.state.sides[s].pokemon[idx];
+            if (!p.fainted && p.lockedMoveIdx >= 0 && p.lockedMoveDuration <= 0) {
+              const td = p.lockedMoveTrueDuration;
+              p.lockedMoveIdx = -1;
+              p.lockedMoveDuration = 0;
+              p.lockedMoveTrueDuration = 0;
+              if (td <= 1) {
+                nextFb.push(...inflictConfusionWithBranching(ctx, fb, s, idx, policy, stats, false));
+                continue;
+              }
+            }
+            nextFb.push(fb);
           }
+          finalBranches = nextFb;
         }
       }
-      if (pendingSlots.length > 0) {
-        b.state.phase = {
-          kind: 'switch',
-          pendingSlots,
-          remainingActions: [],
-          needsEndOfTurn: false,
-        };
-      } else {
-        b.state.phase = {kind: 'turn'};
+
+      for (const fb of finalBranches) {
+        const pendingSlots: {side: 0 | 1; slot: number}[] = [];
+        for (const s of [0, 1] as const) {
+          const side = fb.state.sides[s];
+          const bench = legalBenchSwitches(side);
+          let avail = bench.length;
+          for (let slot = 0; slot < ctx.activeCount; slot++) {
+            const idx = side.active[slot];
+            if ((idx < 0 || side.pokemon[idx].fainted) && avail > 0) {
+              pendingSlots.push({side: s, slot});
+              avail--;
+            }
+          }
+        }
+        if (pendingSlots.length > 0) {
+          fb.state.phase = {
+            kind: 'switch',
+            pendingSlots,
+            remainingActions: [],
+            needsEndOfTurn: false,
+          };
+        } else {
+          fb.state.phase = {kind: 'turn'};
+        }
+        out.push({state: fb.state, probability: fb.probability});
       }
-      out.push({state: b.state, probability: b.probability});
     }
   }
 
@@ -6216,7 +6318,7 @@ export function stepBattle(
         }
         const p = root.sides[s].pokemon[pokeIdx];
         const sp = ctx.sides[s].team[pokeIdx];
-        const effIdx = p.chargingMoveIdx >= 0 ? p.chargingMoveIdx : (p.encoreMoveIdx >= 0 ? p.encoreMoveIdx : act.moveIndex);
+        const effIdx = p.chargingMoveIdx >= 0 ? p.chargingMoveIdx : (p.lockedMoveIdx >= 0 ? p.lockedMoveIdx : (p.encoreMoveIdx >= 0 ? p.encoreMoveIdx : act.moveIndex));
         const move = getMoveForAction(ctx, s, pokeIdx, effIdx, root);
         const ab = activeAbilitySpec(sp, p);
         let prio = move.priority;
@@ -6277,7 +6379,8 @@ export function stepBattle(
       const pIdx = b.state.sides[ra.side].active[ra.action.slot];
       const p = pIdx >= 0 ? b.state.sides[ra.side].pokemon[pIdx] : null;
       const sp = pIdx >= 0 ? ctx.sides[ra.side].team[pIdx] : null;
-      const mv = p && sp ? getMoveForAction(ctx, ra.side, pIdx, p.encoreMoveIdx >= 0 ? p.encoreMoveIdx : ra.action.moveIndex, b.state) : null;
+      const qdIdx = p ? (p.chargingMoveIdx >= 0 ? p.chargingMoveIdx : (p.lockedMoveIdx >= 0 ? p.lockedMoveIdx : (p.encoreMoveIdx >= 0 ? p.encoreMoveIdx : ra.action.moveIndex))) : ra.action.moveIndex;
+      const mv = p && sp ? getMoveForAction(ctx, ra.side, pIdx, qdIdx, b.state) : null;
       if (p && sp && mv && !p.fainted && p.abilityActive && !p.gastroAcid && activeAbilitySpec(sp, p).quickDraw && mv.category !== 'Status') {
         const choices = pickChoices([{item: true, prob: 0.3}, {item: false, prob: 0.7}], policy, stats);
         for (const c of choices) {
@@ -6304,7 +6407,7 @@ export function stepBattle(
       if (idx < 0) continue;
       const p = b.state.sides[ra.side].pokemon[idx];
       if (p.fainted) continue;
-      const effIdx = p.chargingMoveIdx >= 0 ? p.chargingMoveIdx : (p.encoreMoveIdx >= 0 ? p.encoreMoveIdx : ra.action.moveIndex);
+      const effIdx = p.chargingMoveIdx >= 0 ? p.chargingMoveIdx : (p.lockedMoveIdx >= 0 ? p.lockedMoveIdx : (p.encoreMoveIdx >= 0 ? p.encoreMoveIdx : ra.action.moveIndex));
       const mv = getMoveForAction(ctx, ra.side, idx, effIdx, b.state);
       if (mv.specialKind === 'focus-punch') p.focusPunchReady = true;
       if (mv.specialKind === 'beak-blast') p.beakBlastHeating = true;

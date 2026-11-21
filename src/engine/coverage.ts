@@ -1,7 +1,7 @@
 import {getChampionsDex} from './ruleset';
 import {compileItemSpec} from './effects/items';
 import {isAbilitySupported} from './effects/abilities';
-import {isMoveSupported} from './effects/moves';
+import {compileMoveSpec, isMoveSupported} from './effects/moves';
 
 export interface CoverageSection {
   total: number;
@@ -17,12 +17,13 @@ export interface ChampionsCoverageReport {
   items: CoverageSection;
   abilities: CoverageSection;
   moves: CoverageSection;
+  semanticMismatches: string[];
 }
 
 /**
- * Audit engine coverage live against the official `@pkmn/mods/champions` Dex.
- * Re-run after every `@pkmn/sim` / `@pkmn/mods` upgrade to immediately see any
- * newly introduced species, Mega Evolutions, items, abilities, or moves.
+ * Audit engine coverage and mechanical Dex-field consistency live against the
+ * official `@pkmn/mods/champions` Dex. Re-run after every `@pkmn/sim` / `@pkmn/mods`
+ * upgrade to catch missing entries or silent flag drift (willCrit, lockedmove, drain, etc.).
  */
 export function auditChampionsCoverage(): ChampionsCoverageReport {
   const dex = getChampionsDex();
@@ -49,8 +50,31 @@ export function auditChampionsCoverage(): ChampionsCoverageReport {
 
   const moves = dex.moves.all().filter(m => m.exists && !m.isNonstandard && !m.isZ && !m.isMax);
   const missingMoves: string[] = [];
+  const semanticMismatches: string[] = [];
   for (const m of moves) {
-    if (!isMoveSupported(dex, m.id).supported) missingMoves.push(m.id);
+    if (!isMoveSupported(dex, m.id).supported) {
+      missingMoves.push(m.id);
+      continue;
+    }
+    const compiled = compileMoveSpec(dex, m.id).move;
+    if (m.willCrit === true && compiled.critRatio < 4) {
+      semanticMismatches.push(`${m.id}: raw.willCrit=true but compiled.critRatio=${compiled.critRatio}`);
+    }
+    if (m.willCrit === false && compiled.critRatio !== 0) {
+      semanticMismatches.push(`${m.id}: raw.willCrit=false but compiled.critRatio=${compiled.critRatio}`);
+    }
+    if (m.self?.volatileStatus === 'lockedmove' && !compiled.selfLockedMove) {
+      semanticMismatches.push(`${m.id}: raw.self.volatileStatus=lockedmove but compiled.selfLockedMove=false`);
+    }
+    if (Array.isArray(m.drain) && m.drain.length === 2 && (!compiled.drain || !compiled.optTraits.hasDrain)) {
+      semanticMismatches.push(`${m.id}: raw.drain=${JSON.stringify(m.drain)} not propagated to compiled move/optTraits`);
+    }
+    if (m.priority !== compiled.priority) {
+      semanticMismatches.push(`${m.id}: raw.priority=${m.priority} !== compiled.priority=${compiled.priority}`);
+    }
+    if (m.multihit && !compiled.multihit && compiled.specialKind !== 'triple-axel') {
+      semanticMismatches.push(`${m.id}: raw.multihit=${JSON.stringify(m.multihit)} missing on compiled move`);
+    }
   }
 
   const section = (total: number, missing: string[]): CoverageSection => ({
@@ -67,6 +91,7 @@ export function auditChampionsCoverage(): ChampionsCoverageReport {
     items: section(items.length, missingItems),
     abilities: section(usedAbilities.size, missingAbilities),
     moves: section(moves.length, missingMoves),
+    semanticMismatches,
   };
 }
 
@@ -88,8 +113,12 @@ if (require.main === module) {
       console.log(`    missing (${sec.missing.length}): ${sec.missing.slice(0, 25).join(', ')}${sec.missing.length > 25 ? ', ...' : ''}`);
     }
   }
-  if (strict && totalMissing > 0) {
-    console.error(`Coverage audit failed in --strict mode: ${totalMissing} unsupported entries.`);
+  console.log(`  Semantic  : ${r.semanticMismatches.length === 0 ? 'OK (0 mismatches)' : `${r.semanticMismatches.length} mismatch(es)`}`);
+  if (r.semanticMismatches.length > 0) {
+    for (const msg of r.semanticMismatches.slice(0, 25)) console.log(`    - ${msg}`);
+  }
+  if (strict && (totalMissing > 0 || r.semanticMismatches.length > 0)) {
+    console.error(`Coverage audit failed in --strict mode: ${totalMissing} unsupported entries, ${r.semanticMismatches.length} semantic mismatches.`);
     process.exitCode = 1;
   }
 }

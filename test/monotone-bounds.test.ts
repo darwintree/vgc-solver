@@ -14,6 +14,7 @@ import {
   createEngineBoundedAdapter,
   createMonotoneAnalyzer,
   stateFromBattle,
+  stepBattle,
 } from '../src/engine';
 import {championsCases, createChampionsBattle} from '../src/champions-cases';
 import {FIXED_SEED} from '../src/branching-prng';
@@ -179,9 +180,29 @@ test('createMonotoneAnalyzer conservatively disables non-monotone HP hazards', (
       {species: 'Archaludon', ability: 'Stamina', moves: ['Flash Cannon']},
       {species: 'Metagross', ability: 'Clear Body', moves: ['Hard Press']}
     ), false, true],
-    ['Drain move', makeBattle(
+    ['Drain move (safe in 1v1 without contact/faint dmg or attacker Life Orb)', makeBattle(
       {species: 'Archaludon', ability: 'Stamina', moves: ['Flash Cannon']},
       {species: 'Venusaur', ability: 'Overgrow', moves: ['Giga Drain']}
+    ), true, false],
+    ['Drain move vs Rough Skin (fail-closed)', makeBattle(
+      {species: 'Garchomp', ability: 'Rough Skin', moves: ['Earthquake']},
+      {species: 'Golisopod', ability: 'Emergency Exit', moves: ['Leech Life']}
+    ), false, true],
+    ['Drain move vs Rocky Helmet (fail-closed)', makeBattle(
+      {species: 'Archaludon', ability: 'Stamina', moves: ['Flash Cannon'], item: 'Rocky Helmet'},
+      {species: 'Golisopod', ability: 'Emergency Exit', moves: ['Leech Life']}
+    ), false, true],
+    ['Drain move with attacker Life Orb (fail-closed)', makeBattle(
+      {species: 'Archaludon', ability: 'Stamina', moves: ['Flash Cannon']},
+      {species: 'Golisopod', ability: 'Emergency Exit', moves: ['Leech Life'], item: 'Life Orb'}
+    ), false, true],
+    ['Emergency Exit in 1v1 (no bench -> safe)', makeBattle(
+      {species: 'Golisopod', ability: 'Emergency Exit', moves: ['Leech Life', 'Sucker Punch']},
+      {species: 'Archaludon', ability: 'Stamina', moves: ['Flash Cannon']}
+    ), true, true],
+    ['Aftermath & Destiny Bond (fail-closed self)', makeBattle(
+      {species: 'Skuntank', ability: 'Aftermath', moves: ['Crunch']},
+      {species: 'Gengar', ability: 'Cursed Body', moves: ['Shadow Ball', 'Destiny Bond']}
     ), false, false],
     ['Pain Split', makeBattle(
       {species: 'Rotom', ability: 'Levitate', moves: ['Pain Split']},
@@ -317,3 +338,95 @@ test('adaptive monotone solver agrees with discrete oracle and preserves root st
     assert.ok(maxRow <= rAdaptive.upperBound + 1e-6, `${id} P2 certificate ${maxRow} <= ${rAdaptive.upperBound}`);
   }
 });
+
+test('FeatureBit.HAZARDS masks unobservable entry hazards in 1v1 and tracks them when observable', () => {
+  // 1v1 with Stealth Rock and no hazard reader/bench: FeatureBit.HAZARDS must be clear
+  const b1v1 = makeBattle(
+    {species: 'Garchomp', ability: 'Rough Skin', moves: ['Earthquake', 'Stealth Rock']},
+    {species: 'Hippowdon', ability: 'Sand Stream', moves: ['Earthquake', 'Slack Off']}
+  );
+  const ctx1v1 = compileContextFromBattle(b1v1);
+  assert.equal((ctx1v1.featureMask & FeatureBit.HAZARDS) !== 0, false);
+  const s1 = stateFromBattle(ctx1v1, b1v1);
+  const s2 = cloneState(s1);
+  s2.sides[1].stealthRock = true;
+  assert.equal(canonicalStateKey(ctx1v1, s1), canonicalStateKey(ctx1v1, s2));
+
+  // 1v1 with Rapid Spin or Stomping Tantrum: FeatureBit.HAZARDS must be set
+  const bSpin = makeBattle(
+    {species: 'Garchomp', ability: 'Rough Skin', moves: ['Earthquake', 'Stealth Rock']},
+    {species: 'Excadrill', ability: 'Sand Rush', moves: ['Earthquake', 'Rapid Spin']}
+  );
+  const ctxSpin = compileContextFromBattle(bSpin);
+  assert.equal((ctxSpin.featureMask & FeatureBit.HAZARDS) !== 0, true);
+  const ss1 = stateFromBattle(ctxSpin, bSpin);
+  const ss2 = cloneState(ss1);
+  ss2.sides[1].stealthRock = true;
+  assert.notEqual(canonicalStateKey(ctxSpin, ss1), canonicalStateKey(ctxSpin, ss2));
+
+  const bStomp = makeBattle(
+    {species: 'Garchomp', ability: 'Rough Skin', moves: ['Stomping Tantrum', 'Stealth Rock']},
+    {species: 'Hippowdon', ability: 'Sand Stream', moves: ['Earthquake', 'Slack Off']}
+  );
+  assert.equal((compileContextFromBattle(bStomp).featureMask & FeatureBit.HAZARDS) !== 0, true);
+});
+
+test('compact adapter PP-template cache matches fresh stepBattle bit-for-bit across PP>=3 and PP=1..2 Encore boundaries', () => {
+  const b = makeBattle(
+    {species: 'Primarina', ability: 'Torrent', moves: ['Moonblast', 'Encore']},
+    {species: 'Archaludon', ability: 'Stamina', moves: ['Flash Cannon', 'Protect']}
+  );
+  const ctx = compileContextFromBattle(b);
+  const adapter = createEngineBoundedAdapter(b, {hpOutputMode: 'discrete'})!;
+  const base = stateFromBattle(ctx, b);
+  const actions1 = adapter.legalActions(base, 0);
+  const actions2 = adapter.legalActions(base, 1);
+
+  const testCases: Array<{pp0: number[]; pp1: number[]; encoreTurns?: number; encoreIdx?: number}> = [
+    {pp0: [15, 8], pp1: [16, 16]},
+    {pp0: [12, 7], pp1: [10, 14]}, // hits cached PP-template from [15,8] / [16,16]
+    {pp0: [3, 3], pp1: [3, 3]},    // hits same '+' bucket, stays >= 1 after turn
+    {pp0: [2, 5], pp1: [2, 5], encoreTurns: 2, encoreIdx: 0},
+    {pp0: [1, 5], pp1: [1, 5], encoreTurns: 2, encoreIdx: 0}, // drops to 0 PP -> ends Encore early!
+  ];
+
+  for (const tc of testCases) {
+    const st = cloneState(base);
+    st.sides[0].pokemon[0].pp = tc.pp0.slice();
+    st.sides[1].pokemon[0].pp = tc.pp1.slice();
+    if (tc.encoreTurns) {
+      st.sides[1].pokemon[0].encoreTurns = tc.encoreTurns;
+      st.sides[1].pokemon[0].encoreMoveIdx = tc.encoreIdx ?? 0;
+    }
+
+    const a1 = actions1[0]; // Moonblast
+    const a2 = actions2[0]; // Flash Cannon
+    const cachedRes = adapter.enumerateTurn(st, a1, a2, {});
+    const freshRes = stepBattle(ctx, st, (a1 as any).sideAction, (a2 as any).sideAction, {
+      mode: 'certified',
+      hpOutputMode: 'discrete',
+    });
+    assert.equal(cachedRes.complete, true);
+    assert.equal(freshRes.complete, true);
+
+    const mapOf = (items: Array<{key: string; p: number}>) => {
+      const m = new Map<string, number>();
+      for (const x of items) m.set(x.key, (m.get(x.key) ?? 0) + x.p);
+      return m;
+    };
+    const mCached = mapOf(cachedRes.outcomes.map((o: any) => ({
+      key: o.utility !== undefined ? `U:${o.utility}` : canonicalStateKey(ctx, o.snapshot),
+      p: o.probability,
+    })));
+    const mFresh = mapOf(freshRes.outcomes.map(o => ({
+      key: o.state.phase.kind === 'ended' ? `U:${o.state.phase.winner === 0 ? 1 : o.state.phase.winner === 1 ? -1 : 0}` : canonicalStateKey(ctx, o.state),
+      p: o.probability,
+    })));
+    assert.equal(mCached.size, mFresh.size, `Outcome count mismatch for pp=${tc.pp0}/${tc.pp1}`);
+    for (const [k, p] of mFresh) {
+      assert.ok(mCached.has(k), `Missing key ${k} for pp=${tc.pp0}/${tc.pp1}`);
+      assert.ok(Math.abs((mCached.get(k) ?? 0) - p) < 1e-12, `Prob diff on ${k}`);
+    }
+  }
+});
+
